@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "baseUrl": ".",
+    "paths": {
+      "@a2ui-platform/shared": ["packages/shared/src/index.ts"],
+      "@a2ui-platform/renderer": ["packages/renderer/src/index.ts"],
+      "@a2ui-platform/agent": ["packages/agent/src/index.ts"]
+    }
+  }
+}

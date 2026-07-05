@@ -1,0 +1,11 @@
+.a2ui-surface {
+  min-height: 160px;
+  padding: 16px;
+  color: #1f2937;
+  background: #ffffff;
+}
+
+.a2ui-empty {
+  color: #6b7280;
+  font-size: 14px;
+}

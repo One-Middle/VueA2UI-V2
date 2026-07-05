@@ -1,0 +1,257 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Session {
+  id                String    @id @default(uuid()) @db.Uuid
+  title             String    @default("未命名会话")
+  description       String?
+  status            String    @default("active")
+  catalogId         String    @map("catalog_id")
+  catalogVersion    String    @map("catalog_version")
+  rendererVersion   String    @map("renderer_version")
+  modelProvider     String    @default("openai-compatible") @map("model_provider")
+  modelName         String    @map("model_name")
+  modelConfig       Json      @default("{}") @map("model_config")
+  currentSnapshotId String?   @map("current_snapshot_id") @db.Uuid
+  lastAgentRunId    String?   @map("last_agent_run_id") @db.Uuid
+  metadata          Json      @default("{}")
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt         DateTime? @map("deleted_at") @db.Timestamptz
+
+  messages          Message[]
+  uploadedFiles     UploadedFile[]
+  skills            SessionSkill[]
+  agentRuns         AgentRun[]
+  a2uiEvents        A2UIEvent[]
+  surfaceSnapshots  SurfaceSnapshot[]
+  rendererEvents    RendererEvent[]
+
+  @@index([status, updatedAt])
+  @@index([catalogId])
+  @@map("sessions")
+}
+
+model Message {
+  id            String    @id @default(uuid()) @db.Uuid
+  sessionId     String    @map("session_id") @db.Uuid
+  agentRunId    String?   @map("agent_run_id") @db.Uuid
+  role          String
+  kind          String    @default("chat")
+  content       String    @default("")
+  attachments   Json      @default("[]")
+  a2uiEventIds  Json      @default("[]") @map("a2ui_event_ids")
+  metadata      Json      @default("{}")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz
+
+  session       Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+  @@index([agentRunId])
+  @@map("messages")
+}
+
+model UploadedFile {
+  id            String    @id @default(uuid()) @db.Uuid
+  sessionId     String    @map("session_id") @db.Uuid
+  originalName  String    @map("original_name")
+  mimeType      String    @default("text/plain") @map("mime_type")
+  extension     String    @default(".txt")
+  sizeBytes     Int       @map("size_bytes")
+  encoding      String    @default("utf-8")
+  content       String
+  contentSha256 String?   @map("content_sha256")
+  status        String    @default("ready")
+  errorMessage  String?   @map("error_message")
+  metadata      Json      @default("{}")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz
+
+  session       Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  skills        Skill[]
+
+  @@index([sessionId, createdAt])
+  @@map("uploaded_files")
+}
+
+model Skill {
+  id           String    @id @default(uuid()) @db.Uuid
+  name         String
+  description  String?
+  content      String
+  sourceType   String    @default("manual") @map("source_type")
+  sourceFileId String?   @map("source_file_id") @db.Uuid
+  version      Int       @default(1)
+  isActive     Boolean   @default(true) @map("is_active")
+  metadata     Json      @default("{}")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz
+
+  sourceFile   UploadedFile?  @relation(fields: [sourceFileId], references: [id], onDelete: SetNull)
+  sessions     SessionSkill[]
+
+  @@index([isActive, updatedAt])
+  @@map("skills")
+}
+
+model SessionSkill {
+  id         String    @id @default(uuid()) @db.Uuid
+  sessionId  String    @map("session_id") @db.Uuid
+  skillId    String    @map("skill_id") @db.Uuid
+  enabled    Boolean   @default(true)
+  enabledAt  DateTime  @default(now()) @map("enabled_at") @db.Timestamptz
+  disabledAt DateTime? @map("disabled_at") @db.Timestamptz
+  metadata   Json      @default("{}")
+
+  session    Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  skill      Skill     @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, skillId])
+  @@index([sessionId, enabled])
+  @@map("session_skills")
+}
+
+model AgentRun {
+  id                 String    @id @default(uuid()) @db.Uuid
+  sessionId          String    @map("session_id") @db.Uuid
+  triggerMessageId   String?   @map("trigger_message_id") @db.Uuid
+  status             String    @default("pending")
+  intent             String?
+  modelProvider      String    @default("openai-compatible") @map("model_provider")
+  modelName          String    @map("model_name")
+  modelConfig        Json      @default("{}") @map("model_config")
+  attemptCount       Int       @default(0) @map("attempt_count")
+  maxAttempts        Int       @default(3) @map("max_attempts")
+  contextSummary     String?   @map("context_summary")
+  inputSnapshotId    String?   @map("input_snapshot_id") @db.Uuid
+  outputSnapshotId   String?   @map("output_snapshot_id") @db.Uuid
+  assistantMessageId String?   @map("assistant_message_id") @db.Uuid
+  failureReason      String?   @map("failure_reason")
+  validationSummary  Json      @default("{}") @map("validation_summary")
+  tokenUsage         Json      @default("{}") @map("token_usage")
+  metadata           Json      @default("{}")
+  startedAt          DateTime? @map("started_at") @db.Timestamptz
+  completedAt        DateTime? @map("completed_at") @db.Timestamptz
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt          DateTime? @map("deleted_at") @db.Timestamptz
+
+  session            Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  toolCalls          ToolCall[]
+  a2uiEvents         A2UIEvent[]
+  snapshots          SurfaceSnapshot[]
+
+  @@index([sessionId, createdAt])
+  @@index([status])
+  @@map("agent_runs")
+}
+
+model ToolCall {
+  id           String    @id @default(uuid()) @db.Uuid
+  agentRunId   String    @map("agent_run_id") @db.Uuid
+  sessionId    String    @map("session_id") @db.Uuid
+  toolName     String    @map("tool_name")
+  status       String    @default("running")
+  attemptIndex Int       @map("attempt_index")
+  inputSummary Json      @default("{}") @map("input_summary")
+  output       Json?
+  errorMessage String?   @map("error_message")
+  durationMs   Int?      @map("duration_ms")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  agentRun     AgentRun  @relation(fields: [agentRunId], references: [id], onDelete: Cascade)
+
+  @@index([agentRunId, attemptIndex])
+  @@index([sessionId, createdAt])
+  @@map("tool_calls")
+}
+
+model A2UIEvent {
+  id               String    @id @default(uuid()) @db.Uuid
+  sessionId        String    @map("session_id") @db.Uuid
+  agentRunId       String?   @map("agent_run_id") @db.Uuid
+  messageId        String?   @map("message_id") @db.Uuid
+  sequence         Int
+  status           String    @default("committed")
+  catalogId        String    @map("catalog_id")
+  catalogVersion   String    @map("catalog_version")
+  rendererVersion  String    @map("renderer_version")
+  surfaceIds       String[]  @default([]) @map("surface_ids")
+  messages         Json
+  validationResult Json      @map("validation_result")
+  metadata         Json      @default("{}")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt        DateTime? @map("deleted_at") @db.Timestamptz
+
+  session          Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  agentRun         AgentRun? @relation(fields: [agentRunId], references: [id], onDelete: SetNull)
+  snapshots        SurfaceSnapshot[]
+
+  @@unique([sessionId, sequence])
+  @@index([sessionId, sequence])
+  @@index([agentRunId])
+  @@map("a2ui_events")
+}
+
+model SurfaceSnapshot {
+  id              String    @id @default(uuid()) @db.Uuid
+  sessionId       String    @map("session_id") @db.Uuid
+  a2uiEventId     String?   @map("a2ui_event_id") @db.Uuid
+  agentRunId      String?   @map("agent_run_id") @db.Uuid
+  sequence        Int
+  isCurrent       Boolean   @default(false) @map("is_current")
+  catalogId       String    @map("catalog_id")
+  catalogVersion  String    @map("catalog_version")
+  rendererVersion String    @map("renderer_version")
+  surfaceCount    Int       @default(0) @map("surface_count")
+  componentCount  Int       @default(0) @map("component_count")
+  snapshot        Json
+  summary         String?
+  metadata        Json      @default("{}")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz
+
+  session         Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  a2uiEvent       A2UIEvent? @relation(fields: [a2uiEventId], references: [id], onDelete: SetNull)
+  agentRun        AgentRun? @relation(fields: [agentRunId], references: [id], onDelete: SetNull)
+
+  @@unique([sessionId, sequence])
+  @@index([sessionId, sequence])
+  @@index([agentRunId])
+  @@map("surface_snapshots")
+}
+
+model RendererEvent {
+  id                String    @id @default(uuid()) @db.Uuid
+  sessionId         String    @map("session_id") @db.Uuid
+  eventType         String    @map("event_type")
+  surfaceId         String    @map("surface_id")
+  sourceComponentId String?   @map("source_component_id")
+  name              String?
+  payload           Json
+  handled           Boolean   @default(false)
+  handledAgentRunId String?   @map("handled_agent_run_id") @db.Uuid
+  errorMessage      String?   @map("error_message")
+  metadata          Json      @default("{}")
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  session           Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+  @@index([surfaceId])
+  @@map("renderer_events")
+}
