@@ -1,0 +1,358 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://a2ui.org/specification/v0.9/catalogs/basic/catalog.json",
+  "title": "A2UI Basic Catalog Component Schema",
+  "description": "Basic Catalog 中 18 个组件的属性 JSON Schema 定义",
+  "definitions": {
+    "Text": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "description": "显示的文本内容，支持字符串或 { path } 绑定",
+          "oneOf": [
+            { "type": "string" },
+            { "type": "object", "required": ["path"], "properties": { "path": { "type": "string" } }, "additionalProperties": false }
+          ]
+        },
+        "usageHint": {
+          "description": "文本样式提示",
+          "type": "string",
+          "enum": ["h1", "h2", "h3", "h4", "h5", "caption", "body"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "Image": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "description": "图片 URL，支持字符串或 { path } 绑定",
+          "oneOf": [
+            { "type": "string" },
+            { "type": "object", "required": ["path"], "properties": { "path": { "type": "string" } }, "additionalProperties": false }
+          ]
+        },
+        "alt": {
+          "description": "替代文本",
+          "type": "string"
+        },
+        "fit": {
+          "description": "图片适应方式",
+          "type": "string",
+          "enum": ["contain", "cover", "fill", "none", "scale-down"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "Icon": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "图标名称，支持字符串或 { path } 绑定",
+          "oneOf": [
+            { "type": "string" },
+            { "type": "object", "required": ["path"], "properties": { "path": { "type": "string" } }, "additionalProperties": false }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "Video": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "description": "视频 URL，支持字符串或 { path } 绑定",
+          "oneOf": [
+            { "type": "string" },
+            { "type": "object", "required": ["path"], "properties": { "path": { "type": "string" } }, "additionalProperties": false }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "AudioPlayer": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "description": "音频 URL，支持字符串或 { path } 绑定",
+          "oneOf": [
+            { "type": "string" },
+            { "type": "object", "required": ["path"], "properties": { "path": { "type": "string" } }, "additionalProperties": false }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "Divider": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "Row": {
+      "type": "object",
+      "properties": {
+        "children": {
+          "description": "子组件 ID 列表",
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "distribution": {
+          "description": "主轴分布方式",
+          "type": "string",
+          "enum": ["start", "center", "end", "spaceBetween", "spaceAround", "spaceEvenly"]
+        },
+        "alignment": {
+          "description": "交叉轴对齐方式",
+          "type": "string",
+          "enum": ["start", "center", "end", "stretch"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "Column": {
+      "type": "object",
+      "properties": {
+        "children": {
+          "description": "子组件 ID 列表",
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "distribution": {
+          "description": "主轴分布方式",
+          "type": "string",
+          "enum": ["start", "center", "end", "spaceBetween", "spaceAround", "spaceEvenly"]
+        },
+        "alignment": {
+          "description": "交叉轴对齐方式",
+          "type": "string",
+          "enum": ["start", "center", "end", "stretch"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "List": {
+      "type": "object",
+      "properties": {
+        "children": {
+          "description": "列表子项，可为静态子组件 ID 数组或 { path, componentId } 模板",
+          "type": "array",
+          "items": {
+            "oneOf": [
+              { "type": "string" },
+              {
+                "type": "object",
+                "required": ["path", "componentId"],
+                "properties": {
+                  "path": { "type": "string" },
+                  "componentId": { "type": "string" }
+                },
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "direction": {
+          "description": "列表方向",
+          "type": "string",
+          "enum": ["vertical", "horizontal"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "Card": {
+      "type": "object",
+      "properties": {
+        "child": {
+          "description": "卡片内嵌子组件（字符串 ID 或内联对象定义）",
+          "oneOf": [
+            { "type": "string" },
+            { "type": "object" }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "Tabs": {
+      "type": "object",
+      "properties": {
+        "tabItems": {
+          "description": "标签页列表",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["title", "child"],
+            "properties": {
+              "title": { "type": "string" },
+              "child": {
+                "description": "标签页内容子组件（字符串 ID 或内联对象定义）",
+                "oneOf": [
+                  { "type": "string" },
+                  { "type": "object" }
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "Modal": {
+      "type": "object",
+      "properties": {
+        "child": {
+          "description": "模态框内容子组件（字符串 ID 或内联对象定义）",
+          "oneOf": [
+            { "type": "string" },
+            { "type": "object" }
+          ]
+        },
+        "trigger": {
+          "description": "触发打开模态框的子组件",
+          "oneOf": [
+            { "type": "string" },
+            { "type": "object" }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "Button": {
+      "type": "object",
+      "properties": {
+        "child": {
+          "description": "按钮内容子组件（字符串 ID 或内联对象定义）",
+          "oneOf": [
+            { "type": "string" },
+            { "type": "object" }
+          ]
+        },
+        "action": {
+          "description": "按钮动作定义",
+          "type": "object",
+          "required": ["name"],
+          "properties": {
+            "name": { "type": "string" },
+            "context": {
+              "description": "动作上下文数据",
+              "type": "object"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "TextField": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "description": "输入框标签",
+          "type": "string"
+        },
+        "text": {
+          "description": "输入框值，支持字符串或 { path } 绑定",
+          "oneOf": [
+            { "type": "string" },
+            { "type": "object", "required": ["path"], "properties": { "path": { "type": "string" } }, "additionalProperties": false }
+          ]
+        },
+        "usageHint": {
+          "description": "输入类型提示",
+          "type": "string",
+          "enum": ["shortText", "longText", "number", "obscured"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "CheckBox": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "description": "复选框标签",
+          "type": "string"
+        },
+        "value": {
+          "description": "复选框值，支持字符串或 { path } 绑定",
+          "oneOf": [
+            { "type": "string" },
+            { "type": "object", "required": ["path"], "properties": { "path": { "type": "string" } }, "additionalProperties": false }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "ChoicePicker": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "description": "选择器标签",
+          "type": "string"
+        },
+        "options": {
+          "description": "可选项数组",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["label", "value"],
+            "properties": {
+              "label": { "type": "string" },
+              "value": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        },
+        "value": {
+          "description": "当前选中值，支持字符串或 { path } 绑定",
+          "oneOf": [
+            { "type": "string" },
+            { "type": "object", "required": ["path"], "properties": { "path": { "type": "string" } }, "additionalProperties": false }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "Slider": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "description": "滑块标签",
+          "type": "string"
+        },
+        "min": {
+          "description": "最小值",
+          "type": "number"
+        },
+        "max": {
+          "description": "最大值",
+          "type": "number"
+        },
+        "value": {
+          "description": "当前值，支持字符串或 { path } 绑定",
+          "oneOf": [
+            { "type": "string" },
+            { "type": "object", "required": ["path"], "properties": { "path": { "type": "string" } }, "additionalProperties": false }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "DateTimeInput": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "description": "日期时间选择器标签",
+          "type": "string"
+        },
+        "value": {
+          "description": "当前值，支持字符串或 { path } 绑定",
+          "oneOf": [
+            { "type": "string" },
+            { "type": "object", "required": ["path"], "properties": { "path": { "type": "string" } }, "additionalProperties": false }
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

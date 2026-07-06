@@ -1,10 +1,20 @@
 <script setup lang="ts">
-import { A2uiSurface } from "@a2ui-platform/renderer";
 import { NConfigProvider, NLayout, NLayoutContent, NLayoutSider, NMenu } from "naive-ui";
-import { computed } from "vue";
+import { computed, onMounted } from "vue";
+import ConversationPanel from "../features/conversation/ConversationPanel.vue";
+import HistoryPanel from "../features/history/HistoryPanel.vue";
+import ImportExportPanel from "../features/import-export/ImportExportPanel.vue";
+import PreviewPanel from "../features/preview/PreviewPanel.vue";
+import RuntimePanel from "../features/runtime/RuntimePanel.vue";
+import SkillsPanel from "../features/skills/SkillsPanel.vue";
 import { useWorkspaceStore, type WorkspaceTab } from "../stores/workspace";
 
 const workspace = useWorkspaceStore();
+
+onMounted(() => {
+  workspace.loadSessions();
+  workspace.loadSkills();
+});
 
 const menuOptions = [
   { key: "conversation", label: "对话" },
@@ -34,8 +44,12 @@ const title = computed(() => menuOptions.find((item) => item.key === workspace.a
           <h1>{{ title }}</h1>
         </header>
         <main class="workspace-main">
-          <a2ui-surface v-if="workspace.activeTab === 'preview'" surface-id="main" />
-          <div v-else class="placeholder">{{ title }}模块待实现</div>
+          <ConversationPanel v-if="workspace.activeTab === 'conversation'" />
+          <PreviewPanel v-else-if="workspace.activeTab === 'preview'" />
+          <HistoryPanel v-else-if="workspace.activeTab === 'history'" />
+          <SkillsPanel v-else-if="workspace.activeTab === 'skills'" />
+          <ImportExportPanel v-else-if="workspace.activeTab === 'import-export'" />
+          <RuntimePanel v-else-if="workspace.activeTab === 'runtime'" />
         </main>
       </n-layout-content>
     </n-layout>

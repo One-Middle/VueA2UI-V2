@@ -1,5 +1,14 @@
 import type { A2UIEventDto, AgentRunDto, MessageDto, SurfaceSnapshotDto, ToolCallDto } from "./api";
 
+/** Agent 运行阶段。 */
+export type AgentRunPhase =
+  | "PREPARE_CONTEXT"
+  | "GENERATE_DRAFT"
+  | "VALIDATE_DRAFT"
+  | "REPAIR_DRAFT"
+  | "COMMIT"
+  | "FAILED";
+
 export type ServerSentEventName =
   | "heartbeat"
   | "agent_run_started"
@@ -24,7 +33,7 @@ export type PlatformSseEvent =
         sessionId: string;
         agentRunId: string;
         attemptIndex: number;
-        phase: string;
+        phase: AgentRunPhase;
         toolCall?: ToolCallDto;
       };
     }

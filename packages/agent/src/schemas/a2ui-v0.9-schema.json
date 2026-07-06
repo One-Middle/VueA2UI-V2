@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://a2ui.org/specification/v0.9/schemas/server-to-client.json",
+  "title": "A2UI v0.9 Server-to-Client Message Schema",
+  "description": "JSON Schema 定义 A2UI v0.9 的 4 种 server-to-client 消息类型",
+  "definitions": {
+    "A2UIComponent": {
+      "type": "object",
+      "required": ["id", "component"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "组件在 surface 中的唯一标识"
+        },
+        "component": {
+          "type": "string",
+          "description": "组件类型名称，必须属于对应 Catalog"
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "oneOf": [
+    {
+      "title": "createSurface",
+      "description": "创建一个新的 UI surface",
+      "type": "object",
+      "required": ["version", "createSurface"],
+      "properties": {
+        "version": {
+          "type": "string",
+          "const": "v0.9"
+        },
+        "createSurface": {
+          "type": "object",
+          "required": ["surfaceId", "catalogId"],
+          "properties": {
+            "surfaceId": {
+              "type": "string",
+              "description": "新 surface 的唯一标识"
+            },
+            "catalogId": {
+              "type": "string",
+              "description": "该 surface 使用的 Catalog ID"
+            },
+            "theme": {
+              "type": "object",
+              "description": "可选的 UI 主题配置"
+            },
+            "sendDataModel": {
+              "type": "boolean",
+              "description": "是否发送 data model"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "title": "updateComponents",
+      "description": "更新 surface 上的组件（创建或替换）",
+      "type": "object",
+      "required": ["version", "updateComponents"],
+      "properties": {
+        "version": {
+          "type": "string",
+          "const": "v0.9"
+        },
+        "updateComponents": {
+          "type": "object",
+          "required": ["surfaceId", "components"],
+          "properties": {
+            "surfaceId": {
+              "type": "string",
+              "description": "目标 surface 的 ID"
+            },
+            "components": {
+              "type": "array",
+              "description": "要更新的组件数组",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/definitions/A2UIComponent"
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "title": "updateDataModel",
+      "description": "更新 surface 上的数据模型",
+      "type": "object",
+      "required": ["version", "updateDataModel"],
+      "properties": {
+        "version": {
+          "type": "string",
+          "const": "v0.9"
+        },
+        "updateDataModel": {
+          "type": "object",
+          "required": ["surfaceId"],
+          "properties": {
+            "surfaceId": {
+              "type": "string",
+              "description": "目标 surface 的 ID"
+            },
+            "path": {
+              "type": "string",
+              "description": "JSON Pointer 路径，如 /users/0/name"
+            },
+            "value": {
+              "description": "要设置的值，可以是任意 JSON 类型"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "title": "deleteSurface",
+      "description": "删除指定的 UI surface",
+      "type": "object",
+      "required": ["version", "deleteSurface"],
+      "properties": {
+        "version": {
+          "type": "string",
+          "const": "v0.9"
+        },
+        "deleteSurface": {
+          "type": "object",
+          "required": ["surfaceId"],
+          "properties": {
+            "surfaceId": {
+              "type": "string",
+              "description": "要删除的 surface ID"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  ]
+}

@@ -1,11 +1,279 @@
+/* ================================================================
+   A2UI Renderer 基础样式
+   ================================================================ */
+
+/* ── Surface ─────────────────────────────────────────────────── */
 .a2ui-surface {
   min-height: 160px;
   padding: 16px;
   color: #1f2937;
   background: #ffffff;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 .a2ui-empty {
   color: #6b7280;
   font-size: 14px;
+  padding: 24px;
+  text-align: center;
+  border: 1px dashed #d1d5db;
+  border-radius: 6px;
+}
+
+/* ── Fallback（未知/未注册组件占位） ──────────────────────────── */
+.a2ui-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 8px 12px;
+  color: #9ca3af;
+  font-size: 13px;
+  border: 2px dashed #d1d5db;
+  border-radius: 4px;
+  background: #f9fafb;
+}
+
+/* ── Flex 布局容器 ───────────────────────────────────────────── */
+.a2ui-row {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.a2ui-column {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.a2ui-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* ── 文本层级 ────────────────────────────────────────────────── */
+.a2ui-text-h1 { font-size: 32px; font-weight: 700; line-height: 1.2; margin: 0; }
+.a2ui-text-h2 { font-size: 24px; font-weight: 600; line-height: 1.3; margin: 0; }
+.a2ui-text-h3 { font-size: 20px; font-weight: 600; line-height: 1.4; margin: 0; }
+.a2ui-text-h4 { font-size: 18px; font-weight: 500; line-height: 1.4; margin: 0; }
+.a2ui-text-h5 { font-size: 16px; font-weight: 500; line-height: 1.5; margin: 0; }
+.a2ui-text-body { font-size: 14px; font-weight: 400; line-height: 1.5; margin: 0; }
+.a2ui-text-caption { font-size: 12px; font-weight: 400; line-height: 1.4; color: #6b7280; }
+
+/* ── Button ──────────────────────────────────────────────────── */
+.a2ui-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #ffffff;
+  background: #3b82f6;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.a2ui-button:hover {
+  background: #2563eb;
+}
+
+.a2ui-button:active {
+  background: #1d4ed8;
+}
+
+/* ── TextField ───────────────────────────────────────────────── */
+.a2ui-textfield {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.a2ui-textfield-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.a2ui-textfield-input {
+  padding: 8px 12px;
+  font-size: 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.a2ui-textfield-input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
+
+/* ── CheckBox ────────────────────────────────────────────────── */
+.a2ui-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+/* ── Modal ───────────────────────────────────────────────────── */
+.a2ui-modal-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+}
+
+.a2ui-modal {
+  position: relative;
+  min-width: 320px;
+  max-width: 90vw;
+  padding: 24px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+}
+
+.a2ui-modal-close {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  font-size: 18px;
+  color: #6b7280;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+/* ── 其他组件 ────────────────────────────────────────────────── */
+.a2ui-image {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+}
+
+.a2ui-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  width: 1em;
+  height: 1em;
+}
+
+.a2ui-video {
+  max-width: 100%;
+  border-radius: 4px;
+}
+
+.a2ui-audio {
+  width: 100%;
+  min-width: 240px;
+}
+
+.a2ui-divider {
+  border: none;
+  border-top: 1px solid #e5e7eb;
+  margin: 12px 0;
+}
+
+.a2ui-list {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* ── Tabs ────────────────────────────────────────────────────── */
+.a2ui-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.a2ui-tabs-header {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.a2ui-tabs-tab {
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #6b7280;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.a2ui-tabs-tab--active {
+  color: #3b82f6;
+  border-bottom-color: #3b82f6;
+}
+
+.a2ui-tabs-content {
+  padding: 8px 0;
+}
+
+/* ── Slider ──────────────────────────────────────────────────── */
+.a2ui-slider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.a2ui-slider-value {
+  font-size: 13px;
+  color: #6b7280;
+  min-width: 36px;
+}
+
+/* ── ChoicePicker / DateTimeInput ────────────────────────────── */
+.a2ui-choicepicker {
+  padding: 8px 12px;
+  font-size: 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  outline: none;
+}
+
+.a2ui-datetimeinput {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.a2ui-datetimeinput-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.a2ui-datetimeinput-input {
+  padding: 8px 12px;
+  font-size: 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  outline: none;
 }

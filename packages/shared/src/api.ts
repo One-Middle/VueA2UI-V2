@@ -177,3 +177,116 @@ export interface SendMessageResponse {
 
 export type RendererActionRequest = A2UIClientMessage;
 export type RendererErrorRequest = A2UIClientMessage;
+
+// ─── 会话请求 / 响应 ────────────────────────────────────
+
+/** 创建会话请求。 */
+export interface CreateSessionRequest {
+  /** 会话标题，默认 "未命名会话" */
+  title?: string;
+  /** 会话描述 */
+  description?: string;
+  /** 模型名称，省略时使用 Runtime 默认配置 */
+  modelName?: string;
+}
+
+/** 更新会话请求。 */
+export interface UpdateSessionRequest {
+  /** 新的会话标题 */
+  title?: string;
+  /** 新的会话描述 */
+  description?: string;
+  /** 新的会话状态 */
+  status?: SessionStatus;
+}
+
+/** 会话详情响应。 */
+export interface SessionDetailResponse {
+  session: SessionDto;
+  currentSnapshot: SurfaceSnapshotDto | null;
+  enabledSkillIds: string[];
+}
+
+// ─── Skill 请求 ─────────────────────────────────────────
+
+/** 创建 Skill 请求。 */
+export interface CreateSkillRequest {
+  /** Skill 名称 */
+  name: string;
+  /** Skill 描述 */
+  description?: string;
+  /** Skill 内容（Markdown） */
+  content: string;
+}
+
+/** 更新 Skill 请求。 */
+export interface UpdateSkillRequest {
+  /** 新的 Skill 名称 */
+  name?: string;
+  /** 新的 Skill 描述 */
+  description?: string;
+  /** 新的 Skill 内容 */
+  content?: string;
+  /** 是否启用 */
+  isActive?: boolean;
+}
+
+// ─── Runtime 配置 ───────────────────────────────────────
+
+/** 运行时配置的完整 DTO（与 API 文档 12.1 对齐）。 */
+export interface RuntimeConfigDto {
+  modelProvider: string;
+  modelName: string;
+  baseUrlConfigured: boolean;
+  apiKeyConfigured: boolean;
+  temperature: number;
+  maxTokens: number;
+  timeoutMs: number;
+  maxAttempts: number;
+  catalogId: string;
+  catalogVersion: string;
+  rendererVersion: string;
+}
+
+/** 更新 Runtime 配置请求。 */
+export interface UpdateRuntimeConfigRequest {
+  modelName?: string;
+  temperature?: number;
+  maxTokens?: number;
+  timeoutMs?: number;
+  maxAttempts?: number;
+}
+
+// ─── 导出 / 详情响应 ────────────────────────────────────
+
+/** 导出完整会话的类型（与 API 文档 11.1 对齐）。 */
+export interface ExportSessionDto {
+  version: string;
+  exportedAt: string;
+  session: SessionDto;
+  messages: MessageDto[];
+  uploadedFiles: UploadedFileDto[];
+  skills: SkillDto[];
+  sessionSkills: SessionSkillDto[];
+  agentRuns: AgentRunDto[];
+  toolCalls: ToolCallDto[];
+  a2uiEvents: A2UIEventDto[];
+  surfaceSnapshots: SurfaceSnapshotDto[];
+}
+
+/** Agent Run 详情响应。 */
+export interface AgentRunDetailResponse {
+  agentRun: AgentRunDto;
+  toolCalls: ToolCallDto[];
+  assistantMessage: MessageDto | null;
+  a2uiEvents: A2UIEventDto[];
+}
+
+// ─── 会话 Skill 关联表 DTO ──────────────────────────────
+
+/** 会话与 Skill 的关联记录。 */
+export interface SessionSkillDto {
+  sessionId: string;
+  skillId: string;
+  enabled: boolean;
+}

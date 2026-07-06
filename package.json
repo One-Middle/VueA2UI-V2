@@ -6,6 +6,9 @@
   "packageManager": "pnpm@9.0.0",
   "scripts": {
     "dev": "pnpm --parallel --filter @a2ui-platform/frontend --filter @a2ui-platform/backend dev",
+    "dev:backend": "pnpm --filter @a2ui-platform/backend dev",
+    "dev:frontend": "pnpm --filter @a2ui-platform/frontend dev",
+    "setup": "pnpm install && pnpm --filter @a2ui-platform/shared build && cd packages/backend && npx prisma generate && npx prisma db push && cd ../.. && pnpm dev",
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
