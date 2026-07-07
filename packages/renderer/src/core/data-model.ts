@@ -10,6 +10,7 @@
  */
 
 import { shallowReactive } from "vue";
+import { logger } from "../logger.js";
 import type { JsonValue } from "@a2ui-platform/shared";
 
 /** 将 JSON Pointer 路径解析为路径片段数组（已解码）。 */
@@ -225,7 +226,7 @@ export class DataModel {
         try {
           cb();
         } catch (e) {
-          console.error("[DataModel] 订阅回调异常:", e);
+          logger.error("订阅回调异常:", e);
         }
       });
     }

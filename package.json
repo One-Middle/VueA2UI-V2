@@ -5,20 +5,22 @@
   "type": "module",
   "packageManager": "pnpm@9.0.0",
   "scripts": {
-    "dev": "pnpm --parallel --filter @a2ui-platform/frontend --filter @a2ui-platform/backend dev",
+    "dev": "node --env-file=.env scripts/prepare-dev.mjs && pnpm --parallel --filter @a2ui-platform/frontend --filter @a2ui-platform/backend dev",
+    "dev:app": "pnpm --parallel --filter @a2ui-platform/frontend --filter @a2ui-platform/backend dev",
     "dev:backend": "pnpm --filter @a2ui-platform/backend dev",
     "dev:frontend": "pnpm --filter @a2ui-platform/frontend dev",
-    "setup": "pnpm install && pnpm --filter @a2ui-platform/shared build && cd packages/backend && npx prisma generate && npx prisma db push && cd ../.. && pnpm dev",
-    "build": "pnpm -r build",
-    "test": "pnpm -r test",
-    "typecheck": "pnpm -r typecheck",
-    "lint": "pnpm -r lint",
+    "setup": "pnpm install --config.confirmModulesPurge=false && pnpm --filter @a2ui-platform/shared build && node --env-file=.env scripts/ensure-dev-db.mjs && pnpm dev:app",
+    "build": "pnpm --filter @a2ui-platform/* -r build",
+    "test": "pnpm --filter @a2ui-platform/* -r test",
+    "typecheck": "pnpm --filter @a2ui-platform/* -r typecheck",
+    "lint": "pnpm --filter @a2ui-platform/* -r lint",
     "format": "prettier --write ."
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
     "prettier": "^3.4.2",
     "typescript": "^5.7.2",
-    "vitest": "^2.1.8"
+    "vitest": "^2.1.8",
+    "jsdom": "^25.0.1"
   }
 }

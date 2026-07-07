@@ -36,7 +36,7 @@ class StreamService {
     existing.push(client);
     this.clients.set(sessionId, existing);
 
-    logger.info({ sessionId, clientCount: existing.length }, "SSE client connected");
+    logger.debug({ sessionId, clientCount: existing.length }, "SSE client connected");
 
     // 客户端断开时清理
     res.on("close", () => {
@@ -74,7 +74,7 @@ class StreamService {
       }
     }
     this.clients.delete(sessionId);
-    logger.info({ sessionId }, "All SSE clients disconnected for session");
+    logger.debug({ sessionId }, "All SSE clients disconnected for session");
   }
 
   /**
@@ -108,7 +108,7 @@ class StreamService {
     } else {
       this.clients.set(sessionId, filtered);
     }
-    logger.info({ sessionId, clientId }, "SSE client disconnected");
+    logger.debug({ sessionId, clientId }, "SSE client disconnected");
     this.stopHeartbeatIfEmpty();
   }
 

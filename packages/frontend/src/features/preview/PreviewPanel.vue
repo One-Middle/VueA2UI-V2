@@ -22,10 +22,10 @@ const hasContent = ref(false);
 
 // 监听 Renderer store 中的新消息
 watch(
-  () => renderer.a2uiMessages.length,
+  () => renderer.messagesForRenderer.length,
   () => {
-    if (renderer.a2uiMessages.length > 0) {
-      messageProcessor.processMessages(renderer.a2uiMessages);
+    if (renderer.messagesForRenderer.length > 0) {
+      messageProcessor.processMessages(renderer.messagesForRenderer);
       hasContent.value = surfaceGroup.getSurfaceIds().length > 0;
     }
   },
@@ -34,8 +34,8 @@ watch(
 
 onMounted(() => {
   // 初始处理已有消息
-  if (renderer.a2uiMessages.length > 0) {
-    messageProcessor.processMessages(renderer.a2uiMessages);
+  if (renderer.messagesForRenderer.length > 0) {
+    messageProcessor.processMessages(renderer.messagesForRenderer);
     hasContent.value = surfaceGroup.getSurfaceIds().length > 0;
   }
 });

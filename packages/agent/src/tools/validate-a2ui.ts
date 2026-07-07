@@ -8,6 +8,7 @@ import type {
 } from "@a2ui-platform/shared";
 import a2uiSchema from "../schemas/a2ui-v0.9-schema.json" with { type: "json" };
 import catalogSchema from "../schemas/basic-catalog-schema.json" with { type: "json" };
+import { logger } from "../logger.js";
 
 // ─── Ajv 实例（懒初始化） ────────────────────────────────────
 
@@ -57,6 +58,8 @@ export function validateA2UI(input: ValidateA2UIInput): ValidateA2UIResult {
 
   const { messages, catalogId, currentSnapshot } = input;
 
+  logger.debug(`开始校验 → messages=${messages.length}, catalogId=${catalogId}`);
+
   // 收集所有已知 surface（已创建 + currentSnapshot 中的）
   const knownSurfaceIds = new Set<string>();
   if (currentSnapshot?.surfaces) {
@@ -104,6 +107,10 @@ export function validateA2UI(input: ValidateA2UIInput): ValidateA2UIResult {
 
   // —— 步骤 6：安全约束检查 ——
   validateSafetyConstraints(messages, errors);
+
+  if (errors.length > 0) {
+    logger.debug(`校验发现问题 → errors=${errors.length}, warnings=${warnings.length}`);
+  }
 
   return {
     valid: errors.length === 0,

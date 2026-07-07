@@ -28,9 +28,18 @@ import type {
   UpdateSkillRequest,
   UploadedFileDto,
 } from "@a2ui-platform/shared";
+import { logger } from "./logger";
 
 /** API 基础路径，从环境变量读取，默认 /api */
-const baseUrl = import.meta.env.VITE_API_BASE_URL ?? "/api";
+const baseUrl = resolveApiBaseUrl(import.meta.env.VITE_API_BASE_URL);
+
+export function resolveApiBaseUrl(configuredBaseUrl?: string): string {
+  const trimmed = configuredBaseUrl?.trim();
+  if (!trimmed) return "/api";
+
+  const normalized = trimmed.replace(/\/+$/, "");
+  return normalized.endsWith("/api") ? normalized : `${normalized}/api`;
+}
 
 /** API 错误类 */
 export class ApiError extends Error {
@@ -67,6 +76,8 @@ async function request<T>(
   }
 
   const res = await fetch(url, init);
+
+  logger.debug(`${method} ${path} → ${res.status}`);
 
   if (res.status === 204) {
     return undefined as T;

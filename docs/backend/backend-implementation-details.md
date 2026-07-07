@@ -13,7 +13,6 @@ src/
   config.ts                   # 环境变量配置（dotenv）
   logger.ts                   # Pino 日志
   db.ts                       # PrismaClient 单例
-  mock-agent.ts               # Mock Agent（固定 A2UI 消息）
   repositories/
     session.repository.ts     # sessions 表 CRUD
     message.repository.ts     # messages 表 CRUD
@@ -174,15 +173,15 @@ StreamService 维护 `sessionId → Response[]` 映射，支持一个 session �
 
 心跳每 20 秒发送一次。
 
-## 7. Mock Agent
+## 7. 正式 Agent Runtime
 
-在真实模型不可用时，`mock-agent.ts` 返回固定的合法 A2UI 消息：
+后端通过 `@a2ui-platform/agent` 调用正式 `AgentRuntime.run(input)`：
 
-- `createSurface`（surfaceId: "main"）
-- `updateComponents`（Column 布局 + Text 标题/描述 + Row 按钮组）
-- 始终返回 COMMITTED 状态
-
-输入输出类型与真实 agent 调用完全对齐（`AgentRunInput → AgentRunResult`）。
+- 从数据库读取最近消息、上传 `.txt` 文件内容、启用的 skills 和当前 snapshot，组装 `AgentRunInput`。
+- 使用环境变量中的 OpenAI-compatible 配置创建 `ModelClient`。
+- Runtime 内部执行模型生成、`validateA2UI` 校验和最多 3 次修复循环。
+- 每次 `validateA2UI` 调用会写入 `tool_calls`，并通过 SSE 推送 `agent_run_attempt`。
+- `COMMITTED` 创建 `a2ui_events` 和 `surface_snapshots`；`TEXT_ONLY` 只创建 assistant message；`FAILED` 创建 `validation_error` message。
 
 ## 8. 环境配置
 
@@ -190,10 +189,13 @@ StreamService 维护 `sessionId → Response[]` 映射，支持一个 session �
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| PORT | 3000 | 服务端口 |
+| PORT | 3100 | 服务端口 |
 | DATABASE_URL | — | PostgreSQL 连接串 |
 | OPENAI_COMPAT_BASE_URL | https://api.openai.com/v1 | 模型 API 地址 |
 | OPENAI_COMPAT_API_KEY | "" | API 密钥 |
 | OPENAI_COMPAT_MODEL | gpt-4.1 | 模型名称 |
+| OPENAI_COMPAT_TEMPERATURE | 0.2 | 模型温度 |
+| OPENAI_COMPAT_MAX_TOKENS | 8192 | 最大生成 token 数 |
+| OPENAI_COMPAT_TIMEOUT_MS | 60000 | 模型请求超时时间，单位毫秒 |
 
 固定 Catalog ID：`https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json`

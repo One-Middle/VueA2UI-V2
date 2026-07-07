@@ -1,4 +1,5 @@
 import type { JsonObject } from "@a2ui-platform/shared";
+import { logger } from "../logger.js";
 
 /**
  * 统一的应用层错误，包含 HTTP 状态码、错误码和消息。
@@ -75,7 +76,7 @@ export function errorHandler(
   }
 
   // 未知错误
-  console.error("Unhandled error:", err);
+  logger.error({ err }, "Unhandled error");
   res.status(500).json({
     error: {
       code: "INTERNAL_ERROR",

@@ -3,7 +3,7 @@
  * Tabs 组件：标签页容器，读取 tabItems 数组。
  */
 import { computed, inject, ref } from "vue";
-import { type ComponentContext, componentContextKey } from "../../vue/context";
+import { componentContextKey } from "../../vue/context";
 import A2uiComponent from "../../vue/A2uiComponent.vue";
 
 const props = defineProps<{ surfaceId: string; componentId: string }>();
@@ -19,6 +19,8 @@ const tabItems = computed(() => {
 
 /** 当前选中的 tab 索引 */
 const activeIndex = ref(0);
+
+const activeTab = computed(() => tabItems.value[activeIndex.value]);
 
 /** 切换标签页 */
 function selectTab(index: number): void {
@@ -41,9 +43,9 @@ function selectTab(index: number): void {
     </div>
     <div class="a2ui-tabs-content">
       <A2uiComponent
-        v-if="tabItems[activeIndex]?.child"
+        v-if="activeTab?.child"
         :surface-id="surfaceId"
-        :component-id="String(tabItems[activeIndex].child)"
+        :component-id="String(activeTab.child)"
       />
     </div>
   </div>

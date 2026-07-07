@@ -8,6 +8,8 @@ import { sessionRepository } from "../repositories/session.repository.js";
 import { sessionArchived } from "../utils/errors.js";
 import { parsePagination, buildPageResult } from "../utils/pagination.js";
 
+const SID = (id: string) => id.slice(0, 8);
+
 function toMessageDto(
   m: Awaited<ReturnType<typeof messageRepository.findById>>
 ): MessageDto | null {
@@ -65,7 +67,7 @@ export const messageService = {
       maxAttempts: 3,
     });
 
-    logger.info({ sessionId, messageId: message.id, agentRunId: agentRun.id }, "用户消息和 Agent Run 已创建");
+    logger.info(`收到用户消息 → session=${SID(sessionId)}, content=${content.length}字, agentRun=${SID(agentRun.id)}`);
 
     return {
       message: {

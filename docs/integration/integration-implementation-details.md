@@ -13,7 +13,7 @@
                               ↓
                          返回 202 + streamUrl
                               ↓
-                         异步执行 mockAgentRun / AgentRuntime.run()
+                         异步执行 AgentRuntime.run()
                               ↓
                          validateA2UI 校验通过
                               ↓
@@ -61,7 +61,7 @@ Frontend 显示失败消息（不更新 Renderer）
 ### 4.2 Backend ↔ Agent
 
 **接口**：
-- Backend 构建 `AgentRunInput` → 调用 `mockAgentRun(input)` 或 `agentRuntime.run(input)`
+- Backend 构建 `AgentRunInput` → 调用 `AgentRuntime.run(input)`
 - Agent 返回 `AgentRunResult`（COMMITTED | TEXT_ONLY | FAILED）
 - 类型从 `@a2ui-platform/shared` 的 `AgentRunInput`、`AgentRunResult` 导入
 
@@ -102,17 +102,17 @@ type AgentRunResult =
 ### SSE Events
 - `heartbeat`、`agent_run_started`、`agent_run_attempt`、`assistant_message`、`a2ui_messages`、`surface_snapshot`、`agent_run_failed`
 
-## 6. Mock 端到端链路
+## 6. 正式端到端链路
 
-在不依赖真实 OpenAI API 的情况下验证完整链路：
+当前链路依赖正式 Agent Runtime 和 OpenAI-compatible API：
 
-1. 后端 `mock-agent.ts` 返回固定的合法 A2UI 消息
-2. 不执行 validateA2UI（mock 结果直接为 valid: true）
-3. 完整走通：用户消息 → API → mockAgentRun → 事务提交 → SSE → Frontend → Renderer
+1. 后端组装 `AgentRunInput`，包含最近消息、上传文件、启用 skills 和当前 snapshot。
+2. `AgentRuntime.run()` 调用模型生成 A2UI 草稿，并执行 `validateA2UI` 校验与修复循环。
+3. 完整走通：用户消息 → API → AgentRuntime.run → validateA2UI → 事务提交 → SSE → Frontend → Renderer。
 
 ### 验收标准
 - 用户创建会话 → 发送消息 → 收到 a2ui_messages → Renderer 渲染 UI
-- UI 显示 "Hello A2UI" 标题 + 描述文字 + "确认"/"取消" 按钮
+- UI 根据真实模型输出渲染，并且只接收后端校验通过的 A2UI messages
 
 ## 7. 文件进入 Agent 上下文
 

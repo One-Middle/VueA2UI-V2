@@ -71,7 +71,36 @@ const componentContext = computed<ComponentContext | null>(() => {
 });
 
 /** 提供 ComponentContext 给子组件 */
-provide(componentContextKey, componentContext);
+const contextProxy: ComponentContext = {
+  get componentModel() {
+    return requireComponentContext().componentModel;
+  },
+  get dataContext() {
+    return requireComponentContext().dataContext;
+  },
+  get surfaceId() {
+    return requireComponentContext().surfaceId;
+  },
+  resolveValue(raw: unknown): unknown {
+    return requireComponentContext().resolveValue(raw);
+  },
+  dispatchAction(name: string, context?: Record<string, unknown>): void {
+    requireComponentContext().dispatchAction(name, context);
+  },
+  createSetter(path: string): (value: unknown) => void {
+    return requireComponentContext().createSetter(path);
+  },
+};
+
+function requireComponentContext(): ComponentContext {
+  const ctx = componentContext.value;
+  if (!ctx) {
+    throw new Error(`A2UI component context is unavailable: ${props.componentId}`);
+  }
+  return ctx;
+}
+
+provide(componentContextKey, contextProxy);
 </script>
 
 <template>

@@ -4,6 +4,7 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [vue()],
+  envDir: resolve(__dirname, "../.."),
   resolve: {
     alias: {
       "@a2ui-platform/renderer": resolve(__dirname, "../renderer/src/index.ts"),
@@ -12,7 +13,13 @@ export default defineConfig({
     },
   },
   server: {
-    port: 5173
+    port: 5173,
+    proxy: {
+      "/api": {
+        target: "http://localhost:3100",
+        changeOrigin: true,
+      },
+    },
   },
   test: {
     environment: "jsdom",

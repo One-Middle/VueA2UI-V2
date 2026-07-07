@@ -16,6 +16,12 @@ export const useRendererStore = defineStore("renderer", {
     rendererReady: false,
   }),
 
+  getters: {
+    messagesForRenderer(state): A2UIServerMessage[] {
+      return state.a2uiMessages as A2UIServerMessage[];
+    },
+  },
+
   actions: {
     /**
      * 处理 A2UI 消息批次
@@ -28,7 +34,7 @@ export const useRendererStore = defineStore("renderer", {
 
     /** 清空所有状态（切换 session 时调用） */
     reset() {
-      this.a2uiMessages = [] as unknown[];
+      this.a2uiMessages = [];
       this.rendererReady = false;
     },
 

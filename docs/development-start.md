@@ -375,3 +375,19 @@ TASK-INT-002：Mock A2UI 端到端链路
 - 先提交合法 A2UI event，再推送 Renderer。
 - 所有项目文档使用中文。
 - 不在任务中引入产品文档未定义的新功能。
+
+## 9. 本地开发数据库
+
+后端使用 PostgreSQL，不提供内存数据库或 SQLite 兜底。根目录 `.env.example` 中的默认连接串为：
+
+```text
+postgresql://postgres:postgres@localhost:5432/a2ui_agent_platform?schema=public
+```
+
+本地开发推荐安装 Docker Desktop。根目录提供 `docker-compose.yml`，`pnpm dev` 会先执行 `scripts/ensure-dev-db.mjs`：
+
+- 如果 `.env` 中的 `DATABASE_URL` 已可连接，则直接复用现有数据库。
+- 如果不可连接，则尝试执行 `docker compose up -d postgres` 启动本地 PostgreSQL。
+- 数据库就绪后自动执行 Prisma Client 生成和 `prisma db push`，再启动前端与后端开发服务。
+
+如果不使用 Docker，需要手动启动 PostgreSQL，并确保 `.env` 中 `DATABASE_URL` 指向可连接的数据库。

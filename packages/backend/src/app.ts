@@ -1,6 +1,5 @@
 import cors from "cors";
 import express from "express";
-import pinoHttp from "pino-http";
 import { config } from "./config.js";
 import { logger } from "./logger.js";
 import { errorHandler } from "./utils/errors.js";
@@ -19,7 +18,18 @@ import { exportRouter } from "./routes/export.js";
 export function createApp() {
   const app = express();
 
-  app.use(pinoHttp({ logger }));
+  // 仅在 LOG_LEVEL=debug 时打印 HTTP 请求摘要，避免冗长的请求日志
+  app.use((req, _res, next) => {
+    if (process.env.LOG_LEVEL === "debug") {
+      const start = Date.now();
+      _res.on("finish", () => {
+        const duration = Date.now() - start;
+        logger.debug(`${req.method} ${req.originalUrl} → ${_res.statusCode} (${duration}ms)`);
+      });
+    }
+    next();
+  });
+
   app.use(cors());
   app.use(express.json({ limit: "1mb" }));
 

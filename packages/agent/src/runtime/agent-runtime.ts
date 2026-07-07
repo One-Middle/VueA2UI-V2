@@ -11,6 +11,7 @@ import { PromptComposer } from "../prompts/prompt-composer.js";
 import { ModelClient } from "../model/model-client.js";
 import { parseModelOutput } from "./output-parser.js";
 import { validateA2UI } from "../tools/validate-a2ui.js";
+import { logger, shortId } from "../logger.js";
 
 // ─── 常量 ──────────────────────────────────────────────────
 
@@ -45,8 +46,13 @@ export class AgentRuntime {
     input: AgentRunInput,
     onToolCall?: (record: ToolCallRecord) => void,
   ): Promise<AgentRunResult> {
+    const sid = shortId(input.sessionId);
+
     // ── 阶段 PREPARE_CONTEXT ──
     const context = this.contextBuilder.buildContext(input);
+    logger.info(
+      `准备上下文 → session=${sid}, model=${input.model.name}`,
+    );
 
     let lastAssistantMessage = "";
     let lastA2uiMessages: A2UIServerMessage[] = [];
@@ -69,6 +75,12 @@ export class AgentRuntime {
           )
         : this.promptComposer.composeInitial(context);
 
+      logger.info(
+        isRepair
+          ? `修复模式 → attempt=${attempt}/${MAX_ATTEMPTS}, 上次错误数=${lastValidation?.errors.length ?? 0}`
+          : `调用模型 → attempt=${attempt}/${MAX_ATTEMPTS}`,
+      );
+
       let modelResponse;
       try {
         modelResponse = await this.modelClient.generate([
@@ -77,6 +89,8 @@ export class AgentRuntime {
         ]);
       } catch (err) {
         // 模型调用失败 → 如果不是最后一次，继续尝试
+        const errMsg = err instanceof Error ? err.message : String(err);
+        logger.warn(`模型调用失败 → attempt=${attempt}/${MAX_ATTEMPTS}, error=${errMsg.slice(0, 120)}`);
         if (attempt >= MAX_ATTEMPTS) {
           return {
             status: "FAILED",
@@ -111,6 +125,7 @@ export class AgentRuntime {
       const parseResult = parseModelOutput(modelResponse.content);
 
       if (!parseResult.ok) {
+        logger.warn(`解析失败 → attempt=${attempt}/${MAX_ATTEMPTS}, error=${parseResult.error.slice(0, 120)}`);
         // 解析失败 → 如果不是最后一次，继续尝试
         lastAssistantMessage = modelResponse.content;
         lastA2uiMessages = [];
@@ -139,6 +154,10 @@ export class AgentRuntime {
       });
       const validateDuration = Date.now() - validateStartTime;
       lastValidation = validation;
+
+      logger.info(
+        `A2UI 校验 → ${validation.valid ? "✅ 通过" : "❌ 未通过"}, errors=${validation.errors.length}, warnings=${validation.warnings.length}, 耗时=${validateDuration}ms`,
+      );
 
       // 记录 ToolCallRecord 并回调
       const toolCallRecord: ToolCallRecord = {
@@ -170,6 +189,7 @@ export class AgentRuntime {
       if (validation.valid) {
         // 有 A2UI 消息 → COMMITTED
         if (a2uiMessages.length > 0) {
+          logger.info(`Agent 完成 → ✅ COMMITTED, attempts=${attempt}, messages=${a2uiMessages.length}, tokens=${totalTokens?.["totalTokens"] ?? "?"}`);
           return {
             status: "COMMITTED",
             assistantMessage,
@@ -181,6 +201,7 @@ export class AgentRuntime {
         }
 
         // 无 A2UI 消息 → TEXT_ONLY
+        logger.info(`Agent 完成 → TEXT_ONLY, attempts=${attempt}`);
         return {
           status: "TEXT_ONLY",
           assistantMessage,
@@ -192,6 +213,7 @@ export class AgentRuntime {
 
       // 校验未通过，且已是最后一次尝试
       if (attempt >= MAX_ATTEMPTS) {
+        logger.warn(`Agent 完成 → ❌ FAILED, attempts=${MAX_ATTEMPTS}, errors=${validation.errors.length}`);
         return {
           status: "FAILED",
           assistantMessage,

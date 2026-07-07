@@ -11,9 +11,9 @@ const handleSend = () => { if (content.value.trim()) { emit("send", content.valu
 <template>
   <div class="message-input-area">
     <n-input v-model:value="content" type="textarea" placeholder="输入您的 UI 需求..." :rows="3" :disabled="disabled"
-      @keydown.ctrl.enter="handleSend" />
+      @keydown.enter.prevent="handleSend" />
     <n-button type="primary" :disabled="disabled || !content.trim()" @click="handleSend" style="margin-top: 8px">
-      发送 (Ctrl+Enter)
+      发送 (Enter)
     </n-button>
   </div>
 </template>

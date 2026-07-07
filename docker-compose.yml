@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: a2ui-platform-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: a2ui_agent_platform
+    ports:
+      - "5432:5432"
+    volumes:
+      - a2ui_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d a2ui_agent_platform"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  a2ui_postgres_data:

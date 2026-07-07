@@ -11,7 +11,17 @@ import type {
 import { defineStore } from "pinia";
 import * as api from "../services/api";
 import { connectStream, type StreamConnection } from "../services/stream";
+import { logger, shortId } from "../services/logger";
 import { useRendererStore } from "./renderer";
+
+type WorkspaceA2UIEvent = Omit<A2UIEventDto, "messages" | "validationResult"> & {
+  messages: unknown[];
+  validationResult: unknown;
+};
+
+type WorkspaceSurfaceSnapshot = Omit<SurfaceSnapshotDto, "snapshot"> & {
+  snapshot: unknown;
+};
 
 export type WorkspaceTab =
   | "conversation"
@@ -35,8 +45,8 @@ export const useWorkspaceStore = defineStore("workspace", {
     skills: [] as SkillDto[],
     enabledSkillIds: [] as string[],
     agentRuns: [] as AgentRunDto[],
-    a2uiEvents: [] as unknown as A2UIEventDto[],
-    surfaceSnapshots: [] as unknown as SurfaceSnapshotDto[],
+    a2uiEvents: [] as WorkspaceA2UIEvent[],
+    surfaceSnapshots: [] as WorkspaceSurfaceSnapshot[],
 
     // ─── 发送状态 ───
     isSending: false,
@@ -131,12 +141,20 @@ export const useWorkspaceStore = defineStore("workspace", {
     },
 
     async sendMessage(content: string, attachmentFileIds?: string[]) {
-      if (!this.activeSessionId || !content.trim()) return;
+      const trimmedContent = content.trim();
+      if (!trimmedContent) return;
 
       this.isSending = true;
       try {
-        await api.sendMessage(this.activeSessionId, {
-          content: content.trim(),
+        let sessionId = this.activeSessionId;
+        if (!sessionId) {
+          const session = await this.createSession(createSessionTitle(trimmedContent));
+          sessionId = session.id;
+        }
+
+        logger.info(`发送消息 → session=${shortId(sessionId)}, content=${trimmedContent.length}字`);
+        await api.sendMessage(sessionId, {
+          content: trimmedContent,
           attachmentFileIds,
           options: { intent: "CREATE_UI" },
         });
@@ -266,8 +284,7 @@ export const useWorkspaceStore = defineStore("workspace", {
       if (!this.activeSessionId) return;
       try {
         const result = await api.listA2UIEvents(this.activeSessionId, { limit: 200 });
-        // @ts-expect-error TS2589: A2UIEventDto 递归类型导致 Pinia 深度实例化
-        this.a2uiEvents = result.items;
+        this.a2uiEvents = result.items.map(toWorkspaceA2UIEvent);
       } catch {
         // 静默处理
       }
@@ -277,7 +294,7 @@ export const useWorkspaceStore = defineStore("workspace", {
       if (!this.activeSessionId) return;
       try {
         const result = await api.listSnapshots(this.activeSessionId, { limit: 100 });
-        this.surfaceSnapshots = result.items;
+        this.surfaceSnapshots = result.items.map(toWorkspaceSurfaceSnapshot);
       } catch {
         // 静默处理
       }
@@ -289,6 +306,9 @@ export const useWorkspaceStore = defineStore("workspace", {
 
       this.streamStatus = "connecting";
       const renderer = useRendererStore();
+      const sid = shortId(this.activeSessionId);
+
+      logger.info(`SSE 连接中 → session=${sid}`);
 
       this._streamConnection = connectStream(this.activeSessionId, {
         heartbeat: (_data: { time: string }) => {
@@ -297,6 +317,7 @@ export const useWorkspaceStore = defineStore("workspace", {
 
         agent_run_started: (data: { sessionId: string; agentRun: Pick<AgentRunDto, "id" | "status" | "attemptCount" | "maxAttempts"> }) => {
           this.streamStatus = "connected";
+          logger.info(`← SSE ← BACKEND: agent_run_started → runId=${shortId(data.agentRun.id)}`);
           // 添加或更新 run
           const existingIdx = this.agentRuns.findIndex((r) => r.id === data.agentRun.id);
           if (existingIdx >= 0) {
@@ -327,21 +348,24 @@ export const useWorkspaceStore = defineStore("workspace", {
         a2ui_messages: (data: { sessionId: string; a2uiEvent: A2UIEventDto }) => {
           // 将 A2UI 消息交给 Renderer 处理
           const msgs = data.a2uiEvent.messages as A2UIServerMessage[];
+          logger.info(`← SSE ← BACKEND: a2ui_messages → ${msgs.length}条 → RENDERER`);
           if (msgs.length > 0) {
             renderer.processMessages(msgs);
           }
           // 追加 event 记录
-          this.a2uiEvents.push(data.a2uiEvent);
+          this.a2uiEvents.push(toWorkspaceA2UIEvent(data.a2uiEvent));
           // 排序
           this.a2uiEvents.sort((a, b) => a.sequence - b.sequence);
         },
 
         surface_snapshot: (data: { sessionId: string; snapshot: SurfaceSnapshotDto }) => {
-          const existingIdx = this.surfaceSnapshots.findIndex((s) => s.id === data.snapshot.id);
+          const snapshot = toWorkspaceSurfaceSnapshot(data.snapshot);
+          logger.info(`← SSE ← BACKEND: surface_snapshot → surfaces=${data.snapshot.surfaceCount}, components=${data.snapshot.componentCount}`);
+          const existingIdx = this.surfaceSnapshots.findIndex((s) => s.id === snapshot.id);
           if (existingIdx >= 0) {
-            this.surfaceSnapshots[existingIdx] = data.snapshot;
+            this.surfaceSnapshots[existingIdx] = snapshot;
           } else {
-            this.surfaceSnapshots.push(data.snapshot);
+            this.surfaceSnapshots.push(snapshot);
           }
           // 确保 isCurrent 只标记最新的
           this.surfaceSnapshots.sort((a, b) => a.sequence - b.sequence);
@@ -355,6 +379,7 @@ export const useWorkspaceStore = defineStore("workspace", {
           agentRun: Pick<AgentRunDto, "id" | "status" | "attemptCount" | "failureReason">;
           message: MessageDto;
         }) => {
+          logger.warn(`← SSE ← BACKEND: agent_run_failed → runId=${shortId(data.agentRun.id)}, reason=${(data.agentRun.failureReason ?? "").slice(0, 80)}`);
           // 更新 run 状态
           const run = this.agentRuns.find((r) => r.id === data.agentRun.id);
           if (run) {
@@ -371,6 +396,7 @@ export const useWorkspaceStore = defineStore("workspace", {
 
         onError: (_error: Error) => {
           this.streamStatus = "error";
+          logger.error(`SSE 连接错误 → ${_error.message}`);
         },
 
         onReconnecting: (_attempt: number) => {
@@ -390,3 +416,23 @@ export const useWorkspaceStore = defineStore("workspace", {
     },
   },
 });
+
+function toWorkspaceA2UIEvent(event: A2UIEventDto): WorkspaceA2UIEvent {
+  return {
+    ...event,
+    messages: event.messages as unknown[],
+    validationResult: event.validationResult,
+  };
+}
+
+function toWorkspaceSurfaceSnapshot(snapshot: SurfaceSnapshotDto): WorkspaceSurfaceSnapshot {
+  return {
+    ...snapshot,
+    snapshot: snapshot.snapshot,
+  };
+}
+
+function createSessionTitle(content: string): string {
+  const normalized = content.replace(/\s+/g, " ").trim();
+  return normalized.length > 24 ? `${normalized.slice(0, 24)}...` : normalized;
+}

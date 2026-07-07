@@ -24,6 +24,18 @@ export const fileRepository = {
     });
   },
 
+  findReadyWithContentBySessionId(sessionId: string) {
+    return prisma.uploadedFile.findMany({
+      where: { sessionId, deletedAt: null, status: "ready" },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        originalName: true,
+        content: true,
+      },
+    });
+  },
+
   findById(id: string) {
     return prisma.uploadedFile.findFirst({
       where: { id, deletedAt: null },

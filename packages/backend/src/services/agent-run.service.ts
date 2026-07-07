@@ -1,27 +1,37 @@
 import type {
+  A2UIEventDto,
+  A2UIServerMessage,
+  AgentRunDetailResponse,
   AgentRunDto,
-  AgentRunResult,
   AgentRunInput,
+  AgentRunResult,
   JsonObject,
   MessageDto,
-  A2UIEventDto,
   SurfaceSnapshotDto,
-  AgentRunDetailResponse,
-  A2UIServerMessage,
+  ToolCallRecord,
 } from "@a2ui-platform/shared";
+import {
+  AgentContextBuilder,
+  AgentRuntime,
+  ModelClient,
+  PromptComposer,
+} from "@a2ui-platform/agent";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../db.js";
 import { logger } from "../logger.js";
-import { agentRunRepository } from "../repositories/agent-run.repository.js";
-import { messageRepository } from "../repositories/message.repository.js";
 import { a2uiEventRepository } from "../repositories/a2ui-event.repository.js";
+import { agentRunRepository } from "../repositories/agent-run.repository.js";
+import { fileRepository } from "../repositories/file.repository.js";
+import { messageRepository } from "../repositories/message.repository.js";
+import { sessionSkillRepository } from "../repositories/session-skill.repository.js";
 import { surfaceSnapshotRepository } from "../repositories/surface-snapshot.repository.js";
 import { toolCallRepository } from "../repositories/tool-call.repository.js";
 import { notFound } from "../utils/errors.js";
-import { streamService } from "./stream.service.js";
-import { snapshotService } from "./snapshot.service.js";
-import { mockAgentRun } from "../mock-agent.js";
 import { config } from "../config.js";
+import { snapshotService } from "./snapshot.service.js";
+import { streamService } from "./stream.service.js";
+
+const SID = (id: string) => id.slice(0, 8);
 
 function toAgentRunDto(r: Awaited<ReturnType<typeof agentRunRepository.findById>>): AgentRunDto | null {
   if (!r) return null;
@@ -52,16 +62,71 @@ function toAgentRunError(err: unknown): string {
   return String(err);
 }
 
+function buildAgentRuntime(): AgentRuntime {
+  return new AgentRuntime(
+    new ModelClient({
+      baseUrl: config.openai.baseUrl,
+      apiKey: config.openai.apiKey,
+      model: config.openai.model,
+      temperature: config.openai.temperature,
+      maxTokens: config.openai.maxTokens,
+      timeoutMs: config.openai.timeoutMs,
+    }),
+    new PromptComposer(),
+    new AgentContextBuilder(),
+  );
+}
+
+async function recordRuntimeToolCall(
+  agentRunId: string,
+  sessionId: string,
+  record: ToolCallRecord,
+): Promise<void> {
+  const toolCall = await toolCallRepository.create({
+    agentRun: { connect: { id: agentRunId } },
+    sessionId,
+    toolName: record.toolName,
+    status: record.status,
+    attemptIndex: record.attemptIndex,
+    inputSummary: record.inputSummary as Prisma.InputJsonValue,
+    output: (record.output ?? {}) as Prisma.InputJsonValue,
+    errorMessage: record.errorMessage ?? null,
+    durationMs: record.durationMs ?? null,
+  });
+
+  streamService.send(sessionId, {
+    event: "agent_run_attempt",
+    data: {
+      sessionId,
+      agentRunId,
+      attemptIndex: record.attemptIndex,
+      phase: "VALIDATE_DRAFT",
+      toolCall: {
+        id: toolCall.id,
+        agentRunId: toolCall.agentRunId,
+        sessionId: toolCall.sessionId,
+        toolName: toolCall.toolName,
+        status: toolCall.status as "running" | "succeeded" | "failed",
+        attemptIndex: toolCall.attemptIndex,
+        inputSummary: toolCall.inputSummary as JsonObject,
+        output: toolCall.output as JsonObject | null,
+        errorMessage: toolCall.errorMessage,
+        durationMs: toolCall.durationMs,
+        createdAt: toolCall.createdAt.toISOString(),
+      },
+    },
+  });
+}
+
 export const agentRunService = {
   /**
-   * 执行一次 agent run：启动 → mock agent → commit 或 fail。
+   * 执行一次正式 Agent run：启动、调用 Agent Runtime、提交或失败。
    */
   async executeRun(agentRunId: string, sessionId: string, userMessage: string): Promise<void> {
-    // 1. 启动 run
     const run = await agentRunRepository.update(agentRunId, {
       status: "running",
       startedAt: new Date(),
-      attemptCount: 1,
+      attemptCount: 0,
     });
 
     streamService.send(sessionId, {
@@ -77,20 +142,35 @@ export const agentRunService = {
       },
     });
 
-    logger.info({ sessionId, agentRunId }, "Agent run 已启动");
+    logger.info(`Agent run 启动 -> session=${SID(sessionId)}, runId=${SID(agentRunId)}`);
+    logger.debug("-> SSE -> FRONTEND: agent_run_started");
 
-    // 2. 异步执行 mock agent
     setImmediate(async () => {
       try {
-        // 获取当前快照作为 input
         const currentSnapshot = await surfaceSnapshotRepository.findCurrentBySessionId(sessionId);
+        const recentMessages = await messageRepository.findBySessionId(sessionId, { limit: 20 });
+        const uploadedFiles = await fileRepository.findReadyWithContentBySessionId(sessionId);
+        const enabledSkills = await sessionSkillRepository.findBySessionId(sessionId);
 
         const agentInput: AgentRunInput = {
           sessionId,
           userMessage,
-          recentMessages: [],
-          uploadedFiles: [],
-          enabledSkills: [],
+          recentMessages: recentMessages.map((message) => ({
+            role: message.role,
+            content: message.content,
+          })),
+          uploadedFiles: uploadedFiles.map((file) => ({
+            id: file.id,
+            originalName: file.originalName,
+            content: file.content,
+          })),
+          enabledSkills: enabledSkills
+            .filter((sessionSkill) => sessionSkill.enabled && sessionSkill.skill.isActive)
+            .map((sessionSkill) => ({
+              id: sessionSkill.skill.id,
+              name: sessionSkill.skill.name,
+              content: sessionSkill.skill.content,
+            })),
           currentSnapshot: currentSnapshot ? (currentSnapshot.snapshot as AgentRunInput["currentSnapshot"]) : null,
           catalogId: config.catalog.id,
           catalogVersion: config.catalog.version,
@@ -102,50 +182,36 @@ export const agentRunService = {
           },
         };
 
-        // 记录 tool call（mock）
-        const toolCall = await toolCallRepository.create({
-          agentRun: { connect: { id: agentRunId } },
-          sessionId,
-          toolName: "generate_a2ui",
-          status: "running",
-          attemptIndex: 1,
-          inputSummary: { userMessage },
+        const runtime = buildAgentRuntime();
+        const toolCallTasks: Array<Promise<void>> = [];
+        const result = await runtime.run(agentInput, (record) => {
+          toolCallTasks.push(recordRuntimeToolCall(agentRunId, sessionId, record));
         });
-
-        const result = await mockAgentRun(agentInput);
-
-        // 更新 tool call 为成功
-        await prisma.toolCall.update({
-          where: { id: toolCall.id },
-          data: {
-            status: "succeeded",
-            output: result as unknown as Prisma.InputJsonValue,
-            durationMs: 100,
-          },
-        });
+        await Promise.all(toolCallTasks);
 
         if (result.status === "COMMITTED") {
           await agentRunService.commitRun(agentRunId, sessionId, result);
+        } else if (result.status === "TEXT_ONLY") {
+          await agentRunService.commitTextOnlyRun(agentRunId, sessionId, result);
         } else {
-          await agentRunService.failRun(agentRunId, sessionId, (result as Extract<AgentRunResult, { status: "FAILED" }>).failureReason ?? "未知错误", result.attemptCount);
+          await agentRunService.failRun(agentRunId, sessionId, result.failureReason, result.attemptCount);
         }
       } catch (err) {
-        logger.error({ err, sessionId, agentRunId }, "Agent run 执行失败");
+        logger.error(`Agent run 执行失败 -> session=${SID(sessionId)}, runId=${SID(agentRunId)}, error=${toAgentRunError(err).slice(0, 120)}`);
         await agentRunService.failRun(agentRunId, sessionId, toAgentRunError(err), 1);
       }
     });
   },
 
   /**
-   * 提交成功的 agent run：在事务中创建 assistant message、a2ui_events、snapshot。
+   * 提交成功的 agent run：创建 assistant message、A2UI event 和 snapshot。
    */
   async commitRun(
     agentRunId: string,
     sessionId: string,
-    result: Extract<AgentRunResult, { status: "COMMITTED" }>
+    result: Extract<AgentRunResult, { status: "COMMITTED" }>,
   ): Promise<void> {
     await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      // 1. 创建 assistant message
       const assistantMessage = await tx.message.create({
         data: {
           sessionId,
@@ -159,10 +225,7 @@ export const agentRunService = {
         },
       });
 
-      // 2. 计算 sequence
       const sequence = await a2uiEventRepository.getNextSequence(sessionId, tx);
-
-      // 3. 创建 a2ui_event
       const surfaceIds = extractSurfaceIds(result.a2uiMessages);
       const a2uiEvent = await tx.a2UIEvent.create({
         data: {
@@ -180,20 +243,16 @@ export const agentRunService = {
         },
       });
 
-      // 4. 关联 a2uiEventIds 到 assistant message
       await tx.message.update({
         where: { id: assistantMessage.id },
         data: { a2uiEventIds: [a2uiEvent.id] },
       });
 
-      // 5. 计算 snapshot（回放所有事件）
       const snapshotData = await snapshotService.computeFromEvents(sessionId);
       const { surfaceCount, componentCount } = snapshotService.getCounts(snapshotData);
 
-      // 6. unset 旧的 current snapshot
       await surfaceSnapshotRepository.unsetCurrent(sessionId, tx);
 
-      // 7. 创建新 snapshot
       const newSnapshot = await tx.surfaceSnapshot.create({
         data: {
           sessionId,
@@ -211,7 +270,6 @@ export const agentRunService = {
         },
       });
 
-      // 8. 更新 session
       await tx.session.update({
         where: { id: sessionId },
         data: {
@@ -220,53 +278,96 @@ export const agentRunService = {
         },
       });
 
-      // 9. 更新 agent_run 为 committed
       await tx.agentRun.update({
         where: { id: agentRunId },
         data: {
           status: "committed",
+          attemptCount: result.attemptCount,
           outputSnapshotId: newSnapshot.id,
           assistantMessageId: assistantMessage.id,
           validationSummary: result.validation as unknown as Prisma.InputJsonValue,
+          tokenUsage: (result.tokenUsage ?? {}) as Prisma.InputJsonValue,
           completedAt: new Date(),
         },
       });
 
-      // 事务提交后推送 SSE
-      const assistantMessageDto = buildMessageDto(assistantMessage);
-      const a2uiEventDto = buildA2UIEventDto(a2uiEvent, sessionId);
-      const snapshotDto = buildSnapshotDto(newSnapshot, sessionId);
-
       streamService.send(sessionId, {
         event: "assistant_message",
-        data: { sessionId, message: assistantMessageDto },
+        data: { sessionId, message: buildMessageDto(assistantMessage) },
       });
 
       streamService.send(sessionId, {
         event: "a2ui_messages",
-        data: { sessionId, a2uiEvent: a2uiEventDto },
+        data: { sessionId, a2uiEvent: buildA2UIEventDto(a2uiEvent, sessionId) },
       });
 
       streamService.send(sessionId, {
         event: "surface_snapshot",
-        data: { sessionId, snapshot: snapshotDto },
+        data: { sessionId, snapshot: buildSnapshotDto(newSnapshot, sessionId) },
       });
 
-      logger.info({ sessionId, agentRunId, sequence }, "Agent run 已提交");
+      logger.info(`Agent run 提交 -> session=${SID(sessionId)}, runId=${SID(agentRunId)}, sequence=${sequence}`);
+      logger.debug("-> SSE -> FRONTEND: assistant_message + a2ui_messages + surface_snapshot");
     });
   },
 
   /**
-   * 标记 agent run 失败：在事务中创建 assistant 失败消息，推送 SSE。
+   * 提交仅文本回复的 agent run：不创建 A2UI event，也不更新 snapshot。
+   */
+  async commitTextOnlyRun(
+    agentRunId: string,
+    sessionId: string,
+    result: Extract<AgentRunResult, { status: "TEXT_ONLY" }>,
+  ): Promise<void> {
+    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const assistantMessage = await tx.message.create({
+        data: {
+          sessionId,
+          agentRunId,
+          role: "assistant",
+          kind: "chat",
+          content: result.assistantMessage,
+          attachments: [],
+          a2uiEventIds: [],
+          metadata: {},
+        },
+      });
+
+      await tx.session.update({
+        where: { id: sessionId },
+        data: { lastAgentRunId: agentRunId },
+      });
+
+      await tx.agentRun.update({
+        where: { id: agentRunId },
+        data: {
+          status: "committed",
+          attemptCount: result.attemptCount,
+          assistantMessageId: assistantMessage.id,
+          tokenUsage: (result.tokenUsage ?? {}) as Prisma.InputJsonValue,
+          completedAt: new Date(),
+        },
+      });
+
+      streamService.send(sessionId, {
+        event: "assistant_message",
+        data: { sessionId, message: buildMessageDto(assistantMessage) },
+      });
+
+      logger.info(`Agent run 文本回复提交 -> session=${SID(sessionId)}, runId=${SID(agentRunId)}`);
+    });
+  },
+
+  /**
+   * 标记 agent run 失败，并创建 assistant 失败消息。
    */
   async failRun(
     agentRunId: string,
     sessionId: string,
     reason: string,
-    attemptCount: number
+    attemptCount: number,
   ): Promise<void> {
     await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      // 1. 创建 assistant 失败消息
       const failMessage = await tx.message.create({
         data: {
           sessionId,
@@ -280,7 +381,6 @@ export const agentRunService = {
         },
       });
 
-      // 2. 更新 agent_run
       await tx.agentRun.update({
         where: { id: agentRunId },
         data: {
@@ -292,8 +392,6 @@ export const agentRunService = {
         },
       });
 
-      const failMessageDto = buildMessageDto(failMessage);
-
       streamService.send(sessionId, {
         event: "agent_run_failed",
         data: {
@@ -304,11 +402,12 @@ export const agentRunService = {
             attemptCount,
             failureReason: reason,
           },
-          message: failMessageDto,
+          message: buildMessageDto(failMessage),
         },
       });
 
-      logger.warn({ sessionId, agentRunId, reason }, "Agent run 失败");
+      logger.warn(`Agent run 失败 -> session=${SID(sessionId)}, runId=${SID(agentRunId)}, reason=${reason.slice(0, 120)}`);
+      logger.debug("-> SSE -> FRONTEND: agent_run_failed");
     });
   },
 
@@ -321,7 +420,7 @@ export const agentRunService = {
   },
 
   /**
-   * 查询 agent run 详情（含 tool calls、assistant message、a2ui events）。
+   * 查询 agent run 详情，包含 tool calls、assistant message 和 A2UI events。
    */
   async getRunDetail(sessionId: string, runId: string): Promise<AgentRunDetailResponse> {
     const run = await agentRunRepository.findById(runId);
@@ -363,15 +462,25 @@ export const agentRunService = {
         durationMs: tc.durationMs,
         createdAt: tc.createdAt.toISOString(),
       })),
-      assistantMessage: assistantMessage
-        ? buildMessageDto(assistantMessage)
-        : null,
-      a2uiEvents: relatedEvents.map((e: { id: string; sessionId: string; agentRunId: string | null; messageId: string | null; sequence: number; status: string; catalogId: string; catalogVersion: string; rendererVersion: string; surfaceIds: string[]; messages: unknown; validationResult: unknown; createdAt: Date }) => buildA2UIEventDto(e, sessionId)),
+      assistantMessage: assistantMessage ? buildMessageDto(assistantMessage) : null,
+      a2uiEvents: relatedEvents.map((e: {
+        id: string;
+        sessionId: string;
+        agentRunId: string | null;
+        messageId: string | null;
+        sequence: number;
+        status: string;
+        catalogId: string;
+        catalogVersion: string;
+        rendererVersion: string;
+        surfaceIds: string[];
+        messages: unknown;
+        validationResult: unknown;
+        createdAt: Date;
+      }) => buildA2UIEventDto(e, sessionId)),
     };
   },
 };
-
-// ─── Helper: extract surface IDs ──────────────────────────
 
 function extractSurfaceIds(messages: A2UIServerMessage[]): string[] {
   const surfaceIds = new Set<string>();
@@ -391,8 +500,6 @@ function extractSurfaceIds(messages: A2UIServerMessage[]): string[] {
   }
   return Array.from(surfaceIds);
 }
-
-// ─── Helper: build DTOs from raw DB rows ──────────────────
 
 function buildMessageDto(m: {
   id: string;
@@ -436,7 +543,7 @@ function buildA2UIEventDto(
     validationResult: unknown;
     createdAt: Date;
   },
-  sessionId: string
+  sessionId: string,
 ): A2UIEventDto {
   return {
     id: e.id,
@@ -472,7 +579,7 @@ function buildSnapshotDto(
     summary: string | null;
     createdAt: Date;
   },
-  sessionId: string
+  sessionId: string,
 ): SurfaceSnapshotDto {
   return {
     id: s.id,

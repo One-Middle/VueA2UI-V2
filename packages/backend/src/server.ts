@@ -1,34 +1,61 @@
+import type { Server } from "node:http";
 import { createApp } from "./app.js";
 import { config } from "./config.js";
-import { logger } from "./logger.js";
 import { prisma } from "./db.js";
+import { logger } from "./logger.js";
 
 const app = createApp();
+let server: Server | null = null;
+let shuttingDown = false;
 
-// 启动时连接数据库
-prisma.$connect().then(() => {
-  logger.info("Prisma 已连接到数据库");
+try {
+  await prisma.$connect();
+  logger.info("Prisma connected");
 
-  app.listen(config.port, () => {
+  server = app.listen(config.port, () => {
     logger.info({ port: config.port }, "Backend server started");
   });
-}).catch((err: unknown) => {
-  logger.error({ err }, "数据库连接失败，服务退出");
-  process.exit(1);
-});
 
-// 优雅关闭
-async function gracefulShutdown(signal: string) {
-  logger.info({ signal }, "收到关闭信号，开始优雅退出");
+  server.on("error", (err: NodeJS.ErrnoException) => {
+    if (err.code === "EADDRINUSE") {
+      logger.error({ port: config.port }, "Backend port is already in use");
+      void gracefulShutdown("EADDRINUSE", 1);
+      return;
+    }
+
+    logger.error({ err }, "Backend server error");
+    void gracefulShutdown("SERVER_ERROR", 1);
+  });
+} catch (err: unknown) {
+  logger.error({ err }, "Database connection failed");
+  process.exit(1);
+}
+
+async function gracefulShutdown(signal: string, exitCode = 0) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+
+  logger.info({ signal }, "Graceful shutdown started");
+
   try {
+    if (server?.listening) {
+      await new Promise<void>((resolve, reject) => {
+        server?.close((err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+      logger.info("HTTP server closed");
+    }
+
     await prisma.$disconnect();
-    logger.info("Prisma 连接已关闭");
-    process.exit(0);
+    logger.info("Prisma disconnected");
+    process.exit(exitCode);
   } catch (err: unknown) {
-    logger.error({ err }, "关闭数据库连接时出错");
+    logger.error({ err }, "Graceful shutdown failed");
     process.exit(1);
   }
 }
 
-process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
-process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+process.on("SIGTERM", () => void gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => void gracefulShutdown("SIGINT"));

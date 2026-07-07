@@ -13,6 +13,7 @@
 
 import type { A2UIServerMessage } from "@a2ui-platform/shared";
 import { SurfaceGroupModel } from "./surface-model";
+import { logger } from "../logger.js";
 
 /** 消息处理结果 */
 export interface ProcessMessagesResult {
@@ -38,13 +39,12 @@ export class MessageProcessor {
     let accepted = 0;
     const surfaceIds = new Set<string>();
 
+    logger.info(`处理 A2UI 消息 → ${msgs.length}条`);
+
     for (const msg of msgs) {
       // 只接受 v0.9 消息
       if (msg.version !== "v0.9") {
-        console.warn(
-          "[MessageProcessor] 忽略非 v0.9 版本消息:",
-          msg.version
-        );
+        logger.warn(`忽略非 v0.9 版本消息: ${msg.version}`);
         continue;
       }
 
@@ -59,6 +59,7 @@ export class MessageProcessor {
         );
         surface.createSurface(payload);
         surfaceIds.add(payload.surfaceId);
+        logger.info(`创建 Surface → surfaceId=${payload.surfaceId}, catalogId=${payload.catalogId}`);
         handled = true;
       }
 
@@ -69,11 +70,10 @@ export class MessageProcessor {
         if (surface) {
           surface.updateComponents(components);
           surfaceIds.add(surfaceId);
+          logger.debug(`更新组件 → surfaceId=${surfaceId}, ${components.length}个`);
           handled = true;
         } else {
-          console.warn(
-            `[MessageProcessor] updateComponents 目标 surface 不存在: "${surfaceId}"`
-          );
+          logger.warn(`updateComponents 目标 surface 不存在: "${surfaceId}"`);
         }
       }
 
@@ -84,11 +84,10 @@ export class MessageProcessor {
         if (surface) {
           surface.updateDataModel(path, value ?? null);
           surfaceIds.add(surfaceId);
+          logger.debug(`更新数据模型 → surfaceId=${surfaceId}, path=${path}`);
           handled = true;
         } else {
-          console.warn(
-            `[MessageProcessor] updateDataModel 目标 surface 不存在: "${surfaceId}"`
-          );
+          logger.warn(`updateDataModel 目标 surface 不存在: "${surfaceId}"`);
         }
       }
 
@@ -103,7 +102,7 @@ export class MessageProcessor {
       if (handled) {
         accepted++;
       } else {
-        console.warn("[MessageProcessor] 无法识别的消息类型:", Object.keys(msg));
+        logger.warn("无法识别的消息类型:", Object.keys(msg).join(", "));
       }
     }
 

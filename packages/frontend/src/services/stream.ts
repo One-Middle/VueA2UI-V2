@@ -6,6 +6,8 @@
  */
 
 import type { PlatformSseEvent, ServerSentEventName } from "@a2ui-platform/shared";
+import { resolveApiBaseUrl } from "./api";
+import { logger } from "./logger";
 
 /** SSE 事件处理器映射 */
 export type StreamHandlers = {
@@ -35,7 +37,7 @@ const RECONNECT_DELAY_MS = 3000;
  * @returns 连接控制器，可调用 close() 主动关闭
  */
 export function connectStream(sessionId: string, handlers: StreamHandlers): StreamConnection {
-  const baseUrl = import.meta.env.VITE_API_BASE_URL ?? "/api";
+  const baseUrl = resolveApiBaseUrl(import.meta.env.VITE_API_BASE_URL);
   const url = `${baseUrl}/sessions/${sessionId}/stream`;
 
   let lastEventId: string | null = null;
@@ -70,6 +72,8 @@ export function connectStream(sessionId: string, handlers: StreamHandlers): Stre
       // 连接成功，重置重试计数
       retryCount = 0;
 
+      logger.debug(`SSE 连接成功 → session=${sessionId.slice(0, 8)}`);
+
       const reader = res.body?.getReader();
       if (!reader) {
         throw new Error("无法读取响应流");
@@ -103,6 +107,7 @@ export function connectStream(sessionId: string, handlers: StreamHandlers): Stre
           } else if (line === "") {
             // 空行表示一帧结束
             if (currentEvent && currentData) {
+              logger.debug(`SSE 帧 → event=${currentEvent}, id=${currentId ?? "-"}`);
               try {
                 const parsedData = JSON.parse(currentData);
                 if (currentId) {
@@ -135,6 +140,7 @@ export function connectStream(sessionId: string, handlers: StreamHandlers): Stre
       // 尝试重连
       if (retryCount < MAX_RETRIES) {
         retryCount++;
+        logger.warn(`SSE 重连 → attempt=${retryCount}/${MAX_RETRIES}`);
         handlers.onReconnecting?.(retryCount);
         await new Promise((resolve) => setTimeout(resolve, RECONNECT_DELAY_MS));
         connect();

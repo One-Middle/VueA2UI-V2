@@ -37,6 +37,8 @@ export interface ModelClientConfig {
 
 // ─── ModelClient ────────────────────────────────────────────
 
+import { logger } from "../logger.js";
+
 export class ModelClient {
   private config: ModelClientConfig;
 
@@ -64,9 +66,13 @@ export class ModelClient {
       max_tokens: maxTokens,
     });
 
+    logger.debug(`调用 LLM API → url=${url}, model=${model}, messages=${messages.length}`);
+
     // 使用 AbortController 控制超时
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    const startTime = Date.now();
 
     try {
       const response = await fetch(url, {
@@ -78,6 +84,8 @@ export class ModelClient {
         body,
         signal: controller.signal,
       });
+
+      const elapsed = Date.now() - startTime;
 
       if (!response.ok) {
         let errorDetail = `HTTP ${response.status}`;
@@ -108,6 +116,10 @@ export class ModelClient {
           totalTokens: data.usage.total_tokens,
         };
       }
+
+      logger.info(
+        `LLM 响应 → tokens=${result.usage?.totalTokens ?? "?"}, 内容长度=${result.content.length}, 耗时=${elapsed}ms`
+      );
 
       return result;
     } catch (err) {

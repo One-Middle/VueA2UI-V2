@@ -6,18 +6,37 @@
 
 所有项目文档必须使用中文。
 
+## 必读文档
+
+优先阅读：
+
+- `docs/README.md`：文档总入口。
+- `docs/project-feature-structure.md`：项目主要功能结构。
+- `docs/project-structure.md`：工程结构说明。
+- `docs/development-start.md`：开发启动说明。
+- `docs/product/agent-platform-prd.md`：产品需求。
+- `docs/product/agent-platform-design.md`：系统设计。
+- `docs/product/agent-platform-api.md`：API 契约。
+- `docs/product/agent-platform-db-schema.md`：数据库契约。
+- `docs/product/agent-platform-module-specs.md`：模块实现规格。
+
+模块文档：
+
+- Frontend：`docs/frontend/frontend-implementation.md`、`docs/frontend/tasks.md`
+- Renderer：`docs/frontend/renderer/renderer-implementation.md`、`docs/frontend/renderer/tasks.md`
+- Backend：`docs/backend/backend-implementation.md`、`docs/backend/tasks.md`
+- Agent：`docs/agent/agent-runtime-implementation.md`、`docs/agent/tasks.md`
+- 集成：`docs/product/tasks/integration-tasks.md`
+
 ## 技术栈
 
-- Monorepo：pnpm workspace
-- 包目录：`packages/*`
+- Monorepo：pnpm workspace，包目录为 `packages/*`
 - 前端：Vue 3 + Vite + Vue Router + Pinia + Naive UI
 - Renderer：Vue 3 + A2UI v0.9
 - 后端：Node.js + Express + Prisma + PostgreSQL
 - Agent：Node.js / TypeScript + OpenAI-compatible API
-- API DTO 校验：Zod
-- A2UI JSON Schema 校验：Ajv
-- 日志：pino
-- 文件上传：multer
+- 校验：Zod、Ajv
+- 日志与上传：pino、multer
 - 测试：Vitest
 
 ## 包结构
@@ -31,37 +50,14 @@ packages/
   agent/      # Agent Runtime、Prompt、ModelClient、validateA2UI
 ```
 
-## 必读文档
-
-全局契约：
-
-- `docs/development-start.md`
-- `docs/product/agent-platform-prd.md`
-- `docs/product/agent-platform-design.md`
-- `docs/product/agent-platform-api.md`
-- `docs/product/agent-platform-db-schema.md`
-- `docs/product/agent-platform-module-specs.md`
-
-模块文档：
-
-- Frontend：`docs/frontend/frontend-implementation.md`、`docs/frontend/tasks.md`
-- Renderer：`docs/frontend/renderer/renderer-implementation.md`、`docs/frontend/renderer/tasks.md`
-- Backend：`docs/backend/backend-implementation.md`、`docs/backend/tasks.md`
-- Agent：`docs/agent/agent-runtime-implementation.md`、`docs/agent/tasks.md`
-- 集成：`docs/product/tasks/integration-tasks.md`
+不要优先修改生成物或依赖目录：`node_modules/`、`.pnpm-store/`、`packages/*/dist/`、`packages/*/node_modules/`、`packages/backend/uploads/`、`tmp-dev-*.log`。
 
 ## 开发原则
 
-- 先共享类型，后模块并行。
-- 先 mock 链路，后真实模型。
-- 先最小闭环，后补齐组件。
+- 先共享类型，后模块实现；跨模块契约优先放入 `packages/shared`。
 - 后端只提交通过 `validateA2UI` 的 A2UI 消息。
 - Renderer 不接收未通过后端校验的消息作为正式状态。
-- Agent 不生成任意 HTML、JavaScript 或 CSS。
-- MVP 不做登录。
-- MVP 不提供外部 HTTP/API 工具。
-- MVP 固定 Basic Catalog，但保留 `catalogId` 和 `catalogVersion`。
-- 文件读取只允许用户上传的 `.txt` 文件。
+- 当修改模块的功能逻辑时，需要更新对应文档。
 
 ## 模块边界
 
@@ -69,44 +65,25 @@ packages/
 
 负责工作台 UI、路由、Pinia 状态、Naive UI 界面、HTTP API 调用、SSE 接收、Renderer 接入和导入导出入口。
 
-不负责：
-
-- A2UI 协议渲染核心。
-- 模型调用。
-- A2UI 校验。
-- 数据库访问。
+不负责：A2UI 协议渲染核心、模型调用、A2UI 校验、数据库访问。
 
 ### `packages/renderer`
 
 负责 A2UI v0.9 消息处理、surface/component/data model、Vue3 渲染、Basic Catalog 组件、action/error 派发。
 
-不负责：
-
-- 后端 API 调用。
-- 会话持久化。
-- Agent 修复逻辑。
-- 工作台业务状态。
+不负责：后端 API 调用、会话持久化、Agent 修复逻辑、工作台业务状态。
 
 ### `packages/backend`
 
 负责 Express API、Prisma、PostgreSQL、SSE、文件上传、skills、events、snapshots、Renderer action/error 记录和 Agent run 编排。
 
-不负责：
-
-- 直接调用 OpenAI-compatible API。
-- 直接生成 A2UI 草稿。
-- 绕过 Agent/validateA2UI 提交模型输出。
+不负责：直接调用 OpenAI-compatible API、直接生成 A2UI 草稿、绕过 Agent/validateA2UI 提交模型输出。
 
 ### `packages/agent`
 
 负责 Agent Runtime、上下文构建、prompt、模型调用、输出解析、`validateA2UI` 和三次修复循环。
 
-不负责：
-
-- 直接写数据库。
-- 直接访问任意本地路径。
-- 开放 HTTP API。
-- 外部 HTTP/API 工具。
+不负责：直接写数据库、直接访问任意本地路径、开放 HTTP API、外部 HTTP/API 工具。
 
 ### `packages/shared`
 
@@ -119,18 +96,6 @@ packages/
 - `src/agent.ts`：Agent input、result、validation、tool call 类型。
 - `src/sse.ts`：SSE event 类型。
 - `src/index.ts`：统一导出入口。
-
-跨包契约变更必须先更新 `packages/shared`，再更新调用方；不要在业务模块内复制定义共享 DTO。
-
-## 推荐开工顺序
-
-1. `TASK-INT-001`：完善 `packages/shared` 共享类型契约。
-2. `TASK-INT-002`：Mock A2UI 端到端链路。
-3. Renderer 最小闭环：DataModel、SurfaceModel、MessageProcessor、Text/Row/Column/Button/TextField。
-4. Backend 基础 API：sessions、messages、agent_runs、a2ui_events、surface_snapshots、SSE。
-5. Frontend 工作台：tabs、对话、预览、SSE 接入。
-6. Agent Runtime：ContextBuilder、PromptComposer、ModelClient、validateA2UI、修复循环。
-7. 文件、skills、导入导出和调试面板。
 
 ## 命令约定
 
@@ -148,8 +113,7 @@ pnpm typecheck
 ## 代码规范
 
 - 使用 TypeScript。
-- 优先复用 `packages/shared` 类型。
-- 跨模块类型变更先改 `packages/shared`，再改模块实现。
+- 优先复用 `packages/shared` 类型；跨模块类型变更先改 `packages/shared`，再改模块实现。
 - API 请求/响应遵守 `docs/product/agent-platform-api.md`。
 - Prisma schema 遵守 `docs/product/agent-platform-db-schema.md`。
 - 前端业务状态使用 Pinia。

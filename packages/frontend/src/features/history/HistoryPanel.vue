@@ -11,7 +11,7 @@ const workspace = useWorkspaceStore();
       <div class="tab-content">
         <div v-if="workspace.sessions.length === 0" style="color: #999; padding: 20px;">暂无会话</div>
         <div v-for="s in workspace.sessions" :key="s.id" class="session-item"
-          :class="{ active: s.id === workspace.activeSessionId }" @click="workspace.setActiveSessionId(s.id)">
+          :class="{ active: s.id === workspace.activeSessionId }" @click="workspace.setActiveSessionId(s.id); workspace.setActiveTab('conversation')">
           <strong>{{ s.title }}</strong>
           <span class="meta">{{ s.status }} · {{ s.modelName }} · {{ new Date(s.updatedAt).toLocaleString() }}</span>
         </div>
