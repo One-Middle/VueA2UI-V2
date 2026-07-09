@@ -19,21 +19,31 @@ const childComponentId = computed(() => {
 /** action 名称 */
 const actionName = computed(() => {
   const raw = ctx.componentModel.getProperty("action");
-  return ctx.resolveValue(raw) ?? "";
+  const resolved = ctx.resolveValue(raw);
+  if (resolved && typeof resolved === "object" && "name" in resolved) {
+    return String((resolved as { name?: unknown }).name ?? "");
+  }
+  return String(resolved ?? "");
 });
 
-/** action 上下文键列表 */
-const actionContextKeys = computed(() => {
-  const raw = ctx.componentModel.getProperty("context");
+/** action 上下文 */
+const actionContext = computed(() => {
+  const raw = ctx.componentModel.getProperty("action");
   const resolved = ctx.resolveValue(raw);
-  return Array.isArray(resolved) ? resolved as string[] : [];
+  if (!resolved || typeof resolved !== "object" || !("context" in resolved)) {
+    return {};
+  }
+  const value = (resolved as { context?: unknown }).context;
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
 });
 
 /** 点击时解析 action context 并派发 */
 function handleClick(): void {
   const context: Record<string, unknown> = {};
-  for (const key of actionContextKeys.value) {
-    context[key] = ctx.dataContext.resolve({ path: key });
+  for (const [key, value] of Object.entries(actionContext.value)) {
+    context[key] = ctx.resolveValue(value);
   }
   ctx.dispatchAction(actionName.value as string, context);
 }

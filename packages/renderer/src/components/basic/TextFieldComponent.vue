@@ -32,10 +32,15 @@ const currentValue = computed({
 /** usageHint："short" → input，"long" → textarea */
 const usageHint = computed(() => {
   const raw = ctx.componentModel.getProperty("usageHint");
-  return ctx.resolveValue(raw) ?? "short";
+  return ctx.resolveValue(raw) ?? "shortText";
 });
 
-const isTextarea = computed(() => usageHint.value === "long");
+const isTextarea = computed(() => usageHint.value === "longText");
+const inputType = computed(() => {
+  if (usageHint.value === "number") return "number";
+  if (usageHint.value === "obscured") return "password";
+  return "text";
+});
 </script>
 
 <template>
@@ -49,7 +54,7 @@ const isTextarea = computed(() => usageHint.value === "long");
     />
     <input
       v-else
-      type="text"
+      :type="inputType"
       class="a2ui-textfield-input"
       :value="currentValue"
       @input="currentValue = ($event.target as HTMLInputElement).value"

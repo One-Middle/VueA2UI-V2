@@ -25,7 +25,6 @@ type WorkspaceSurfaceSnapshot = Omit<SurfaceSnapshotDto, "snapshot"> & {
 
 export type WorkspaceTab =
   | "conversation"
-  | "preview"
   | "history"
   | "skills"
   | "import-export"
@@ -51,6 +50,9 @@ export const useWorkspaceStore = defineStore("workspace", {
     // ─── 发送状态 ───
     isSending: false,
 
+    // ─── AI 生成状态（SSE 事件驱动） ───
+    isGenerating: false,
+
     // ─── SSE 连接（不在 state 中序列化） ───
     _streamConnection: null as StreamConnection | null,
   }),
@@ -59,6 +61,23 @@ export const useWorkspaceStore = defineStore("workspace", {
     // ─── Tab 切换 ───
     setActiveTab(tab: WorkspaceTab) {
       this.activeTab = tab;
+    },
+
+    startNewConversation() {
+      this.disconnectSSE();
+      this.activeTab = "conversation";
+      this.activeSessionId = null;
+      this.streamStatus = "idle";
+      this.messages = [];
+      this.uploadedFiles = [];
+      this.enabledSkillIds = [];
+      this.agentRuns = [];
+      this.a2uiEvents = [];
+      this.surfaceSnapshots = [];
+      this.isSending = false;
+      this.isGenerating = false;
+      const renderer = useRendererStore();
+      renderer.reset();
     },
 
     // ─── 会话管理 ───
@@ -87,30 +106,56 @@ export const useWorkspaceStore = defineStore("workspace", {
       this.disconnectSSE();
 
       this.activeSessionId = sessionId;
+      this.isGenerating = false;
 
-      if (sessionId) {
-        // 清空之前的数据
-        this.messages = [];
-        this.uploadedFiles = [];
-        this.enabledSkillIds = [];
-        this.agentRuns = [];
-        this.a2uiEvents = [];
-        this.surfaceSnapshots = [];
+      // 清空之前的数据
+      this.messages = [];
+      this.uploadedFiles = [];
+      this.enabledSkillIds = [];
+      this.agentRuns = [];
+      this.a2uiEvents = [];
+      this.surfaceSnapshots = [];
 
-        // 清空 Renderer
-        const renderer = useRendererStore();
-        renderer.reset();
+      // 清空 Renderer
+      const renderer = useRendererStore();
+      renderer.reset();
 
-        // 加载新会话数据
-        this.loadMessages();
-        this.loadFiles();
-        this.loadAgentRuns();
-        this.loadA2UIEvents();
-        this.loadSnapshots();
-        this.loadSessionDetail();
+      if (!sessionId) {
+        return;
+      }
 
-        // 建立 SSE 连接
-        this.connectSSE();
+      // 加载新会话数据
+      this.loadMessages();
+      this.loadFiles();
+      this.loadAgentRuns();
+      this.loadA2UIEvents();
+      this.loadSnapshots();
+      this.loadSessionDetail();
+
+      // 建立 SSE 连接
+      this.connectSSE();
+    },
+
+    async deleteSession(sessionId: string) {
+      try {
+        await api.deleteSession(sessionId);
+        // 移除本地会话列表中的对应项
+        this.sessions = this.sessions.filter((s) => s.id !== sessionId);
+        // 如果正在删除的是当前选中的会话，清空选中状态
+        if (this.activeSessionId === sessionId) {
+          this.disconnectSSE();
+          this.activeSessionId = null;
+          this.messages = [];
+          this.uploadedFiles = [];
+          this.enabledSkillIds = [];
+          this.agentRuns = [];
+          this.a2uiEvents = [];
+          this.surfaceSnapshots = [];
+          const renderer = useRendererStore();
+          renderer.reset();
+        }
+      } catch {
+        throw new Error("删除会话失败");
       }
     },
 
@@ -317,6 +362,7 @@ export const useWorkspaceStore = defineStore("workspace", {
 
         agent_run_started: (data: { sessionId: string; agentRun: Pick<AgentRunDto, "id" | "status" | "attemptCount" | "maxAttempts"> }) => {
           this.streamStatus = "connected";
+          this.isGenerating = true;
           logger.info(`← SSE ← BACKEND: agent_run_started → runId=${shortId(data.agentRun.id)}`);
           // 添加或更新 run
           const existingIdx = this.agentRuns.findIndex((r) => r.id === data.agentRun.id);
@@ -356,6 +402,8 @@ export const useWorkspaceStore = defineStore("workspace", {
           this.a2uiEvents.push(toWorkspaceA2UIEvent(data.a2uiEvent));
           // 排序
           this.a2uiEvents.sort((a, b) => a.sequence - b.sequence);
+          // A2UI 消息到达 = 生成完成
+          this.isGenerating = false;
         },
 
         surface_snapshot: (data: { sessionId: string; snapshot: SurfaceSnapshotDto }) => {
@@ -392,6 +440,8 @@ export const useWorkspaceStore = defineStore("workspace", {
           if (!existing) {
             this.messages.push(data.message);
           }
+          // 生成结束
+          this.isGenerating = false;
         },
 
         onError: (_error: Error) => {

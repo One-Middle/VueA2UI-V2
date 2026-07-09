@@ -65,3 +65,16 @@ sessionsRouter.patch(
     }
   }
 );
+
+/**
+ * DELETE /api/sessions/:sessionId —— 软删除会话
+ */
+sessionsRouter.delete("/sessions/:sessionId", async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const sessionId = req.params.sessionId as string;
+    const result = await sessionService.delete(sessionId);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});

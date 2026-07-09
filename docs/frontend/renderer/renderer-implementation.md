@@ -104,7 +104,14 @@
 - `Slider`
 - `DateTimeInput`
 
-## 8. 验收标准
+## 8. 渲染样式与属性映射
+
+- Renderer 包入口必须加载 `styles.css`，确保工作台预览区使用 Basic Catalog 样式，而不是浏览器默认纯文本样式。
+- `Row` 和 `Column` 需要把 A2UI 协议值映射为合法 CSS flex 值：`start -> flex-start`、`end -> flex-end`、`spaceBetween -> space-between`、`spaceAround -> space-around`、`spaceEvenly -> space-evenly`。
+- `Button.action` 按 Catalog 契约解析为 `{ name, context }`，点击时派发 `a2ui:action`。
+- `TextField.usageHint` 使用 `shortText`、`longText`、`number`、`obscured`，分别映射到单行输入、多行输入、数字输入和密码输入。
+
+## 9. 验收标准
 
 - 能处理 create/update/delete surface。
 - 能从 `root` 渲染组件树。

@@ -190,6 +190,7 @@ export class AgentRuntime {
         // 有 A2UI 消息 → COMMITTED
         if (a2uiMessages.length > 0) {
           logger.info(`Agent 完成 → ✅ COMMITTED, attempts=${attempt}, messages=${a2uiMessages.length}, tokens=${totalTokens?.["totalTokens"] ?? "?"}`);
+          logger.info(`📦 最终提交的 A2UI 消息:\n${JSON.stringify(a2uiMessages, null, 2)}`);
           return {
             status: "COMMITTED",
             assistantMessage,

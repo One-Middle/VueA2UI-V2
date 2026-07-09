@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * Card 组件：卡片容器，渲染单个 child。
+ * Card 组件：卡片容器，渲染可选 title 和单个 child。
  */
 import { computed, inject } from "vue";
 import { type ComponentContext, componentContextKey } from "../../vue/context";
@@ -14,10 +14,17 @@ const childComponentId = computed(() => {
   const raw = ctx.componentModel.getProperty("child");
   return ctx.resolveValue(raw) as string | undefined;
 });
+
+const title = computed(() => {
+  const raw = ctx.componentModel.getProperty("title");
+  const resolved = ctx.resolveValue(raw);
+  return typeof resolved === "string" ? resolved : "";
+});
 </script>
 
 <template>
   <div class="a2ui-card" :data-component-id="componentId">
+    <div v-if="title" class="a2ui-card-title">{{ title }}</div>
     <A2uiComponent
       v-if="childComponentId"
       :surface-id="surfaceId"

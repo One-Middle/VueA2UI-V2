@@ -1,6 +1,7 @@
 import type { AgentContext } from "../context/context-builder.js";
 import type { ValidationIssue } from "@a2ui-platform/shared";
 import { getAllCatalogComponentNames } from "../tools/catalog-schema.js";
+import { buildA2uiProtocolGuide } from "./a2ui-protocol-guide.js";
 
 // ─── PromptComposer ─────────────────────────────────────────
 
@@ -65,39 +66,7 @@ export class PromptComposer {
       "## 角色",
       "你是一个 A2UI 页面生成助手。你的任务是根据用户的自然语言描述，使用固定的 Basic Catalog 组件生成符合 A2UI v0.9 规范的 UI 界面。",
       "",
-      "## 可用组件",
-      `你只能使用以下 Basic Catalog 组件：${componentList}。`,
-      "不能使用 Catalog 之外的任意组件。",
-      "",
-      "## 输出格式要求",
-      "你的输出必须是一个严格的 JSON 对象（不要用 Markdown 代码块包裹），结构如下：",
-      "{",
-      '  "assistantMessage": "给用户的文本回复（解释你生成了什么）",',
-      '  "a2uiMessages": [ /* A2UI v0.9 消息数组 */ ]',
-      "}",
-      "",
-      "### a2uiMessages 说明",
-      "a2uiMessages 是 A2UI v0.9 server-to-client 消息数组。每条消息是以下四种之一：",
-      '1. createSurface — { "version": "v0.9", "createSurface": { "surfaceId": "...", "catalogId": "..." } }',
-      '2. updateComponents — { "version": "v0.9", "updateComponents": { "surfaceId": "...", "components": [...] } }',
-      '3. updateDataModel — { "version": "v0.9", "updateDataModel": { "surfaceId": "...", "path": "/...", "value": ... } }',
-      '4. deleteSurface — { "version": "v0.9", "deleteSurface": { "surfaceId": "..." } }',
-      "",
-      "必须先 createSurface，再用 updateComponents 添加组件。",
-      "",
-      "### 组件定义规范",
-      "每个组件对象的最小结构：",
-      '{ "id": "唯一组件ID", "component": "组件类型名称", ...组件属性 }',
-      "",
-      "### 组件关系 - 邻接表",
-      "使用邻接表方式定义组件树：",
-      "- 每个组件都有唯一的字符串 id。",
-      '- 容器组件（Row、Column、List、Card、Tabs、Modal）通过 child（单子）或 children（多子，字符串数组）引用其他组件的 id。',
-      "- 必须有一个 id 为 \"root\" 的组件作为 UI 树的根。",
-      "",
-      "### 数据绑定",
-      '数据绑定使用 JSON Pointer 格式：{ "path": "/some/data/path" }',
-      "例如，TextField 的 text 属性可以绑定到 data model 的某个路径。",
+      buildA2uiProtocolGuide(componentList),
       "",
       "## 禁止事项",
       "- 禁止生成任意 HTML、JavaScript 或 CSS。",

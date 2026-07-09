@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * Tabs 组件：标签页容器，读取 tabItems 数组。
+ * Tabs 组件：标签页容器，读取 tabItems 数组，并兼容模型常见输出 tabs。
  */
 import { computed, inject, ref } from "vue";
 import { componentContextKey } from "../../vue/context";
@@ -12,7 +12,9 @@ const ctx = inject(componentContextKey)!;
 
 /** tabItems 数组：每个元素 { title: string; child: string } */
 const tabItems = computed(() => {
-  const raw = ctx.componentModel.getProperty("tabItems");
+  const raw =
+    ctx.componentModel.getProperty("tabItems") ??
+    ctx.componentModel.getProperty("tabs");
   const resolved = ctx.resolveValue(raw);
   return Array.isArray(resolved) ? resolved as Record<string, unknown>[] : [];
 });
@@ -26,6 +28,11 @@ const activeTab = computed(() => tabItems.value[activeIndex.value]);
 function selectTab(index: number): void {
   activeIndex.value = index;
 }
+
+const activeChildId = computed(() => {
+  const child = activeTab.value?.child;
+  return typeof child === "string" ? child : undefined;
+});
 </script>
 
 <template>
@@ -43,9 +50,9 @@ function selectTab(index: number): void {
     </div>
     <div class="a2ui-tabs-content">
       <A2uiComponent
-        v-if="activeTab?.child"
+        v-if="activeChildId"
         :surface-id="surfaceId"
-        :component-id="String(activeTab.child)"
+        :component-id="activeChildId"
       />
     </div>
   </div>

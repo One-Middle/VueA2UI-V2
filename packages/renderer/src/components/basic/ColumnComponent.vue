@@ -11,6 +11,22 @@ const props = defineProps<{ surfaceId: string; componentId: string }>();
 
 const ctx = inject(componentContextKey)!;
 
+const justifyContentMap: Record<string, CSSProperties["justifyContent"]> = {
+  start: "flex-start",
+  center: "center",
+  end: "flex-end",
+  spaceBetween: "space-between",
+  spaceAround: "space-around",
+  spaceEvenly: "space-evenly",
+};
+
+const alignItemsMap: Record<string, CSSProperties["alignItems"]> = {
+  start: "flex-start",
+  center: "center",
+  end: "flex-end",
+  stretch: "stretch",
+};
+
 /** 解析 distribution（justify-content） */
 const distribution = computed(() => {
   const raw = ctx.componentModel.getProperty("distribution");
@@ -27,8 +43,8 @@ const alignment = computed(() => {
 const childIds = computed(() => ctx.componentModel.getChildIds());
 
 const columnStyle = computed<CSSProperties>(() => ({
-  justifyContent: distribution.value,
-  alignItems: alignment.value,
+  justifyContent: justifyContentMap[distribution.value] ?? "flex-start",
+  alignItems: alignItemsMap[alignment.value] ?? "stretch",
 }));
 </script>
 

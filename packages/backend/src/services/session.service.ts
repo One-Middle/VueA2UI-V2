@@ -101,4 +101,13 @@ export const sessionService = {
     logger.info({ sessionId }, "Session updated");
     return { session: toSessionDto(updated)! };
   },
+
+  async delete(sessionId: string) {
+    const existing = await sessionRepository.findById(sessionId);
+    if (!existing) throw notFound("Session", sessionId);
+
+    await sessionRepository.softDelete(sessionId);
+    logger.info({ sessionId }, "Session soft-deleted");
+    return { success: true };
+  },
 };

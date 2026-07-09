@@ -1,3 +1,5 @@
+import "./styles.css";
+
 // ─── 核心数据模型 ───────────────────────────────────────────
 export { DataModel } from "./core/data-model";
 export { ComponentModel } from "./core/component-model";

@@ -189,6 +189,11 @@ export function updateSession(id: string, data: UpdateSessionRequest): Promise<{
   return request("PATCH", `/sessions/${id}`, data);
 }
 
+/** 删除会话（软删除） */
+export function deleteSession(id: string): Promise<{ success: boolean }> {
+  return request("DELETE", `/sessions/${id}`);
+}
+
 // ─── 消息 ──────────────────────────────────────────────────
 
 /** 获取消息列表 */
