@@ -2,6 +2,15 @@
 
 ## 2026-07-12
 
+### 文档结构
+
+- 重构 `docs/` 文档体系，新增 `overview`、`product`、`architecture`、`contracts`、`modules`、`tasks`、`archive` 分层。
+- 将旧版重复文档归档到 `docs/archive/legacy-2026-07/`，仅作为历史参考，不再作为当前实现契约。
+- 重写 `docs/README.md`，明确“一个事实只有一个权威位置”的维护规则。
+- 新增 `docs/modules/frontend.md`、`renderer.md`、`backend.md`、`agent.md`、`shared.md`、`integration.md`，统一记录模块功能定位、技术栈、代码工程结构和文件职责。
+- 新增 `docs/contracts/api.md`、`db-schema.md`、`a2ui-v0.9.md`、`shared-types.md`，作为跨模块契约入口。
+- 精简 `AGENTS.md`，移除旧文档路径、重复模块说明和过细模板，保留 AI 协作所需的入口文档、开发原则、文档维护和代码规范。
+
 ### 代码规范
 
 - 更新 AGENTS.md 注释规范：统一中文 JSDoc 格式、文件头注释模板、方法注释要求、区块分隔线规范。

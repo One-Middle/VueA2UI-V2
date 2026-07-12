@@ -1,155 +1,77 @@
 # A2UI Agent 平台文档入口
 
-本文档是 `docs/` 目录的总入口，用于帮助产品、前端、后端、Renderer、Agent 和集成开发快速定位相关资料。
+本文档是 `docs/` 的唯一入口。新的文档结构按“一个事实只有一个权威位置”整理，旧版长文档已归档到 `docs/archive/legacy-2026-07/`，仅作为历史参考。
 
-## 1. 项目定位
+## 1. 文档结构
 
-本项目是一个全栈 Agent 无代码 A2UI 创作平台。用户通过对话或上传 `.txt` 文件描述 UI 需求，后端 Agent Runtime 生成 A2UI v0.9 消息；消息经 `validateA2UI` 校验后由后端提交，前端 Vue3 Renderer 渲染为可交互 UI。
+```text
+docs/
+  README.md                  # 文档入口
+  overview.md                # 项目概览、功能地图、MVP 边界
+  development.md             # 本地开发、命令、环境和工程约定
+  CHANGELOG.md               # 变更记录
+  product/
+    prd.md                   # 产品需求、用户故事、非目标
+    roadmap.md               # 阶段计划和演进方向
+  architecture/
+    system-design.md         # 系统架构、模块边界、端到端链路
+    decisions/               # 架构决策记录
+  contracts/
+    api.md                   # HTTP/SSE API 契约
+    db-schema.md             # 数据库契约
+    a2ui-v0.9.md             # A2UI v0.9 与 Basic Catalog 契约
+    shared-types.md          # packages/shared 类型契约
+  modules/
+    frontend.md              # packages/frontend 实现地图
+    renderer.md              # packages/renderer 实现地图
+    backend.md               # packages/backend 实现地图
+    agent.md                 # packages/agent 实现地图
+    shared.md                # packages/shared 实现地图
+    integration.md           # 跨模块联调说明
+  tasks/
+    current.md               # 当前任务清单
+  archive/
+    legacy-2026-07/          # 旧文档归档
+```
 
-核心模块：
+## 2. 阅读路径
 
-- `packages/shared`：跨模块共享类型、DTO、SSE、A2UI 协议类型。
-- `packages/renderer`：A2UI v0.9 Vue3 Renderer。
-- `packages/frontend`：平台工作台、会话、预览、历史、调试与导入导出。
-- `packages/backend`：Express API、Prisma、PostgreSQL、SSE、文件和 Agent 编排。
-- `packages/agent`：Agent Runtime、Prompt、模型调用、A2UI 校验与修复循环。
+第一次了解项目：
 
-## 2. 推荐阅读路径
+1. [项目概览](./overview.md)
+2. [产品需求](./product/prd.md)
+3. [系统设计](./architecture/system-design.md)
+4. [开发说明](./development.md)
 
-### 2.1 第一次了解项目
+准备开发某个模块：
 
-1. [开发启动说明](./development-start.md)
-2. [项目主要功能结构](./project-feature-structure.md)
-3. [项目结构说明](./project-structure.md)
-4. [PRD](./product/agent-platform-prd.md)
-5. [设计文档](./product/agent-platform-design.md)
-6. [API 设计](./product/agent-platform-api.md)
-7. [数据库 Schema 设计](./product/agent-platform-db-schema.md)
-8. [模块实现规格](./product/agent-platform-module-specs.md)
+1. 先读 [系统设计](./architecture/system-design.md) 的模块边界。
+2. 再读对应模块文档：`docs/modules/*.md`。
+3. 若涉及跨模块数据，查看 `docs/contracts/` 下的契约文档。
+4. 最后查看 [当前任务清单](./tasks/current.md)。
 
-### 2.2 准备开发功能
+排查端到端问题：
 
-1. 先读全局契约：
-   [开发启动说明](./development-start.md)、
-   [设计文档](./product/agent-platform-design.md)、
-   [API 设计](./product/agent-platform-api.md)、
-   [数据库 Schema 设计](./product/agent-platform-db-schema.md)。
-2. 再读对应模块的实现说明和任务清单。
-3. 最后查看跨模块集成任务，确认改动是否影响端到端链路。
+1. [集成说明](./modules/integration.md)
+2. [API 契约](./contracts/api.md)
+3. [A2UI 契约](./contracts/a2ui-v0.9.md)
+4. 对应模块实现文档
 
-### 2.3 排查端到端问题
+## 3. 权威来源规则
 
-1. [集成实现详情](./integration/integration-implementation-details.md)
-2. [跨模块集成任务清单](./product/tasks/integration-tasks.md)
-3. [Backend 模块实现详情](./backend/backend-implementation-details.md)
-4. [Frontend 模块实现详情](./frontend/frontend-implementation-details.md)
-5. [Agent Runtime 模块实现详情](./agent/agent-runtime-implementation-details.md)
-6. [Renderer 模块实现详情](./renderer/renderer-implementation-details.md)
+- 产品范围只维护在 [产品需求](./product/prd.md)。
+- 系统架构、模块依赖和职责边界只维护在 [系统设计](./architecture/system-design.md)。
+- HTTP/SSE 接口只维护在 [API 契约](./contracts/api.md)。
+- 数据库表、字段、事务边界只维护在 [数据库契约](./contracts/db-schema.md)。
+- A2UI 协议、消息顺序和 Basic Catalog 只维护在 [A2UI 契约](./contracts/a2ui-v0.9.md)。
+- 代码目录、文件作用和模块内部流程只维护在 `docs/modules/*.md`。
+- 当前开发任务只维护在 [当前任务清单](./tasks/current.md)。
 
-## 3. 按角色阅读
+## 4. 维护约定
 
-### 产品与需求
-
-- [PRD](./product/agent-platform-prd.md)：产品目标、用户体验、功能范围和成功指标。
-- [项目主要功能结构](./project-feature-structure.md)：主要功能域、工作流、页面结构和端到端功能链路。
-- [项目结构说明](./project-structure.md)：仓库目录、packages 分层、关键源码入口和生成目录说明。
-- [设计文档](./product/agent-platform-design.md)：总体架构、模块边界和核心链路。
-- [模块实现规格](./product/agent-platform-module-specs.md)：各模块职责、业务逻辑、API 映射和验收标准。
-- [全模块实施计划](./product/agent-platform-implementation-plan.md)：阶段计划和实施顺序。
-
-### 前端工作台
-
-- [Frontend 模块实现说明](./frontend/frontend-implementation.md)：模块定位、页面结构、状态管理和 API 集成。
-- [Frontend 模块实现详情](./frontend/frontend-implementation-details.md)：目录结构、页面、功能模块和关键实现。
-- [Frontend 模块任务清单](./frontend/tasks.md)：前端任务拆分与验收点。
-
-### Renderer
-
-- [Frontend Renderer 模块实现说明](./frontend/renderer/renderer-implementation.md)：Renderer 定位、核心对象、消息支持和 MVP 组件范围。
-- [Frontend Renderer 模块任务清单](./frontend/renderer/tasks.md)：Renderer 任务拆分。
-- [Basic Catalog 组件能力优化方案](./frontend/renderer/basic-catalog-component-optimization.md)：组件样式参数、预定义视觉能力和 Agent/Renderer 同步改造方案。
-- [A2UI 协议认识](./frontend/renderer/protocol/A2UI协议认识.md)：A2UI 协议概念、价值和核心模型。
-- [A2UI v0.9 渲染器实现指南](./frontend/renderer/a2ui-renderer-v0_9-guide.md)：渲染器实现路径和能力要求。
-- [Renderer 模块实现详情](./renderer/renderer-implementation-details.md)：Renderer 内部模型、消息处理和组件实现细节。
-
-### 后端
-
-- [Backend 模块实现说明](./backend/backend-implementation.md)：模块定位、服务分层、事务边界和验收标准。
-- [Backend 模块实现详情](./backend/backend-implementation-details.md)：文件结构、API 列表、服务层和数据访问。
-- [Backend 模块任务清单](./backend/tasks.md)：后端任务拆分与验收点。
-- [数据库 Schema 设计](./product/agent-platform-db-schema.md)：Prisma/PostgreSQL 数据模型契约。
-- [API 设计](./product/agent-platform-api.md)：后端 HTTP API 契约。
-
-### Agent Runtime
-
-- [Agent Runtime 模块实现说明](./agent/agent-runtime-implementation.md)：Runtime 定位、状态机、输出契约和验收标准。
-- [Agent Runtime 模块实现详情](./agent/agent-runtime-implementation-details.md)：ContextBuilder、PromptComposer、ModelClient、校验与修复循环。
-- [Agent Runtime 模块任务清单](./agent/tasks.md)：Agent 任务拆分与验收点。
-
-### 共享类型与集成
-
-- [共享类型规格说明](./shared/shared-types-spec.md)：`packages/shared` 类型契约。
-- [集成实现详情](./integration/integration-implementation-details.md)：端到端成功路径、失败路径和模块集成点。
-- [跨模块集成任务清单](./product/tasks/integration-tasks.md)：共享类型、Mock 链路、真实 Agent 链路和 SSE 集成任务。
-
-## 4. 全量文档索引
-
-### 根目录
-
-- [开发启动说明](./development-start.md)
-- [项目主要功能结构](./project-feature-structure.md)
-- [项目结构说明](./project-structure.md)
-
-### Product
-
-- [PRD](./product/agent-platform-prd.md)
-- [设计文档](./product/agent-platform-design.md)
-- [API 设计](./product/agent-platform-api.md)
-- [数据库 Schema 设计](./product/agent-platform-db-schema.md)
-- [模块实现规格](./product/agent-platform-module-specs.md)
-- [全模块实施计划](./product/agent-platform-implementation-plan.md)
-- [跨模块集成任务清单](./product/tasks/integration-tasks.md)
-
-### Shared
-
-- [共享类型规格说明](./shared/shared-types-spec.md)
-
-### Frontend
-
-- [Frontend 模块实现说明](./frontend/frontend-implementation.md)
-- [Frontend 模块实现详情](./frontend/frontend-implementation-details.md)
-- [Frontend 模块任务清单](./frontend/tasks.md)
-
-### Renderer
-
-- [Frontend Renderer 模块实现说明](./frontend/renderer/renderer-implementation.md)
-- [Frontend Renderer 模块任务清单](./frontend/renderer/tasks.md)
-- [Basic Catalog 组件能力优化方案](./frontend/renderer/basic-catalog-component-optimization.md)
-- [A2UI 协议认识](./frontend/renderer/protocol/A2UI协议认识.md)
-- [A2UI v0.9 渲染器实现指南](./frontend/renderer/a2ui-renderer-v0_9-guide.md)
-- [Renderer 模块实现详情](./renderer/renderer-implementation-details.md)
-
-### Backend
-
-- [Backend 模块实现说明](./backend/backend-implementation.md)
-- [Backend 模块实现详情](./backend/backend-implementation-details.md)
-- [Backend 模块任务清单](./backend/tasks.md)
-
-### Agent
-
-- [Agent Runtime 模块实现说明](./agent/agent-runtime-implementation.md)
-- [Agent Runtime 模块实现详情](./agent/agent-runtime-implementation-details.md)
-- [Agent Runtime 模块任务清单](./agent/tasks.md)
-
-### Integration
-
-- [集成实现详情](./integration/integration-implementation-details.md)
-
-## 5. 文档维护约定
-
-- 新增产品能力时，应同步更新 PRD、设计文档、API/DB 契约和对应模块文档。
-- 跨模块类型变更应先更新共享类型规格，再更新模块实现文档。
-- 后端 API 变化应同步更新 API 设计、Backend 文档和 Frontend API 集成说明。
-- Prisma Schema 变化应同步更新数据库 Schema 设计和相关模块文档。
-- Agent 输出契约变化应同步更新 Agent 文档、Renderer 文档和集成文档。
-- 所有项目文档保持中文。
+- 所有项目文档必须使用中文。
+- 新增产品能力时，先更新 PRD，再更新架构、契约和相关模块文档。
+- 修改 API、DB、A2UI 或 shared 类型时，必须同步更新 `docs/contracts/`。
+- 修改模块功能逻辑时，必须同步更新对应 `docs/modules/*.md`。
+- 设计功能逻辑发生变化时，必须更新 [CHANGELOG](./CHANGELOG.md)，并记录日期。
+- `docs/archive/legacy-2026-07/` 中的内容不作为当前实现契约；如发现有价值内容，应迁移到新的权威文档后再引用。
