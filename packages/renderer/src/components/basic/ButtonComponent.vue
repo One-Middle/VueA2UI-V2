@@ -5,6 +5,11 @@
 import { computed, inject } from "vue";
 import { type ComponentContext, componentContextKey } from "../../vue/context";
 import A2uiComponent from "../../vue/A2uiComponent.vue";
+import {
+  resolveBooleanProp,
+  resolveVisualClasses,
+  resolveVisualStyle,
+} from "./visual-props";
 
 const props = defineProps<{ surfaceId: string; componentId: string }>();
 
@@ -39,8 +44,28 @@ const actionContext = computed(() => {
     : {};
 });
 
+const isDisabled = computed(() => resolveBooleanProp(ctx, "disabled"));
+
+const isLoading = computed(() => resolveBooleanProp(ctx, "loading"));
+
+const isFullWidth = computed(() => resolveBooleanProp(ctx, "fullWidth"));
+
+const buttonClasses = computed(() => [
+  "a2ui-button",
+  ...resolveVisualClasses(ctx, "a2ui-button"),
+  {
+    "a2ui-button--full-width": isFullWidth.value,
+    "a2ui-button--loading": isLoading.value,
+  },
+]);
+
+const buttonStyle = computed(() => resolveVisualStyle(ctx));
+
 /** 点击时解析 action context 并派发 */
 function handleClick(): void {
+  if (isDisabled.value || isLoading.value) {
+    return;
+  }
   const context: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(actionContext.value)) {
     context[key] = ctx.resolveValue(value);
@@ -52,7 +77,11 @@ function handleClick(): void {
 <template>
   <button
     class="a2ui-button"
+    :class="buttonClasses"
+    :style="buttonStyle"
     :data-component-id="componentId"
+    :disabled="isDisabled || isLoading"
+    :aria-busy="isLoading ? 'true' : undefined"
     @click="handleClick"
   >
     <A2uiComponent

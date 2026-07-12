@@ -1,25 +1,22 @@
-// ─── Runtime ────────────────────────────────────────────────
-export { AgentRuntime } from "./runtime/agent-runtime.js";
+/**
+ * Agent 包公共 API 入口。
+ *
+ * 职责：
+ * - 暴露 Agent Runtime 工厂函数（后端唯一需要的运行时 API）
+ * - 暴露输出解析、校验与 Catalog 工具函数
+ *
+ * 不暴露：AgentRuntime、ModelClient、PromptComposer、AgentContextBuilder
+ * 等内部实现细节——外部只能通过 createAgentRuntime() 获取 IAgentRuntime 实例。
+ */
+
+// ─── 工厂入口（后端唯一需要导入的 Agent 运行时 API）───
+export { createAgentRuntime } from "./runtime/create-agent-runtime.js";
+
+// ─── 输出解析工具 ────────────────────────────────────────
 export { parseModelOutput } from "./runtime/output-parser.js";
 export { parseComponentInfoRequest } from "./runtime/component-info-request-parser.js";
 
-// ─── Context ────────────────────────────────────────────────
-export { AgentContextBuilder } from "./context/context-builder.js";
-export type { AgentContext } from "./context/context-builder.js";
-
-// ─── Prompts ────────────────────────────────────────────────
-export { PromptComposer } from "./prompts/prompt-composer.js";
-
-// ─── Model ──────────────────────────────────────────────────
-export { ModelClient } from "./model/model-client.js";
-export type {
-  ChatMessage,
-  ModelResponse,
-  TokenUsage,
-  ModelClientConfig,
-} from "./model/model-client.js";
-
-// ─── Tools ──────────────────────────────────────────────────
+// ─── 校验与 Catalog 工具 ─────────────────────────────────
 export { validateA2UI } from "./tools/validate-a2ui.js";
 export {
   getCatalogComponents,

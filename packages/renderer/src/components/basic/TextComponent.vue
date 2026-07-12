@@ -4,6 +4,10 @@
  */
 import { computed, inject } from "vue";
 import { type ComponentContext, componentContextKey } from "../../vue/context";
+import {
+  resolveVisualClasses,
+  resolveVisualStyle,
+} from "./visual-props";
 
 const props = defineProps<{ surfaceId: string; componentId: string }>();
 
@@ -27,12 +31,36 @@ const tagMap: Record<string, string> = {
   body: "p", caption: "span",
 };
 const tag = computed(() => tagMap[usageHint.value as string] ?? "p");
+
+const maxLines = computed(() => {
+  const raw = ctx.componentModel.getProperty("maxLines");
+  const value = Number(ctx.resolveValue(raw));
+  return Number.isFinite(value) && value > 0 ? value : undefined;
+});
+
+const textClasses = computed(() => [
+  `a2ui-text-${usageHint.value}`,
+  ...resolveVisualClasses(ctx, "a2ui-text"),
+]);
+
+const textStyle = computed(() => ({
+  ...resolveVisualStyle(ctx),
+  ...(maxLines.value
+    ? {
+        display: "-webkit-box",
+        WebkitLineClamp: maxLines.value,
+        WebkitBoxOrient: "vertical",
+        overflow: "hidden",
+      }
+    : {}),
+}));
 </script>
 
 <template>
   <component
     :is="tag"
-    :class="`a2ui-text-${usageHint}`"
+    :class="textClasses"
+    :style="textStyle"
     :data-component-id="componentId"
   >{{ text }}</component>
 </template>

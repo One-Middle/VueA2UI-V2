@@ -5,6 +5,7 @@ import { buildA2uiProtocolGuide } from "./a2ui-protocol-guide.js";
 
 export interface PromptDisclosureOptions {
   componentDetails?: string;
+  skillDetails?: string;
   forceFinalOutput?: boolean;
 }
 
@@ -68,11 +69,12 @@ export class PromptComposer {
   ): string {
     return [
       "## 角色",
-      "你是一个 A2UI 页面生成助手。你的任务是根据用户的自然语言描述，使用固定的 Basic Catalog 组件生成符合 A2UI v0.9 规范的 UI 界面。",
+      "你是一个 A2UI 页面生成助手。你的任务是根据用户的自然语言描述，理解用户想要生成UI组件，使用固定的 Basic Catalog 组件生成符合 A2UI v0.9 规范的 UI 组件。",
       "",
       buildA2uiProtocolGuide({
         componentSummaries,
         componentDetails: options.componentDetails,
+        skillDetails: options.skillDetails,
         forceFinalOutput: options.forceFinalOutput,
       }),
       "",
@@ -113,7 +115,7 @@ export class PromptComposer {
     parts.push("");
 
     parts.push(
-      "请根据以上用户需求和上下文信息生成 A2UI。若需要组件字段详情，请先输出 componentInfoRequest；若已有足够信息，请输出最终 { assistantMessage, a2uiMessages } JSON。",
+      "请根据以上用户需求和上下文信息生成 A2UI。若需要 Skill 完整内容，请先输出 skillInfoRequest；若需要组件字段详情，请先输出 componentInfoRequest；若已有足够信息，请输出最终 { assistantMessage, a2uiMessages } JSON。",
     );
 
     return parts.join("\n");

@@ -195,6 +195,60 @@ describe("workspace store session restore", () => {
     });
     expect(workspace.surfaceSnapshots).toHaveLength(1);
   });
+
+  it("stores runtime tool calls from agent_run_attempt SSE events", async () => {
+    vi.mocked(api.getSession).mockResolvedValue({
+      session: makeSession("session-a"),
+      enabledSkillIds: [],
+      currentSnapshot: null,
+    });
+
+    const workspace = useWorkspaceStore();
+    workspace.setActiveSessionId("session-a");
+
+    const handlers = vi.mocked(connectStream).mock.calls.at(-1)?.[1] as StreamHandlers;
+    handlers.agent_run_started?.({
+      sessionId: "session-a",
+      agentRun: {
+        id: "run-skill",
+        status: "running",
+        attemptCount: 0,
+        maxAttempts: 3,
+      },
+    });
+    handlers.agent_run_attempt?.({
+      sessionId: "session-a",
+      agentRunId: "run-skill",
+      attemptIndex: 1,
+      phase: "GENERATE_DRAFT",
+      toolCall: {
+        id: "tool-1",
+        agentRunId: "run-skill",
+        sessionId: "session-a",
+        toolName: "getSkillContent",
+        status: "succeeded",
+        attemptIndex: 1,
+        inputSummary: {
+          requestedSkills: ["skill-1"],
+        },
+        output: {
+          disclosedSkills: [{ id: "skill-1", name: "课程表规范" }],
+        },
+        errorMessage: null,
+        durationMs: 3,
+        createdAt: "2026-01-01T00:00:00.000Z",
+      },
+    });
+
+    expect(workspace.runtimeToolCalls).toHaveLength(1);
+    expect(workspace.runtimeToolCalls[0]).toMatchObject({
+      toolName: "getSkillContent",
+      status: "succeeded",
+      output: {
+        disclosedSkills: [{ id: "skill-1", name: "课程表规范" }],
+      },
+    });
+  });
 });
 
 function makeSessionDetail(sessionId: string, surfaceId: string): SessionDetailResponse {

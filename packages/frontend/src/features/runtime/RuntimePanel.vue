@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import type { RuntimeConfigDto } from "@a2ui-platform/shared";
-import { NDataTable, NTag } from "naive-ui";
+import type { RuntimeConfigDto, ToolCallDto } from "@a2ui-platform/shared";
+import { NButton, NDataTable, NTag } from "naive-ui";
 import { h, onMounted, ref } from "vue";
 import { getRuntimeConfig } from "../../services/api";
 import { useWorkspaceStore } from "../../stores/workspace";
 
 const workspace = useWorkspaceStore();
 const runtimeConfig = ref<RuntimeConfigDto | null>(null);
+const selectedToolCalls = ref<ToolCallDto[]>([]);
 
 onMounted(async () => {
   try {
@@ -39,7 +40,74 @@ const runColumns = [
     render: (row: any) => (row.startedAt ? new Date(row.startedAt).toLocaleString() : "-"),
   },
   { title: "Failure", key: "failureReason", render: (row: any) => row.failureReason ?? "-" },
+  {
+    title: "Tools",
+    key: "tools",
+    render: (row: any) =>
+      h(
+        NButton,
+        {
+          size: "tiny",
+          quaternary: true,
+          onClick: async () => {
+            const detail = await workspace.loadAgentRunDetail(row.id);
+            selectedToolCalls.value = detail?.toolCalls ?? [];
+          },
+        },
+        { default: () => "查看" },
+      ),
+  },
 ];
+
+const toolCallColumns = [
+  { title: "Tool", key: "toolName" },
+  {
+    title: "Status",
+    key: "status",
+    render: (row: ToolCallDto) => {
+      const typeMap: Record<string, "success" | "error" | "info" | "default"> = {
+        succeeded: "success",
+        failed: "error",
+        running: "info",
+      };
+      return h(NTag, { size: "small", type: typeMap[row.status] ?? "default" }, { default: () => row.status });
+    },
+  },
+  { title: "Attempt", key: "attemptIndex" },
+  {
+    title: "Summary",
+    key: "summary",
+    render: (row: ToolCallDto) => formatToolCallSummary(row),
+  },
+  {
+    title: "Duration",
+    key: "durationMs",
+    render: (row: ToolCallDto) => (row.durationMs == null ? "-" : `${row.durationMs}ms`),
+  },
+  { title: "Error", key: "errorMessage", render: (row: ToolCallDto) => row.errorMessage ?? "-" },
+];
+
+function formatToolCallSummary(row: ToolCallDto): string {
+  if (row.toolName === "getSkillContent") {
+    const output = row.output as { disclosedSkills?: Array<{ name?: string; id?: string }> } | null;
+    const input = row.inputSummary as { requestedSkills?: string[] };
+    const disclosed = output?.disclosedSkills?.map((skill) => skill.name ?? skill.id).filter(Boolean).join("、");
+    const requested = input.requestedSkills?.join("、");
+    return disclosed ? `调用 Skill：${disclosed}` : `请求 Skill：${requested ?? "-"}`;
+  }
+  if (row.toolName === "getCatalogComponentDetails") {
+    const output = row.output as { disclosedComponents?: string[] } | null;
+    const input = row.inputSummary as { requestedComponents?: string[] };
+    return output?.disclosedComponents?.length
+      ? `披露组件：${output.disclosedComponents.join("、")}`
+      : `请求组件：${input.requestedComponents?.join("、") ?? "-"}`;
+  }
+  if (row.toolName === "validateA2UI") {
+    const output = row.output as { valid?: boolean; errorCount?: number; warningCount?: number } | null;
+    return `valid=${output?.valid ?? "-"}, errors=${output?.errorCount ?? 0}, warnings=${output?.warningCount ?? 0}`;
+  }
+  return JSON.stringify(row.inputSummary);
+}
 </script>
 
 <template>
@@ -73,6 +141,16 @@ const runColumns = [
     <section class="runs-section">
       <h3>Agent Runs</h3>
       <n-data-table :columns="runColumns" :data="workspace.agentRuns" :bordered="false" size="small" />
+    </section>
+
+    <section class="runs-section">
+      <h3>Runtime Tool Calls</h3>
+      <n-data-table
+        :columns="toolCallColumns"
+        :data="selectedToolCalls.length > 0 ? selectedToolCalls : workspace.runtimeToolCalls"
+        :bordered="false"
+        size="small"
+      />
     </section>
   </div>
 </template>
@@ -116,6 +194,10 @@ const runColumns = [
   border-radius: 8px;
   background: #ffffff;
   box-shadow: 0 8px 20px rgb(15 23 42 / 4%);
+}
+
+.runs-section + .runs-section {
+  margin-top: 16px;
 }
 
 .runs-section h3 {

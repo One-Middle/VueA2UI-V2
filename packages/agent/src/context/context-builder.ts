@@ -1,5 +1,8 @@
 import type { AgentRunInput } from "@a2ui-platform/shared";
 
+/** Agent Runtime 可用的 Skill 数据。 */
+export type AgentContextSkill = AgentRunInput["enabledSkills"][number];
+
 // ─── AgentContext 接口 ──────────────────────────────────────
 
 /** 构建完成的 Agent 上下文，供 Prompt 使用。 */
@@ -12,6 +15,8 @@ export interface AgentContext {
   uploadedFiles: string;
   /** 启用的 Skills 内容拼接文本 */
   enabledSkills: string;
+  /** 启用的 Skill 原始列表，供 Runtime 按需披露内容 */
+  enabledSkillList: AgentContextSkill[];
   /** 当前 snapshot 的 JSON 摘要 */
   currentSnapshotSummary: string;
   /** 可用组件名称列表 */
@@ -37,6 +42,7 @@ export class AgentContextBuilder {
       recentMessages: this.buildRecentMessages(input.recentMessages),
       uploadedFiles: this.buildUploadedFiles(input.uploadedFiles),
       enabledSkills: this.buildEnabledSkills(input.enabledSkills),
+      enabledSkillList: input.enabledSkills,
       currentSnapshotSummary: this.buildSnapshotSummary(input.currentSnapshot),
       catalogSummary: this.buildCatalogSummary(input.catalogId),
     };
@@ -100,16 +106,17 @@ export class AgentContextBuilder {
    * 拼接启用的 Skills 内容。
    */
   private buildEnabledSkills(
-    skills: Array<{ id: string; name: string; content: string }>,
+    skills: AgentContextSkill[],
   ): string {
     if (!skills || skills.length === 0) {
       return "（无启用的 Skills）";
     }
 
-    const parts: string[] = ["## 启用的 Skills"];
+    const parts: string[] = ["## 启用的 Skills 摘要"];
     for (const s of skills) {
-      parts.push(`### Skill: ${s.name}`);
-      parts.push(s.content);
+      parts.push(`- id: ${s.id}`);
+      parts.push(`  name: ${s.name}`);
+      parts.push(`  description: ${s.description?.trim() || "（无描述）"}`);
       parts.push("");
     }
 

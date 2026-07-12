@@ -10,6 +10,7 @@
  */
 
 import type { A2UIServerMessage, JsonObject, SurfaceSnapshotData } from "./a2ui";
+import type { AgentRunPhase } from "./sse";
 
 /** A2UI 校验过程中发现的单个问题。 */
 export interface ValidationIssue {
@@ -54,7 +55,7 @@ export interface AgentRunInput {
   /** 用户上传的文件列表（含文件内容） */
   uploadedFiles: Array<{ id: string; originalName: string; content: string }>;
   /** 已启用的 Skill 列表 */
-  enabledSkills: Array<{ id: string; name: string; content: string }>;
+  enabledSkills: Array<{ id: string; name: string; description?: string | null; content: string }>;
   /** 当前 Surface 快照数据，用于增量更新 */
   currentSnapshot: SurfaceSnapshotData | null;
   /** 使用的 Catalog ID */
@@ -120,6 +121,8 @@ export interface ToolCallRecord {
   status: "running" | "succeeded" | "failed";
   /** 所在尝试轮次索引 */
   attemptIndex: number;
+  /** Agent 运行阶段，用于 SSE 向前端展示当前工具调用属于哪个阶段 */
+  phase?: AgentRunPhase;
   /** 输入摘要（脱敏后的关键参数） */
   inputSummary: JsonObject;
   /** 输出结果（脱敏后） */
@@ -129,3 +132,35 @@ export interface ToolCallRecord {
   /** 调用耗时（毫秒） */
   durationMs?: number;
 }
+
+/**
+ * Agent Runtime 接口。
+ * 任何 Agent 实现只需实现此接口即可被后端无缝调用。
+ */
+export interface IAgentRuntime {
+  run(
+    input: AgentRunInput,
+    onToolCall?: (record: ToolCallRecord) => void,
+  ): Promise<AgentRunResult>;
+}
+
+/**
+ * Agent Runtime 工厂配置。
+ * 包含模型 API 连接所需的最少参数，与具体模型客户端无关。
+ */
+export interface AgentRuntimeFactoryConfig {
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  temperature: number;
+  maxTokens: number;
+  timeoutMs: number;
+}
+
+/**
+ * Agent Runtime 工厂函数签名。
+ * 后端持有此类型的引用，不必知道 Agent 内部组装细节。
+ */
+export type AgentRuntimeFactory = (
+  config: AgentRuntimeFactoryConfig,
+) => IAgentRuntime;

@@ -4,6 +4,12 @@
  */
 import { computed, inject } from "vue";
 import { type ComponentContext, componentContextKey } from "../../vue/context";
+import {
+  resolveBooleanProp,
+  resolveStringProp,
+  resolveVisualClasses,
+  resolveVisualStyle,
+} from "./visual-props";
 
 const props = defineProps<{ surfaceId: string; componentId: string }>();
 
@@ -21,6 +27,12 @@ const max = computed(() => {
   return Number(ctx.resolveValue(raw) ?? 100);
 });
 
+/** 步进值 */
+const step = computed(() => {
+  const raw = ctx.componentModel.getProperty("step");
+  return Number(ctx.resolveValue(raw) ?? 1);
+});
+
 /** 当前值（双向绑定） */
 const currentValue = computed({
   get() {
@@ -34,17 +46,42 @@ const currentValue = computed({
     }
   },
 });
+
+const showValue = computed(() => resolveBooleanProp(ctx, "showValue", true));
+
+const isDisabled = computed(() => resolveBooleanProp(ctx, "disabled"));
+
+const valuePrefix = computed(() => resolveStringProp(ctx, "valuePrefix"));
+
+const valueSuffix = computed(() => resolveStringProp(ctx, "valueSuffix"));
+
+const sliderClasses = computed(() => [
+  "a2ui-slider",
+  ...resolveVisualClasses(ctx, "a2ui-slider"),
+]);
+
+const sliderStyle = computed(() => resolveVisualStyle(ctx));
 </script>
 
 <template>
-  <div class="a2ui-slider" :data-component-id="componentId">
+  <div
+    class="a2ui-slider"
+    :class="sliderClasses"
+    :style="sliderStyle"
+    :data-component-id="componentId"
+  >
     <input
+      class="a2ui-slider-input"
       type="range"
       :min="min"
       :max="max"
+      :step="step"
       :value="currentValue"
+      :disabled="isDisabled"
       @input="currentValue = Number(($event.target as HTMLInputElement).value)"
     />
-    <span class="a2ui-slider-value">{{ currentValue }}</span>
+    <span v-if="showValue" class="a2ui-slider-value">
+      {{ valuePrefix }}{{ currentValue }}{{ valueSuffix }}
+    </span>
   </div>
 </template>

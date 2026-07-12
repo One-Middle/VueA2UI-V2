@@ -12,6 +12,27 @@ const activeSession = computed(() => workspace.sessions.find((session) => sessio
 
 const isBusy = computed(() => workspace.isSending || workspace.isGenerating);
 
+const latestSkillToolCall = computed(() => {
+  return [...workspace.runtimeToolCalls]
+    .reverse()
+    .find((toolCall) => toolCall.toolName === "getSkillContent");
+});
+
+const skillCallText = computed(() => {
+  const toolCall = latestSkillToolCall.value;
+  if (!toolCall) return "";
+  const output = toolCall.output as { disclosedSkills?: Array<{ name?: string; id?: string }> } | null;
+  const input = toolCall.inputSummary as { requestedSkills?: string[] };
+  const disclosedNames = output?.disclosedSkills
+    ?.map((skill) => skill.name ?? skill.id)
+    .filter(Boolean)
+    .join("、");
+  const requestedNames = input.requestedSkills?.join("、");
+  const skillNames = disclosedNames || requestedNames || "未知 Skill";
+  if (toolCall.status === "failed") return `Skill 调用未完成：${skillNames}`;
+  return `已调用 Skill：${skillNames}`;
+});
+
 const statusText = computed(() => {
   if (workspace.isSending) return "正在发送...";
   if (workspace.isGenerating) return "AI 正在生成 UI...";
@@ -42,6 +63,10 @@ const send = async (content: string) => {
 
     <n-alert v-if="errorMessage" class="conversation-error" type="error" closable @close="errorMessage = ''">
       {{ errorMessage }}
+    </n-alert>
+
+    <n-alert v-if="workspace.isGenerating && skillCallText" class="skill-call-alert" type="info">
+      {{ skillCallText }}
     </n-alert>
 
     <n-spin :show="workspace.isSending" description="正在发送需求...">
@@ -98,6 +123,10 @@ const send = async (content: string) => {
 }
 
 .conversation-error {
+  margin: 12px 14px 0;
+}
+
+.skill-call-alert {
   margin: 12px 14px 0;
 }
 

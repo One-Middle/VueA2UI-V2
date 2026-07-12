@@ -5,17 +5,13 @@ import type {
   AgentRunDto,
   AgentRunInput,
   AgentRunResult,
+  IAgentRuntime,
   JsonObject,
   MessageDto,
   SurfaceSnapshotDto,
   ToolCallRecord,
 } from "@a2ui-platform/shared";
-import {
-  AgentContextBuilder,
-  AgentRuntime,
-  ModelClient,
-  PromptComposer,
-} from "@a2ui-platform/agent";
+import { createAgentRuntime } from "@a2ui-platform/agent";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../db.js";
 import { logger } from "../logger.js";
@@ -62,19 +58,15 @@ function toAgentRunError(err: unknown): string {
   return String(err);
 }
 
-function buildAgentRuntime(): AgentRuntime {
-  return new AgentRuntime(
-    new ModelClient({
-      baseUrl: config.openai.baseUrl,
-      apiKey: config.openai.apiKey,
-      model: config.openai.model,
-      temperature: config.openai.temperature,
-      maxTokens: config.openai.maxTokens,
-      timeoutMs: config.openai.timeoutMs,
-    }),
-    new PromptComposer(),
-    new AgentContextBuilder(),
-  );
+function buildAgentRuntime(): IAgentRuntime {
+  return createAgentRuntime({
+    baseUrl: config.openai.baseUrl,
+    apiKey: config.openai.apiKey,
+    model: config.openai.model,
+    temperature: config.openai.temperature,
+    maxTokens: config.openai.maxTokens,
+    timeoutMs: config.openai.timeoutMs,
+  });
 }
 
 async function recordRuntimeToolCall(
@@ -100,7 +92,7 @@ async function recordRuntimeToolCall(
       sessionId,
       agentRunId,
       attemptIndex: record.attemptIndex,
-      phase: "VALIDATE_DRAFT",
+      phase: record.phase ?? "GENERATE_DRAFT",
       toolCall: {
         id: toolCall.id,
         agentRunId: toolCall.agentRunId,
@@ -169,6 +161,7 @@ export const agentRunService = {
             .map((sessionSkill) => ({
               id: sessionSkill.skill.id,
               name: sessionSkill.skill.name,
+              description: sessionSkill.skill.description,
               content: sessionSkill.skill.content,
             })),
           currentSnapshot: currentSnapshot ? (currentSnapshot.snapshot as AgentRunInput["currentSnapshot"]) : null,

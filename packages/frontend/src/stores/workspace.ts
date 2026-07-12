@@ -19,6 +19,7 @@ import type {
   UploadedFileDto,
   SkillDto,
   SurfaceSnapshotDto,
+  ToolCallDto,
   A2UIServerMessage,
   SurfaceState,
 } from "@a2ui-platform/shared";
@@ -61,6 +62,7 @@ export const useWorkspaceStore = defineStore("workspace", {
     skills: [] as SkillDto[],
     enabledSkillIds: [] as string[],
     agentRuns: [] as AgentRunDto[],
+    runtimeToolCalls: [] as ToolCallDto[],
     a2uiEvents: [] as WorkspaceA2UIEvent[],
     surfaceSnapshots: [] as WorkspaceSurfaceSnapshot[],
 
@@ -95,6 +97,7 @@ export const useWorkspaceStore = defineStore("workspace", {
       this.uploadedFiles = [];
       this.enabledSkillIds = [];
       this.agentRuns = [];
+      this.runtimeToolCalls = [];
       this.a2uiEvents = [];
       this.surfaceSnapshots = [];
       this.isSending = false;
@@ -146,6 +149,7 @@ export const useWorkspaceStore = defineStore("workspace", {
       this.uploadedFiles = [];
       this.enabledSkillIds = [];
       this.agentRuns = [];
+      this.runtimeToolCalls = [];
       this.a2uiEvents = [];
       this.surfaceSnapshots = [];
 
@@ -183,6 +187,7 @@ export const useWorkspaceStore = defineStore("workspace", {
           this.uploadedFiles = [];
           this.enabledSkillIds = [];
           this.agentRuns = [];
+          this.runtimeToolCalls = [];
           this.a2uiEvents = [];
           this.surfaceSnapshots = [];
           const renderer = useRendererStore();
@@ -462,6 +467,7 @@ export const useWorkspaceStore = defineStore("workspace", {
           if (!isCurrent() || data.sessionId !== sessionId) return;
           this.streamStatus = "connected";
           this.isGenerating = true;
+          this.runtimeToolCalls = this.runtimeToolCalls.filter((toolCall) => toolCall.agentRunId === data.agentRun.id);
           logger.info(`← SSE ← BACKEND: agent_run_started → runId=${shortId(data.agentRun.id)}`);
           // 添加或更新 run
           const existingIdx = this.agentRuns.findIndex((r) => r.id === data.agentRun.id);
@@ -472,12 +478,20 @@ export const useWorkspaceStore = defineStore("workspace", {
           }
         },
 
-        agent_run_attempt: (data: { sessionId: string; agentRunId: string; attemptIndex: number; phase: string; toolCall?: unknown }) => {
+        agent_run_attempt: (data: { sessionId: string; agentRunId: string; attemptIndex: number; phase: string; toolCall?: ToolCallDto }) => {
           if (!isCurrent() || data.sessionId !== sessionId) return;
           // 更新对应 run 的 attempt
           const run = this.agentRuns.find((r) => r.id === data.agentRunId);
           if (run) {
             run.attemptCount = data.attemptIndex + 1;
+          }
+          if (data.toolCall) {
+            const existingIdx = this.runtimeToolCalls.findIndex((toolCall) => toolCall.id === data.toolCall!.id);
+            if (existingIdx >= 0) {
+              this.runtimeToolCalls[existingIdx] = data.toolCall;
+            } else {
+              this.runtimeToolCalls.push(data.toolCall);
+            }
           }
         },
 

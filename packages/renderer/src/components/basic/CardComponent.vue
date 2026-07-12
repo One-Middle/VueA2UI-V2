@@ -5,6 +5,7 @@
 import { computed, inject } from "vue";
 import { type ComponentContext, componentContextKey } from "../../vue/context";
 import A2uiComponent from "../../vue/A2uiComponent.vue";
+import { resolveVisualClasses, resolveVisualStyle } from "./visual-props";
 
 const props = defineProps<{ surfaceId: string; componentId: string }>();
 
@@ -22,10 +23,17 @@ const title = computed(() => {
   const resolved = ctx.resolveValue(raw);
   return typeof resolved === "string" ? resolved : "";
 });
+
+const cardClasses = computed(() => [
+  "a2ui-card",
+  ...resolveVisualClasses(ctx, "a2ui-card"),
+]);
+
+const cardStyle = computed(() => resolveVisualStyle(ctx));
 </script>
 
 <template>
-  <div class="a2ui-card" :data-component-id="componentId">
+  <div class="a2ui-card" :class="cardClasses" :style="cardStyle" :data-component-id="componentId">
     <div v-if="title" class="a2ui-card-title">{{ title }}</div>
     <A2uiComponent
       v-if="childComponentId"

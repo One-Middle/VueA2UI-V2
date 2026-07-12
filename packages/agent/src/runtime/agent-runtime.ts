@@ -15,6 +15,7 @@
 import type {
   AgentRunInput,
   AgentRunResult,
+  IAgentRuntime,
   ToolCallRecord,
   ValidateA2UIResult,
   A2UIServerMessage,
@@ -25,6 +26,7 @@ import { PromptComposer } from "../prompts/prompt-composer.js";
 import { ModelClient, type ModelResponse, type TokenUsage } from "../model/model-client.js";
 import { parseModelOutput } from "./output-parser.js";
 import { parseComponentInfoRequest } from "./component-info-request-parser.js";
+import { parseSkillInfoRequest } from "./skill-info-request-parser.js";
 import { validateA2UI } from "../tools/validate-a2ui.js";
 import {
   formatCatalogComponentDetails,
@@ -34,10 +36,10 @@ import { logger, shortId } from "../logger.js";
 
 /** 最大生成 + 修复尝试次数 */
 const MAX_ATTEMPTS = 3;
-/** 渐进式组件披露的最大轮数 */
-const MAX_COMPONENT_DISCLOSURE_ROUNDS = 3;
+/** 渐进式信息披露的最大轮数 */
+const MAX_DISCLOSURE_ROUNDS = 3;
 
-export class AgentRuntime {
+export class AgentRuntime implements IAgentRuntime {
   private modelClient: ModelClient;
   private promptComposer: PromptComposer;
   private contextBuilder: AgentContextBuilder;
@@ -72,7 +74,9 @@ export class AgentRuntime {
     let lastValidation: ValidateA2UIResult | undefined;
     let totalTokens: JsonObject | undefined;
     let componentDetails = "";
+    let skillDetails = "";
     const disclosedComponents = new Set<string>();
+    const disclosedSkills = new Set<string>();
 
     /** 累加 Token 用量到 totalTokens。 */
     const addUsage = (usage?: TokenUsage): void => {
@@ -103,7 +107,7 @@ export class AgentRuntime {
               a2uiMessages: lastA2uiMessages,
             }),
             lastValidation?.errors ?? [],
-            { componentDetails },
+            { componentDetails, skillDetails },
           );
 
           logger.info(
@@ -118,16 +122,19 @@ export class AgentRuntime {
         } else {
           // 初始模式：带渐进式组件披露的生成流程
           const disclosureResult =
-            await this.generateWithComponentDisclosure(
+            await this.generateWithProgressiveDisclosure(
               context,
               attempt,
               disclosedComponents,
+              disclosedSkills,
               componentDetails,
+              skillDetails,
               addUsage,
               onToolCall,
             );
           modelResponse = disclosureResult.modelResponse;
           componentDetails = disclosureResult.componentDetails;
+          skillDetails = disclosureResult.skillDetails;
         }
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err);
@@ -191,6 +198,7 @@ export class AgentRuntime {
         toolName: "validateA2UI",
         status: validation.valid ? "succeeded" : "failed",
         attemptIndex: attempt,
+        phase: "VALIDATE_DRAFT",
         inputSummary: {
           messageCount: a2uiMessages.length,
           catalogId: input.catalogId,
@@ -269,38 +277,34 @@ export class AgentRuntime {
   }
 
   /**
-   * 执行带渐进式组件披露的初始生成流程。
-   * 模型可请求查看组件的详细字段定义，每轮披露一部分组件，最多 3 轮后强制输出。
-   *
-   * @param context - Agent 上下文
-   * @param attempt - 当前尝试轮次
-   * @param disclosedComponents - 已披露的组件名称集合
-   * @param initialComponentDetails - 已累积的组件详情文本
-   * @param addUsage - Token 累加回调
-   * @param onToolCall - 工具调用回调
-   * @returns 模型响应和更新后的组件详情文本
+   * 执行带渐进式信息披露的初始生成流程。
+   * 模型可按需请求 Skill 内容或组件详情，Runtime 披露后进入下一轮生成。
    */
-  private async generateWithComponentDisclosure(
+  private async generateWithProgressiveDisclosure(
     context: AgentContext,
     attempt: number,
     disclosedComponents: Set<string>,
+    disclosedSkills: Set<string>,
     initialComponentDetails: string,
+    initialSkillDetails: string,
     addUsage: (usage?: TokenUsage) => void,
     onToolCall?: (record: ToolCallRecord) => void,
-  ): Promise<{ modelResponse: ModelResponse; componentDetails: string }> {
+  ): Promise<{
+    modelResponse: ModelResponse;
+    componentDetails: string;
+    skillDetails: string;
+  }> {
     let componentDetails = initialComponentDetails;
+    let skillDetails = initialSkillDetails;
     let lastResponse: ModelResponse | undefined;
 
-    for (
-      let round = 1;
-      round <= MAX_COMPONENT_DISCLOSURE_ROUNDS + 1;
-      round++
-    ) {
-      const forceFinalOutput = round > MAX_COMPONENT_DISCLOSURE_ROUNDS;
+    for (let round = 1; round <= MAX_DISCLOSURE_ROUNDS + 1; round++) {
+      const forceFinalOutput = round > MAX_DISCLOSURE_ROUNDS;
       const { systemPrompt, userPrompt } = this.promptComposer.composeInitial(
         context,
         {
           componentDetails,
+          skillDetails,
           forceFinalOutput,
         },
       );
@@ -308,7 +312,7 @@ export class AgentRuntime {
       logger.info(
         forceFinalOutput
           ? `调用模型 → attempt=${attempt}/${MAX_ATTEMPTS}, 强制最终输出`
-          : `调用模型 → attempt=${attempt}/${MAX_ATTEMPTS}, 组件披露轮=${round}/${MAX_COMPONENT_DISCLOSURE_ROUNDS}`,
+          : `调用模型 → attempt=${attempt}/${MAX_ATTEMPTS}, 渐进披露轮=${round}/${MAX_DISCLOSURE_ROUNDS}`,
       );
 
       lastResponse = await this.modelClient.generate([
@@ -317,78 +321,227 @@ export class AgentRuntime {
       ]);
       addUsage(lastResponse.usage);
 
-      // 强制最终输出轮次 —— 不再解析组件请求，直接返回模型输出
       if (forceFinalOutput) {
         break;
       }
 
-      // 解析模型是否请求查看组件详情
-      const requestResult = parseComponentInfoRequest(lastResponse.content);
-      if (!requestResult.ok) {
+      const skillRequestResult = parseSkillInfoRequest(lastResponse.content);
+      const componentRequestResult = parseComponentInfoRequest(lastResponse.content);
+      if (!skillRequestResult.ok && !componentRequestResult.ok) {
         break;
       }
 
-      const disclosureStartTime = Date.now();
-      const requestedComponents = Array.from(
-        new Set(requestResult.request.components),
+      if (skillRequestResult.ok) {
+        const result = this.discloseSkills(
+          context,
+          skillRequestResult.request.skills,
+          disclosedSkills,
+          skillRequestResult.request.reason,
+        );
+        if (result.feedback.length > 0) {
+          skillDetails = [skillDetails, ...result.feedback]
+            .filter((part) => part.trim().length > 0)
+            .join("\n\n");
+        }
+        for (const skillId of result.disclosedSkillIds) {
+          disclosedSkills.add(skillId);
+        }
+        onToolCall?.(result.toolCall(attempt));
+        logger.info(
+          `Skill 内容披露 → requested=${result.requestedSkills.length}, disclosed=${result.disclosedSkills.length}, skipped=${result.skippedSkills.length}, already=${result.alreadyDisclosedSkills.length}`,
+        );
+      }
+
+      if (componentRequestResult.ok) {
+        const result = this.discloseComponents(
+          componentRequestResult.request.components,
+          disclosedComponents,
+        );
+        if (result.feedback.length > 0) {
+          componentDetails = [componentDetails, ...result.feedback]
+            .filter((part) => part.trim().length > 0)
+            .join("\n\n");
+        }
+        for (const componentName of result.disclosedComponents) {
+          disclosedComponents.add(componentName);
+        }
+        onToolCall?.(result.toolCall(attempt));
+        logger.info(
+          `组件详情披露 → requested=${result.requestedComponents.length}, disclosed=${result.disclosedComponents.length}, skipped=${result.skippedComponents.length}, already=${result.alreadyDisclosedComponents.length}`,
+        );
+      }
+    }
+
+    if (!lastResponse) {
+      throw new Error("模型未返回任何内容");
+    }
+
+    return { modelResponse: lastResponse, componentDetails, skillDetails };
+  }
+
+  /** 按需披露 Skill 完整内容。 */
+  private discloseSkills(
+    context: AgentContext,
+    skills: string[],
+    disclosedSkills: Set<string>,
+    reason?: string,
+  ): {
+    requestedSkills: string[];
+    disclosedSkills: Array<{ id: string; name: string }>;
+    disclosedSkillIds: string[];
+    alreadyDisclosedSkills: string[];
+    skippedSkills: string[];
+    feedback: string[];
+    toolCall: (attempt: number) => ToolCallRecord;
+  } {
+    const disclosureStartTime = Date.now();
+    const requestedSkills = Array.from(new Set(skills));
+    const disclosedNow: Array<{ id: string; name: string; content: string }> = [];
+    const alreadyDisclosedSkills: string[] = [];
+    const skippedSkills: string[] = [];
+
+    for (const requested of requestedSkills) {
+      const matched =
+        context.enabledSkillList.find((skill) => skill.id === requested) ??
+        context.enabledSkillList.find((skill) => skill.name === requested);
+
+      if (!matched) {
+        skippedSkills.push(requested);
+        continue;
+      }
+      if (disclosedSkills.has(matched.id)) {
+        alreadyDisclosedSkills.push(matched.name);
+        continue;
+      }
+      disclosedNow.push({
+        id: matched.id,
+        name: matched.name,
+        content: matched.content,
+      });
+    }
+
+    const feedback: string[] = [];
+    for (const skill of disclosedNow) {
+      feedback.push(
+        [`### Skill: ${skill.name}`, `id: ${skill.id}`, "", skill.content].join(
+          "\n",
+        ),
       );
-      const disclosedNow: string[] = [];
-      const alreadyDisclosedComponents: string[] = [];
-      const skippedComponents: string[] = [];
+    }
+    if (skippedSkills.length > 0) {
+      feedback.push(
+        [
+          "### Skill 内容请求反馈",
+          `以下 Skill 未启用或不存在，不能使用：${skippedSkills.join("、")}`,
+        ].join("\n"),
+      );
+    }
+    if (alreadyDisclosedSkills.length > 0) {
+      feedback.push(
+        [
+          "### 已披露 Skill 提醒",
+          `以下 Skill 内容已经提供过，不会重复注入：${alreadyDisclosedSkills.join("、")}`,
+        ].join("\n"),
+      );
+    }
 
-      // 1. 分类请求的组件：新增 vs 已披露 vs 不在 Catalog 中
-      for (const componentName of requestedComponents) {
-        if (disclosedComponents.has(componentName)) {
-          alreadyDisclosedComponents.push(componentName);
-          continue;
-        }
-        if (!getComponentDef(componentName)) {
-          skippedComponents.push(componentName);
-          continue;
-        }
-        disclosedNow.push(componentName);
-      }
+    const disclosedSkillSummaries = disclosedNow.map((skill) => ({
+      id: skill.id,
+      name: skill.name,
+    }));
 
-      // 2. 组装反馈文本
-      const detailText = formatCatalogComponentDetails(disclosedNow);
-      const feedback: string[] = [];
-      if (detailText) {
-        feedback.push(detailText);
-      }
-      if (skippedComponents.length > 0) {
-        feedback.push(
-          [
-            "### 组件详情请求反馈",
-            `以下组件不在 Basic Catalog 中，不能使用：${skippedComponents.join("、")}`,
-          ].join("\n"),
-        );
-      }
-      if (alreadyDisclosedComponents.length > 0) {
-        feedback.push(
-          [
-            "### 已披露组件提醒",
-            `以下组件详情已经提供过，不会重复注入：${alreadyDisclosedComponents.join("、")}`,
-          ].join("\n"),
-        );
-      }
+    return {
+      requestedSkills,
+      disclosedSkills: disclosedSkillSummaries,
+      disclosedSkillIds: disclosedNow.map((skill) => skill.id),
+      alreadyDisclosedSkills,
+      skippedSkills,
+      feedback,
+      toolCall: (attemptIndex: number): ToolCallRecord => ({
+        toolName: "getSkillContent",
+        status: disclosedNow.length > 0 ? "succeeded" : "failed",
+        attemptIndex,
+        phase: "GENERATE_DRAFT",
+        inputSummary: {
+          requestedSkills,
+          alreadyDisclosedSkills,
+          skippedSkills,
+          ...(reason ? { reason } : {}),
+        },
+        output: {
+          disclosedSkills: disclosedSkillSummaries,
+        },
+        durationMs: Date.now() - disclosureStartTime,
+        ...(disclosedNow.length === 0
+          ? { errorMessage: "没有新增可披露 Skill 内容" }
+          : {}),
+      }),
+    };
+  }
 
-      if (feedback.length > 0) {
-        componentDetails = [componentDetails, ...feedback]
-          .filter((part) => part.trim().length > 0)
-          .join("\n\n");
-      }
+  /** 按需披露 Basic Catalog 组件详情。 */
+  private discloseComponents(
+    components: string[],
+    disclosedComponents: Set<string>,
+  ): {
+    requestedComponents: string[];
+    disclosedComponents: string[];
+    alreadyDisclosedComponents: string[];
+    skippedComponents: string[];
+    feedback: string[];
+    toolCall: (attempt: number) => ToolCallRecord;
+  } {
+    const disclosureStartTime = Date.now();
+    const requestedComponents = Array.from(new Set(components));
+    const disclosedNow: string[] = [];
+    const alreadyDisclosedComponents: string[] = [];
+    const skippedComponents: string[] = [];
 
-      // 3. 记录已披露组件
-      for (const componentName of disclosedNow) {
-        disclosedComponents.add(componentName);
+    for (const componentName of requestedComponents) {
+      if (disclosedComponents.has(componentName)) {
+        alreadyDisclosedComponents.push(componentName);
+        continue;
       }
+      if (!getComponentDef(componentName)) {
+        skippedComponents.push(componentName);
+        continue;
+      }
+      disclosedNow.push(componentName);
+    }
 
-      // 4. 记录工具调用
-      const durationMs = Date.now() - disclosureStartTime;
-      onToolCall?.({
+    const detailText = formatCatalogComponentDetails(disclosedNow);
+    const feedback: string[] = [];
+    if (detailText) {
+      feedback.push(detailText);
+    }
+    if (skippedComponents.length > 0) {
+      feedback.push(
+        [
+          "### 组件详情请求反馈",
+          `以下组件不在 Basic Catalog 中，不能使用：${skippedComponents.join("、")}`,
+        ].join("\n"),
+      );
+    }
+    if (alreadyDisclosedComponents.length > 0) {
+      feedback.push(
+        [
+          "### 已披露组件提醒",
+          `以下组件详情已经提供过，不会重复注入：${alreadyDisclosedComponents.join("、")}`,
+        ].join("\n"),
+      );
+    }
+
+    return {
+      requestedComponents,
+      disclosedComponents: disclosedNow,
+      alreadyDisclosedComponents,
+      skippedComponents,
+      feedback,
+      toolCall: (attemptIndex: number): ToolCallRecord => ({
         toolName: "getCatalogComponentDetails",
         status: disclosedNow.length > 0 ? "succeeded" : "failed",
-        attemptIndex: attempt,
+        attemptIndex,
+        phase: "GENERATE_DRAFT",
         inputSummary: {
           requestedComponents,
           skippedComponents,
@@ -397,21 +550,11 @@ export class AgentRuntime {
         output: {
           disclosedComponents: disclosedNow,
         },
-        durationMs,
+        durationMs: Date.now() - disclosureStartTime,
         ...(disclosedNow.length === 0
           ? { errorMessage: "没有新增可披露组件详情" }
           : {}),
-      });
-
-      logger.info(
-        `组件详情披露 → requested=${requestedComponents.length}, disclosed=${disclosedNow.length}, skipped=${skippedComponents.length}, already=${alreadyDisclosedComponents.length}`,
-      );
-    }
-
-    if (!lastResponse) {
-      throw new Error("模型未返回任何内容");
-    }
-
-    return { modelResponse: lastResponse, componentDetails };
+      }),
+    };
   }
 }

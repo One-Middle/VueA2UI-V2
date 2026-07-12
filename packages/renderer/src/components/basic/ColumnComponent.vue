@@ -6,6 +6,12 @@ import { computed, inject } from "vue";
 import type { CSSProperties } from "vue";
 import { componentContextKey } from "../../vue/context";
 import A2uiComponent from "../../vue/A2uiComponent.vue";
+import {
+  resolveBooleanProp,
+  resolveStringProp,
+  resolveVisualClasses,
+  resolveVisualStyle,
+} from "./visual-props";
 
 const props = defineProps<{ surfaceId: string; componentId: string }>();
 
@@ -43,14 +49,23 @@ const alignment = computed(() => {
 const childIds = computed(() => ctx.componentModel.getChildIds());
 
 const columnStyle = computed<CSSProperties>(() => ({
+  ...resolveVisualStyle(ctx),
   justifyContent: justifyContentMap[distribution.value] ?? "flex-start",
   alignItems: alignItemsMap[alignment.value] ?? "stretch",
+  ...(resolveStringProp(ctx, "gap") ? { gap: resolveStringProp(ctx, "gap") } : {}),
+  flexWrap: resolveBooleanProp(ctx, "wrap") ? "wrap" : "nowrap",
 }));
+
+const columnClasses = computed(() => [
+  "a2ui-column",
+  ...resolveVisualClasses(ctx, "a2ui-column"),
+]);
 </script>
 
 <template>
   <div
     class="a2ui-column"
+    :class="columnClasses"
     :data-component-id="componentId"
     :style="columnStyle"
   >
