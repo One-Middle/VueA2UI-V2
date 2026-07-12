@@ -1,3 +1,14 @@
+/**
+ * 会话业务服务。
+ *
+ * 职责：
+ * - 会话的 CRUD 操作（创建、列表、详情、更新、软删除）
+ * - 实体到 DTO 的转换
+ * - 与 session、snapshot、session-skill 三个 repository 的协调
+ *
+ * 不负责：HTTP 请求解析、权限校验、其他资源（消息/A2UI/文件）的管理。
+ */
+
 import type { SessionDto, SurfaceSnapshotDto, SessionDetailResponse } from "@a2ui-platform/shared";
 import { config } from "../config.js";
 import { logger } from "../logger.js";
@@ -6,6 +17,12 @@ import { surfaceSnapshotRepository } from "../repositories/surface-snapshot.repo
 import { sessionSkillRepository } from "../repositories/session-skill.repository.js";
 import { notFound } from "../utils/errors.js";
 
+/**
+ * 将 Prisma 会话实体转换为 SessionDto。
+ *
+ * @param session - Prisma 查询返回的会话实体
+ * @returns 转换后的 DTO，若实体为空则返回 null
+ */
 function toSessionDto(session: Awaited<ReturnType<typeof sessionRepository.findById>>): SessionDto | null {
   if (!session) return null;
   return {
@@ -26,6 +43,9 @@ function toSessionDto(session: Awaited<ReturnType<typeof sessionRepository.findB
 }
 
 export const sessionService = {
+  /**
+   * 创建新会话，使用配置中的默认 Catalog 和模型参数。
+   */
   async create(req: { title?: string; description?: string; modelName?: string }) {
     const session = await sessionRepository.create({
       title: req.title ?? "未命名会话",
@@ -42,6 +62,9 @@ export const sessionService = {
     return { session: toSessionDto(session)! };
   },
 
+  /**
+   * 分页查询会话列表，基于 updatedAt 进行游标分页。
+   */
   async list(filters: { status?: string; limit?: number; cursor?: string | null }) {
     const sessions = await sessionRepository.findMany(filters);
     const items = sessions.map((s) => toSessionDto(s)!);
@@ -58,6 +81,9 @@ export const sessionService = {
     };
   },
 
+  /**
+   * 获取会话详情，含当前快照和已启用的 Skill ID 列表。
+   */
   async getById(sessionId: string): Promise<SessionDetailResponse> {
     const session = await sessionRepository.findById(sessionId);
     if (!session) throw notFound("Session", sessionId);
@@ -93,6 +119,9 @@ export const sessionService = {
     };
   },
 
+  /**
+   * 更新会话的标题、描述或状态。
+   */
   async update(sessionId: string, data: { title?: string; description?: string | null; status?: string }) {
     const existing = await sessionRepository.findById(sessionId);
     if (!existing) throw notFound("Session", sessionId);
@@ -102,6 +131,9 @@ export const sessionService = {
     return { session: toSessionDto(updated)! };
   },
 
+  /**
+   * 软删除会话（标记为 deleted 状态而非物理删除）。
+   */
   async delete(sessionId: string) {
     const existing = await sessionRepository.findById(sessionId);
     if (!existing) throw notFound("Session", sessionId);

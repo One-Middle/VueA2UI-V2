@@ -1,6 +1,7 @@
 import type { A2UIServerMessage, SurfaceSnapshotData, SurfaceState } from "@a2ui-platform/shared";
 import { a2uiEventRepository } from "../repositories/a2ui-event.repository.js";
 import { A2UI_VERSION } from "@a2ui-platform/shared";
+import type { Prisma } from "@prisma/client";
 
 /**
  * 快照计算服务——从所有 committed a2ui_events 按 sequence 回放，
@@ -10,8 +11,11 @@ export const snapshotService = {
   /**
    * 从所有 committed events 按 sequence 回放，构建完整 SurfaceSnapshotData。
    */
-  async computeFromEvents(sessionId: string): Promise<SurfaceSnapshotData> {
-    const events = await a2uiEventRepository.findBySessionId(sessionId, { limit: 1000 });
+  async computeFromEvents(
+    sessionId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<SurfaceSnapshotData> {
+    const events = await a2uiEventRepository.findBySessionId(sessionId, { limit: 1000 }, tx);
     // 过滤出已 committed 的事件
     const committedEvents = events.filter((e) => e.status === "committed");
     // 按 sequence 升序排列

@@ -54,6 +54,8 @@ MVP tab：
 
 点击历史会话时，前端应加载 `GET /api/sessions/:sessionId` 返回的 `currentSnapshot`，并将快照中的每个 surface 转换为标准 A2UI 消息序列后交给 Renderer：先 `createSurface`，再 `updateComponents`，最后 `updateDataModel`。该恢复过程只用于重建预览状态，不改变后端存储，也不新增 A2UI 协议字段。异步加载完成前如果用户已经切换到其他会话，旧会话响应必须被丢弃，避免预览内容串会话。
 
+会话切换应被视为一次完整水合事务：前端为每次选择生成单调递增的会话修订号，并要求详情、列表请求和 SSE Renderer 事件在提交状态前同时匹配会话 ID 与修订号。Renderer 输入必须显式区分快照全量替换和实时消息增量追加；不得通过消息数组长度推断是否发生变化。恢复失败应进入可见错误状态，不能静默显示空预览，也不能回退到未确认完整性的历史事件拼接结果。
+
 历史记录中的 A2UI 调试页保留底层事件信息，但默认以调试记录形式展示：序号、提交状态、关联 surface、消息数量、Agent Run、创建时间，并支持展开查看 `messages` 与 `validationResult` JSON。该页面用于确认后端提交给 Renderer 的消息批次，不作为普通用户理解生成结果的唯一入口。
 
 ## 5. 职责边界

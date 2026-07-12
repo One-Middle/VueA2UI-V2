@@ -1,3 +1,14 @@
+/**
+ * Basic Catalog 组件定义与查询 API。
+ *
+ * 职责：
+ * - 硬编码 A2UI v0.9 Basic Catalog 所有组件的字段定义（类型、必填、可选值等）
+ * - 提供组件定义查询、摘要生成、详情格式化的公共 API
+ * - 支撑渐进式组件披露流程中按需注入组件详情的功能
+ *
+ * 不负责：A2UI Schema 校验逻辑（见 validate-a2ui.ts）、Catalog JSON Schema 文件维护。
+ */
+
 import type {
   CatalogDefinition,
   CatalogComponentDefinition,
@@ -766,9 +777,6 @@ export function getCatalogComponents(): CatalogComponentDefinition[] {
 }
 
 /**
- * 获取所有组件名称列表。
- */
-/**
  * 返回用于首轮 Prompt 的组件摘要。
  * 只暴露组件名称和一句话用途，不包含字段清单。
  */
@@ -827,9 +835,6 @@ export function getComponentDef(
 }
 
 /**
- * 返回完整的 Basic Catalog 定义，包含 catalogId、version 和所有组件定义。
- */
-/**
  * 将按需请求的组件详情格式化为 Prompt 文本。
  * 该函数故意通过 getComponentDef() 查询，作为渐进式披露的单组件入口。
  */
@@ -869,6 +874,9 @@ export function formatCatalogComponentDetails(names: string[]): string {
   return sections.join("\n").trim();
 }
 
+/**
+ * 返回完整的 Basic Catalog 定义，包含 catalogId、version 和所有组件定义。
+ */
 export function getBasicCatalogDefinition(): CatalogDefinition {
   return {
     catalogId:

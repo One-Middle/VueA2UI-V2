@@ -1,4 +1,4 @@
-import type { SessionDetailResponse, SessionDto, SurfaceSnapshotDto } from "@a2ui-platform/shared";
+import type { MessageDto, SessionDetailResponse, SessionDto, SurfaceSnapshotDto } from "@a2ui-platform/shared";
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as api from "../services/api";
@@ -83,6 +83,48 @@ describe("workspace store session restore", () => {
     });
   });
 
+  it("ignores stale list responses and late renderer events from the previous session", async () => {
+    const firstMessages = deferred<{ items: MessageDto[]; pageInfo: { nextCursor: null; hasMore: false } }>();
+    vi.mocked(api.listMessages)
+      .mockReturnValueOnce(firstMessages.promise)
+      .mockResolvedValueOnce({ items: [], pageInfo: { nextCursor: null, hasMore: false } });
+    vi.mocked(api.getSession).mockResolvedValue({
+      session: makeSession("session-a"),
+      enabledSkillIds: [],
+      currentSnapshot: null,
+    });
+
+    const workspace = useWorkspaceStore();
+    const renderer = useRendererStore();
+    workspace.setActiveSessionId("session-a");
+    const oldHandlers = vi.mocked(connectStream).mock.calls.at(-1)?.[1] as StreamHandlers;
+    workspace.setActiveSessionId("session-b");
+
+    firstMessages.resolve({
+      items: [{
+        id: "stale-message",
+        sessionId: "session-a",
+        agentRunId: null,
+        role: "user",
+        kind: "chat",
+        content: "旧会话消息",
+        attachments: [],
+        a2uiEventIds: [],
+        metadata: {},
+        createdAt: "2026-01-01T00:00:00.000Z",
+      }],
+      pageInfo: { nextCursor: null, hasMore: false },
+    });
+    oldHandlers.surface_snapshot?.({
+      sessionId: "session-a",
+      snapshot: makeSnapshot("session-a", "stale-surface"),
+    });
+    await Promise.resolve();
+
+    expect(workspace.messages).toEqual([]);
+    expect(renderer.messagesForRenderer).toEqual([]);
+  });
+
   it("clears generating state when a text-only agent run completes", async () => {
     vi.mocked(api.getSession).mockResolvedValue({
       session: makeSession("session-a"),
@@ -125,6 +167,33 @@ describe("workspace store session restore", () => {
       assistantMessageId: "message-a",
       outputSnapshotId: null,
     });
+  });
+
+  it("restores renderer messages when a surface_snapshot SSE event arrives", async () => {
+    vi.mocked(api.getSession).mockResolvedValue({
+      session: makeSession("session-a"),
+      enabledSkillIds: [],
+      currentSnapshot: null,
+    });
+
+    const workspace = useWorkspaceStore();
+    const renderer = useRendererStore();
+    workspace.setActiveSessionId("session-a");
+
+    const handlers = vi.mocked(connectStream).mock.calls.at(-1)?.[1] as StreamHandlers;
+    handlers.surface_snapshot?.({
+      sessionId: "session-a",
+      snapshot: makeSnapshot("session-a", "surface-live"),
+    });
+
+    expect(renderer.messagesForRenderer).toHaveLength(3);
+    expect(renderer.messagesForRenderer[0]).toMatchObject({
+      createSurface: { surfaceId: "surface-live" },
+    });
+    expect(renderer.messagesForRenderer[1]).toMatchObject({
+      updateComponents: { surfaceId: "surface-live" },
+    });
+    expect(workspace.surfaceSnapshots).toHaveLength(1);
   });
 });
 

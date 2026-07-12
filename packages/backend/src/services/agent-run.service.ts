@@ -248,7 +248,9 @@ export const agentRunService = {
         data: { a2uiEventIds: [a2uiEvent.id] },
       });
 
-      const snapshotData = await snapshotService.computeFromEvents(sessionId);
+      // 必须复用当前事务，否则刚写入的 a2uiEvent 对事务外连接不可见，
+      // 首次生成会错误地产生 surfaces 为空的 current snapshot。
+      const snapshotData = await snapshotService.computeFromEvents(sessionId, tx);
       const { surfaceCount, componentCount } = snapshotService.getCounts(snapshotData);
 
       await surfaceSnapshotRepository.unsetCurrent(sessionId, tx);

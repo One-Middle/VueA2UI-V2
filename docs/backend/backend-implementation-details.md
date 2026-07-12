@@ -145,7 +145,11 @@ Routes (routes/)  →  Services (services/)  →  Repositories (repositories/)  
 8. 更新 session（currentSnapshotId, lastAgentRunId）
 9. 更新 agent_run 为 committed
 
+第 3、5、7 步必须共享同一个 `Prisma.TransactionClient`。`snapshotService.computeFromEvents(sessionId, tx)` 会把该事务客户端继续传给 `a2uiEventRepository.findBySessionId`，确保当前事务刚创建的 committed event 被包含在物化快照中。
+
 **事务提交后**通过 SSE 推送：assistant_message → a2ui_messages → surface_snapshot → agent_run_completed
+
+历史数据如曾受事务可见性问题影响，可执行 `pnpm --filter @a2ui-platform/backend repair:snapshots`。该命令在逐会话事务中从 committed events 重新物化 current snapshot，并只更新内容或统计不一致的快照。
 
 ### 失败 Agent run（agentRunService.failRun）
 

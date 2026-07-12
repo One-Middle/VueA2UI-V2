@@ -9,43 +9,6 @@
 ## 文件结构
 
 ```
-
----
-
-## 九、组件信息渐进式披露机制
-
-当前 Agent 不再在初始 System Prompt 中一次性注入所有 Basic Catalog 组件的完整字段说明。初始上下文只暴露：
-
-- A2UI v0.9 输出 envelope。
-- createSurface、updateDataModel、updateComponents、deleteSurface 消息顺序。
-- 邻接表组件树规则、root 规则、child/children 引用规则。
-- 数据绑定规则和安全禁止项。
-- Basic Catalog 组件名称与一句话功能摘要。
-
-当 LLM 需要某些组件的字段、必填项或枚举值时，应先输出结构化请求：
-
-```json
-{
-  "assistantMessage": "需要查看组件详情后再生成。",
-  "componentInfoRequest": {
-    "components": ["Column", "Text", "Card"],
-    "reason": "需要布局、文本和卡片容器字段"
-  }
-}
-```
-
-Agent Runtime 会解析 `componentInfoRequest.components`，过滤未知组件和已披露组件，通过 `getComponentDef(name)` 获取组件定义，并把对应组件详情注入下一轮 Prompt。组件详情披露最多 3 轮；超过上限后，Runtime 会强制提示 LLM 基于已披露信息输出最终 `{ assistantMessage, a2uiMessages }` JSON。
-
-最终输出契约不变：
-
-```json
-{
-  "assistantMessage": "说明生成或修改了什么",
-  "a2uiMessages": []
-}
-```
-
-`validateA2UI` 仍是最终提交前的强制校验。渐进式披露只改变上下文组织方式，不放宽 A2UI/Catalog 校验。
 packages/agent/src/
 ├── index.ts                        # 统一导出入口
 ├── logger.ts                       # 日志工具（pino）
@@ -58,7 +21,9 @@ packages/agent/src/
 │   └── model-client.ts             # OpenAI-compatible API 客户端
 ├── runtime/
 │   ├── agent-runtime.ts            # Agent 运行时（主流程编排）
-│   └── output-parser.ts            # 模型输出解析器
+│   │   └── output-parser.ts        # 模型输出解析器
+│   ├── component-info-request-parser.ts  # 组件信息请求解析器
+│   └── progressive-disclosure.test.ts    # 渐进式披露测试
 ├── tools/
 │   ├── validate-a2ui.ts            # A2UI 校验器（Ajv）
 │   └── catalog-schema.ts           # Basic Catalog 组件定义
@@ -76,7 +41,7 @@ packages/agent/src/
 将 `AgentRunInput` 转换成一个结构化的 `AgentContext`，包含 6 个部分：
 
 | 字段 | 来源 | 说明 |
-|---|---|---|
+| ---- | ---- | ---- |
 | `userMessage` | 用户输入 | 原始自然语言需求 |
 | `recentMessages` | 最近 20 条对话 | 角色翻译为中文（用户/助手/系统），单条超过 2000 字符会截断 |
 | `uploadedFiles` | 上传的 `.txt` 文件 | 每个文件内容截断到 8000 字符 |
@@ -109,7 +74,7 @@ packages/agent/src/
 由 `buildA2uiProtocolGuide(componentList)` 生成，约 105 行，是 System Prompt 的核心内容：
 
 | 章节 | 内容 |
-|---|---|
+| --- | --- |
 | **1. 输出外层结构** | 必须是纯 JSON `{ assistantMessage, a2uiMessages }`，不能用 Markdown 代码块包裹。纯聊天时 `a2uiMessages` 为空数组 `[]` |
 | **2. 可用组件** | 动态注入 18 个组件名称（从 `catalog-schema.ts` 获取），禁止使用 Catalog 外组件或 HTML/JS/CSS |
 | **3. 消息类型** | 4 种 A2UI v0.9 消息：`createSurface`、`updateDataModel`、`updateComponents`、`deleteSurface`，给出每种消息的 JSON 格式模板。生成顺序：先 createSurface → updateDataModel（如需要）→ updateComponents |
@@ -185,7 +150,7 @@ packages/agent/src/
 ### 请求参数
 
 | 参数 | 来源 | 说明 |
-|---|---|---|
+| --- | --- | --- |
 | `model` | config | 模型名称 |
 | `messages` | 组装结果 | `[{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }]` |
 | `temperature` | config | 温度参数（0-2） |
@@ -246,7 +211,7 @@ packages/agent/src/
 使用 **Ajv** 加载两份 JSON Schema，执行 6 步校验：
 
 | 步骤 | 检查内容 | 错误码 | 实现方式 |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | 1. A2UI 结构 | 每条消息是否符合 A2UI v0.9 消息格式 | `A2UI_STRUCTURE` | `a2ui-v0.9-schema.json` → Ajv compile |
 | 2. 组件属性 | 每个组件的属性类型、枚举值、必填字段 | `CATALOG_PROPERTY` / `UNKNOWN_COMPONENT` | `basic-catalog-schema.json` → Ajv `$ref` 引用对应组件的 definition |
 | 3. Root 存在 | 有 `updateComponents` 时必须存在 `id="root"` | `MISSING_ROOT` | 遍历收集所有组件 id，检查是否包含 "root" |
@@ -318,7 +283,7 @@ packages/agent/src/
 ### 三种终止状态
 
 | 状态 | 含义 | 触发条件 |
-|---|---|---|
+| --- | --- | --- |
 | `COMMITTED` | 成功生成并校验通过 | A2UI 消息通过全部 6 步校验，且消息数组非空 |
 | `TEXT_ONLY` | 纯文本回复 | 校验通过但 `a2uiMessages` 为空数组（用户只是聊天） |
 | `FAILED` | 生成失败 | 3 次尝试后仍解析失败、校验失败或模型调用失败 |
@@ -357,7 +322,7 @@ A2UI v0.9 使用 **邻接表**（flat list + id references）而非嵌套 JSON �
 ### 7.4 安全设计的双层防护
 
 | 层级 | 机制 | 说明 |
-|---|---|---|
+| --- | --- | --- |
 | Prompt 层 | 禁止事项列表 | 阻止 LLM 生成 unsafe 内容 |
 | 校验层 | `UNSAFE_CONTENT` 检查 | 即使 Prompt 失效，正则匹配仍能拦截 |
 | Schema 层 | `additionalProperties: false` | 阻止 LLM 编造不存在的字段 |
@@ -431,3 +396,40 @@ A2UI v0.9 使用 **邻接表**（flat list + id references）而非嵌套 JSON �
                                           │
                                        FAILED
 ```
+
+---
+
+## 九、组件信息渐进式披露机制
+
+当前 Agent 不再在初始 System Prompt 中一次性注入所有 Basic Catalog 组件的完整字段说明。初始上下文只暴露：
+
+- A2UI v0.9 输出 envelope。
+- createSurface、updateDataModel、updateComponents、deleteSurface 消息顺序。
+- 邻接表组件树规则、root 规则、child/children 引用规则。
+- 数据绑定规则和安全禁止项。
+- Basic Catalog 组件名称与一句话功能摘要。
+
+当 LLM 需要某些组件的字段、必填项或枚举值时，应先输出结构化请求：
+
+```json
+{
+  "assistantMessage": "需要查看组件详情后再生成。",
+  "componentInfoRequest": {
+    "components": ["Column", "Text", "Card"],
+    "reason": "需要布局、文本和卡片容器字段"
+  }
+}
+```
+
+Agent Runtime 会解析 `componentInfoRequest.components`，过滤未知组件和已披露组件，通过 `getComponentDef(name)` 获取组件定义，并把对应组件详情注入下一轮 Prompt。组件详情披露最多 3 轮；超过上限后，Runtime 会强制提示 LLM 基于已披露信息输出最终 `{ assistantMessage, a2uiMessages }` JSON。
+
+最终输出契约不变：
+
+```json
+{
+  "assistantMessage": "说明生成或修改了什么",
+  "a2uiMessages": []
+}
+```
+
+`validateA2UI` 仍是最终提交前的强制校验。渐进式披露只改变上下文组织方式，不放宽 A2UI/Catalog 校验。

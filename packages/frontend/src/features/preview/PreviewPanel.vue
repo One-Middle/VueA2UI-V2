@@ -18,6 +18,7 @@ const messageProcessor = new MessageProcessor(surfaceGroup);
 const surfaceIds = ref<string[]>([]);
 const componentJson = ref("");
 const dataModelJson = ref("");
+let consumedMessageCount = 0;
 const componentError = ref("");
 const dataModelError = ref("");
 const isSyncingEditors = ref(false);
@@ -35,13 +36,28 @@ const statusTag = computed(() => {
 });
 
 const processRendererMessages = () => {
-  surfaceGroup.destroy();
-  surfaceIds.value = [];
+  const messages = renderer.messagesForRenderer;
+  const canAppend = renderer.changeKind === "append" && consumedMessageCount <= messages.length;
 
-  if (renderer.messagesForRenderer.length > 0) {
-    messageProcessor.processMessages(renderer.messagesForRenderer);
+  if (canAppend) {
+    const pendingMessages = messages.slice(consumedMessageCount);
+    if (pendingMessages.length > 0) {
+      messageProcessor.processMessages(pendingMessages);
+    }
+  } else {
+    unsubscribeDataModel?.();
+    unsubscribeDataModel = undefined;
+    surfaceGroup.destroy();
+    surfaceIds.value = [];
+    if (messages.length > 0) {
+      messageProcessor.processMessages(messages);
+    }
   }
+
+  consumedMessageCount = messages.length;
   surfaceIds.value = surfaceGroup.getSurfaceIds();
+  unsubscribeDataModel?.();
+  unsubscribeDataModel = activeSurface.value?.dataModel.subscribe("/", syncEditorsFromSurface);
   syncEditorsFromSurface();
 };
 
@@ -176,6 +192,9 @@ function stringifyJson(value: unknown): string {
     </header>
 
     <div class="preview-body">
+      <n-alert v-if="workspace.sessionHydrationStatus === 'error'" type="error" title="历史会话恢复失败">
+        {{ workspace.sessionHydrationError ?? "无法加载当前会话快照，请检查后端服务和会话数据。" }}
+      </n-alert>
       <n-spin :show="workspace.isGenerating && !hasContent" description="AI 正在生成 UI...">
         <div class="preview-stack">
           <div v-if="!hasContent && !workspace.isGenerating" class="panel-center">

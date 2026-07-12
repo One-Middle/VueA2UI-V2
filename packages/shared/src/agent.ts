@@ -1,34 +1,69 @@
+/**
+ * Agent 相关的共享类型定义。
+ *
+ * 职责：
+ * - 定义 Agent 运行输入/输出类型（AgentRunInput、AgentRunResult）
+ * - 定义 A2UI 校验相关类型（ValidateA2UIInput、ValidateA2UIResult、ValidationIssue）
+ * - 定义工具调用记录类型（ToolCallRecord）
+ *
+ * 不负责：具体的校验逻辑、模型调用、上下文构建。
+ */
+
 import type { A2UIServerMessage, JsonObject, SurfaceSnapshotData } from "./a2ui";
 
+/** A2UI 校验过程中发现的单个问题。 */
 export interface ValidationIssue {
+  /** 问题代码，如 A2UI_STRUCTURE、CATALOG_PROPERTY */
   code: string;
+  /** JSON 路径，指向问题所在位置 */
   path?: string;
+  /** 人类可读的问题描述 */
   message: string;
 }
 
+/** validateA2UI 工具的输入参数。 */
 export interface ValidateA2UIInput {
+  /** 待校验的 A2UI 服务端消息列表 */
   messages: A2UIServerMessage[];
+  /** 使用的 Catalog ID */
   catalogId: string;
+  /** 当前 Surface 快照（可选），用于增量校验 */
   currentSnapshot?: SurfaceSnapshotData | null;
 }
 
+/** validateA2UI 工具的返回结果。 */
 export interface ValidateA2UIResult {
+  /** 是否通过校验 */
   valid: boolean;
+  /** 校验错误列表 */
   errors: ValidationIssue[];
+  /** 校验警告列表 */
   warnings: ValidationIssue[];
+  /** 校验通过时返回的规范化消息列表 */
   normalizedMessages: A2UIServerMessage[];
 }
 
+/** Agent 运行输入参数，由后端在触发 Agent Run 时组装。 */
 export interface AgentRunInput {
+  /** 会话 ID */
   sessionId: string;
+  /** 用户输入的文本消息 */
   userMessage: string;
+  /** 最近的对话历史消息 */
   recentMessages: Array<{ role: string; content: string }>;
+  /** 用户上传的文件列表（含文件内容） */
   uploadedFiles: Array<{ id: string; originalName: string; content: string }>;
+  /** 已启用的 Skill 列表 */
   enabledSkills: Array<{ id: string; name: string; content: string }>;
+  /** 当前 Surface 快照数据，用于增量更新 */
   currentSnapshot: SurfaceSnapshotData | null;
+  /** 使用的 Catalog ID */
   catalogId: string;
+  /** Catalog 版本 */
   catalogVersion: string;
+  /** Renderer 版本 */
   rendererVersion: string;
+  /** 模型配置 */
   model: {
     provider: string;
     name: string;
@@ -36,36 +71,61 @@ export interface AgentRunInput {
   };
 }
 
+/** Agent 运行结果，包含三种状态：已提交、纯文本、失败。 */
 export type AgentRunResult =
   | {
+      /** 状态：校验通过并已提交 */
       status: "COMMITTED";
+      /** AI 辅助回复文本 */
       assistantMessage: string;
+      /** 提交的 A2UI 消息列表 */
       a2uiMessages: A2UIServerMessage[];
+      /** 尝试次数（含修复轮次） */
       attemptCount: number;
+      /** 最终校验结果 */
       validation: ValidateA2UIResult;
+      /** Token 用量统计 */
       tokenUsage?: JsonObject;
     }
   | {
+      /** 状态：纯文本回复（无 A2UI 消息） */
       status: "TEXT_ONLY";
+      /** AI 回复文本 */
       assistantMessage: string;
+      /** 无 A2UI 消息时为空数组 */
       a2uiMessages: [];
+      /** 尝试次数 */
       attemptCount: number;
+      /** Token 用量统计 */
       tokenUsage?: JsonObject;
     }
   | {
+      /** 状态：运行失败 */
       status: "FAILED";
+      /** AI 最后一条回复文本 */
       assistantMessage: string;
+      /** 尝试次数（含修复轮次） */
       attemptCount: number;
+      /** 失败时的校验结果（可选） */
       validation?: ValidateA2UIResult;
+      /** 失败原因描述 */
       failureReason: string;
     };
 
+/** Agent 运行过程中的单次工具调用记录。 */
 export interface ToolCallRecord {
+  /** 工具名称 */
   toolName: string;
+  /** 调用状态 */
   status: "running" | "succeeded" | "failed";
+  /** 所在尝试轮次索引 */
   attemptIndex: number;
+  /** 输入摘要（脱敏后的关键参数） */
   inputSummary: JsonObject;
+  /** 输出结果（脱敏后） */
   output?: JsonObject;
+  /** 失败时的错误信息 */
   errorMessage?: string;
+  /** 调用耗时（毫秒） */
   durationMs?: number;
 }

@@ -90,6 +90,8 @@ Agent 成功提交时，必须在一个事务内：
 5. 更新 current snapshot。
 6. 更新 session last run。
 
+事件写入、事件回放和 snapshot 写入必须复用同一个 Prisma 事务客户端。禁止在事务内部通过全局 Prisma Client 回放事件，否则当前事务刚写入的 event 不可见，会生成错误的空 snapshot。
+
 事务提交后才能发送 SSE。
 
 ## 7. 验收标准

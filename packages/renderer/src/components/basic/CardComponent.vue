@@ -15,6 +15,8 @@ const childComponentId = computed(() => {
   return ctx.resolveValue(raw) as string | undefined;
 });
 
+const childComponentIds = computed(() => ctx.componentModel.getChildIds());
+
 const title = computed(() => {
   const raw = ctx.componentModel.getProperty("title");
   const resolved = ctx.resolveValue(raw);
@@ -30,5 +32,13 @@ const title = computed(() => {
       :surface-id="surfaceId"
       :component-id="childComponentId"
     />
+    <template v-else>
+      <A2uiComponent
+        v-for="childId in childComponentIds"
+        :key="childId"
+        :surface-id="surfaceId"
+        :component-id="childId"
+      />
+    </template>
   </div>
 </template>

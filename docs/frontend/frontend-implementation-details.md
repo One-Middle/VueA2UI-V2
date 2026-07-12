@@ -65,15 +65,18 @@ src/
 Renderer 集成流程：
 1. `registerBasicCatalog()` 注册 17 个组件
 2. 创建 `SurfaceGroupModel` → `MessageProcessor`
-3. `watch(renderer.a2uiMessages.length)` → `messageProcessor.processMessages()`
-4. 有内容时渲染 `<A2uiSurface surface-id="main" :surface-group="surfaceGroup">`
-5. `onBeforeUnmount` → `surfaceGroup.destroy()`
+3. Renderer store 通过单调递增的 `revision` 发布变更，并使用 `changeKind` 区分实时增量消息、历史快照全量替换和会话重置；不再观察数组长度，避免两个会话消息数相同时漏掉恢复。
+4. 实时增量只消费尚未处理的消息；历史快照替换时销毁旧 `SurfaceGroupModel` 状态并完整回放 `createSurface → updateComponents → updateDataModel`。
+5. 每次全量重建后重新订阅当前 surface 的 data model，防止订阅仍指向已销毁的旧模型。
+6. 有内容时按实际 `surfaceIds` 渲染 `<A2uiSurface>`；`onBeforeUnmount` 时销毁 surface group。
 
 ### 4.3 历史模块
 
 `NTabs` 两个子 Tab：
 - **会话列表**：显示 sessions（title/status/modelName/时间），点击切换
 - **A2UI Events**：显示 sequence/surfaceIds/消息数量/时间
+
+点击历史会话会启动一次带会话修订号的水合流程。会话详情中的 `currentSnapshot` 是恢复 Renderer 的唯一权威输入；消息、文件、Agent Runs、A2UI Events 和 snapshots 列表并行加载。每项异步响应和 Renderer 相关 SSE 在写入状态前都必须校验会话 ID 与修订号，旧会话的迟到响应不得污染当前会话。详情加载失败时，预览区展示明确错误状态，不使用事件列表或空白 UI 进行静默兜底。
 
 ### 4.4 Skills 模块
 

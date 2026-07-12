@@ -1,3 +1,15 @@
+/**
+ * 后端 HTTP 服务入口。
+ *
+ * 职责：
+ * - 连接数据库（Prisma）
+ * - 启动 Express HTTP 服务器
+ * - 处理服务端错误（端口占用等）
+ * - 优雅关闭（SIGTERM / SIGINT 信号处理）
+ *
+ * 不负责：Express 应用配置（见 app.ts）、业务路由逻辑。
+ */
+
 import type { Server } from "node:http";
 import { createApp } from "./app.js";
 import { config } from "./config.js";
@@ -31,6 +43,12 @@ try {
   process.exit(1);
 }
 
+/**
+ * 优雅关闭服务器：停止接收新请求、关闭 HTTP 服务、断开数据库连接。
+ *
+ * @param signal - 触发关闭的信号名称
+ * @param exitCode - 退出码，默认 0
+ */
 async function gracefulShutdown(signal: string, exitCode = 0) {
   if (shuttingDown) return;
   shuttingDown = true;

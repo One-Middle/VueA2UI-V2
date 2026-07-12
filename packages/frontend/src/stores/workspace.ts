@@ -1,3 +1,16 @@
+/**
+ * 工作台核心状态管理（Pinia Store）。
+ *
+ * 职责：
+ * - 管理会话列表、消息、文件、Skills、Agent Run、A2UI Event、Surface Snapshot 等业务数据
+ * - 管理 UI 状态（Tab 切换、SSE 连接状态、发送/生成状态、会话 hydration 状态）
+ * - 暴露 action 方法供组件调用（CRUD + SSE 连接管理）
+ * - 协调 Renderer Store 的生命周期（reset、processMessages、replaceMessages）
+ *
+ * 不负责：A2UI 渲染逻辑（见 renderer Store）、HTTP 请求实现（见 services/api）、
+ * SSE 底层连接（见 services/stream）。
+ */
+
 import type {
   AgentRunDto,
   A2UIEventDto,
@@ -37,6 +50,9 @@ export const useWorkspaceStore = defineStore("workspace", {
     activeTab: "conversation" as WorkspaceTab,
     activeSessionId: null as string | null,
     streamStatus: "idle" as "idle" | "connecting" | "connected" | "error",
+    sessionHydrationStatus: "idle" as "idle" | "loading" | "ready" | "error",
+    sessionHydrationError: null as string | null,
+    _sessionRevision: 0,
 
     // ─── 业务数据 ───
     sessions: [] as SessionDto[],
@@ -60,15 +76,21 @@ export const useWorkspaceStore = defineStore("workspace", {
 
   actions: {
     // ─── Tab 切换 ───
+
+    /** 切换工作台 Tab。 */
     setActiveTab(tab: WorkspaceTab) {
       this.activeTab = tab;
     },
 
+    /** 开始新会话：断开 SSE、清空所有业务数据、重置 Renderer。 */
     startNewConversation() {
       this.disconnectSSE();
       this.activeTab = "conversation";
       this.activeSessionId = null;
       this.streamStatus = "idle";
+      this.sessionHydrationStatus = "idle";
+      this.sessionHydrationError = null;
+      this._sessionRevision += 1;
       this.messages = [];
       this.uploadedFiles = [];
       this.enabledSkillIds = [];
@@ -82,6 +104,8 @@ export const useWorkspaceStore = defineStore("workspace", {
     },
 
     // ─── 会话管理 ───
+
+    /** 加载会话列表（最多 100 条）。 */
     async loadSessions() {
       try {
         const result = await api.listSessions({ limit: 100 });
@@ -91,6 +115,7 @@ export const useWorkspaceStore = defineStore("workspace", {
       }
     },
 
+    /** 创建新会话并自动选中。 */
     async createSession(title?: string) {
       try {
         const result = await api.createSession({ title });
@@ -102,12 +127,19 @@ export const useWorkspaceStore = defineStore("workspace", {
       }
     },
 
+    /**
+     * 设置当前活跃会话 ID，触发数据加载和 SSE 连接。
+     * 切换前断开旧 SSE、清空旧数据、重置 Renderer，然后并行加载新会话的消息/文件/Agent Run/A2UI Event/Snapshot。
+     */
     setActiveSessionId(sessionId: string | null) {
       // 切换前断开旧的 SSE 连接
       this.disconnectSSE();
 
       this.activeSessionId = sessionId;
+      const sessionRevision = ++this._sessionRevision;
       this.isGenerating = false;
+      this.sessionHydrationStatus = sessionId ? "loading" : "idle";
+      this.sessionHydrationError = null;
 
       // 清空之前的数据
       this.messages = [];
@@ -126,17 +158,18 @@ export const useWorkspaceStore = defineStore("workspace", {
       }
 
       // 加载新会话数据
-      this.loadMessages();
-      this.loadFiles();
-      this.loadAgentRuns();
-      this.loadA2UIEvents();
-      this.loadSnapshots();
-      void this.loadSessionDetail(sessionId);
+      void this.loadMessages(sessionId, sessionRevision);
+      void this.loadFiles(sessionId, sessionRevision);
+      void this.loadAgentRuns(sessionId, sessionRevision);
+      void this.loadA2UIEvents(sessionId, sessionRevision);
+      void this.loadSnapshots(sessionId, sessionRevision);
+      void this.loadSessionDetail(sessionId, sessionRevision);
 
       // 建立 SSE 连接
-      this.connectSSE();
+      this.connectSSE(sessionId, sessionRevision);
     },
 
+    /** 软删除会话，同时清理前端状态。 */
     async deleteSession(sessionId: string) {
       try {
         await api.deleteSession(sessionId);
@@ -160,12 +193,17 @@ export const useWorkspaceStore = defineStore("workspace", {
       }
     },
 
-    async loadSessionDetail(sessionId?: string | null) {
+    /**
+     * 加载会话详情（含当前快照和已启用 Skill），并尝试从快照恢复 Renderer 状态。
+     * 通过 sessionRevision 防止竞态：只有当前会话 ID 与版本号匹配时才会写入状态。
+     */
+    async loadSessionDetail(sessionId?: string | null, requestedRevision?: number) {
       const targetSessionId = sessionId ?? this.activeSessionId;
+      const sessionRevision = requestedRevision ?? this._sessionRevision;
       if (!targetSessionId) return;
       try {
         const result = await api.getSession(targetSessionId);
-        if (this.activeSessionId !== targetSessionId) return;
+        if (!this.isCurrentSession(targetSessionId, sessionRevision)) return;
         // 更新 sessions 列表中对应的项
         const idx = this.sessions.findIndex((s) => s.id === targetSessionId);
         if (idx >= 0) {
@@ -173,22 +211,41 @@ export const useWorkspaceStore = defineStore("workspace", {
         }
         this.enabledSkillIds = result.enabledSkillIds ?? [];
         restoreRendererFromSnapshot(result.currentSnapshot);
-      } catch {
-        // 静默处理
+        this.sessionHydrationStatus = "ready";
+      } catch (error) {
+        if (!this.isCurrentSession(targetSessionId, sessionRevision)) return;
+        this.sessionHydrationStatus = "error";
+        this.sessionHydrationError = error instanceof Error ? error.message : "会话恢复失败";
+        logger.error(`会话恢复失败 → session=${shortId(targetSessionId)}`);
       }
     },
 
+    /** 检查给定的会话 ID 和版本号是否为当前活跃会话（用于防止异步竞态）。 */
+    isCurrentSession(sessionId: string, sessionRevision: number) {
+      return this.activeSessionId === sessionId && this._sessionRevision === sessionRevision;
+    },
+
     // ─── 消息管理 ───
-    async loadMessages() {
-      if (!this.activeSessionId) return;
+
+    /** 加载当前会话的消息列表（最多 200 条）。 */
+    async loadMessages(requestedSessionId?: string | null, requestedRevision?: number) {
+      const sessionId = requestedSessionId ?? this.activeSessionId;
+      const sessionRevision = requestedRevision ?? this._sessionRevision;
+      if (!sessionId) return;
       try {
-        const result = await api.listMessages(this.activeSessionId, { limit: 200 });
+        const result = await api.listMessages(sessionId, { limit: 200 });
+        if (!this.isCurrentSession(sessionId, sessionRevision)) return;
         this.messages = result.items;
       } catch {
         // 静默处理
       }
     },
 
+    /**
+     * 发送消息到当前会话。
+     * 若当前无活跃会话则自动创建（标题从消息内容截取），
+     * 发送成功后 SSE 连接会自动推送 assistant 回复和 A2UI 结果。
+     */
     async sendMessage(content: string, attachmentFileIds?: string[]) {
       const trimmedContent = content.trim();
       if (!trimmedContent) return;
@@ -218,16 +275,22 @@ export const useWorkspaceStore = defineStore("workspace", {
     },
 
     // ─── 文件管理 ───
-    async loadFiles() {
-      if (!this.activeSessionId) return;
+
+    /** 加载当前会话的上传文件列表。 */
+    async loadFiles(requestedSessionId?: string | null, requestedRevision?: number) {
+      const sessionId = requestedSessionId ?? this.activeSessionId;
+      const sessionRevision = requestedRevision ?? this._sessionRevision;
+      if (!sessionId) return;
       try {
-        const result = await api.listFiles(this.activeSessionId);
+        const result = await api.listFiles(sessionId);
+        if (!this.isCurrentSession(sessionId, sessionRevision)) return;
         this.uploadedFiles = result.items;
       } catch {
         // 静默处理
       }
     },
 
+    /** 上传 .txt 文件到当前会话。 */
     async uploadFile(file: File) {
       if (!this.activeSessionId) throw new Error("请先创建或选择会话");
       // 客户端检查 .txt 扩展名
@@ -243,6 +306,7 @@ export const useWorkspaceStore = defineStore("workspace", {
       }
     },
 
+    /** 删除当前会话的上传文件。 */
     async deleteFile(fileId: string) {
       if (!this.activeSessionId) return;
       try {
@@ -254,6 +318,8 @@ export const useWorkspaceStore = defineStore("workspace", {
     },
 
     // ─── Skills 管理 ───
+
+    /** 加载全局 Skill 列表。 */
     async loadSkills() {
       try {
         const result = await api.listSkills();
@@ -263,6 +329,7 @@ export const useWorkspaceStore = defineStore("workspace", {
       }
     },
 
+    /** 创建新 Skill。 */
     async createSkill(name: string, description: string, content: string) {
       try {
         const result = await api.createSkill({ name, description, content });
@@ -273,6 +340,7 @@ export const useWorkspaceStore = defineStore("workspace", {
       }
     },
 
+    /** 更新已有 Skill 的字段。 */
     async updateSkill(skillId: string, data: { name?: string; description?: string; content?: string; isActive?: boolean }) {
       try {
         const result = await api.updateSkill(skillId, data);
@@ -286,6 +354,7 @@ export const useWorkspaceStore = defineStore("workspace", {
       }
     },
 
+    /** 为当前会话启用某个 Skill。 */
     async enableSkill(skillId: string) {
       if (!this.activeSessionId) throw new Error("请先选择会话");
       try {
@@ -298,6 +367,7 @@ export const useWorkspaceStore = defineStore("workspace", {
       }
     },
 
+    /** 为当前会话禁用某个 Skill。 */
     async disableSkill(skillId: string) {
       if (!this.activeSessionId) throw new Error("请先选择会话");
       try {
@@ -309,16 +379,22 @@ export const useWorkspaceStore = defineStore("workspace", {
     },
 
     // ─── Agent Run ───
-    async loadAgentRuns() {
-      if (!this.activeSessionId) return;
+
+    /** 加载当前会话的 Agent Run 列表（最多 100 条）。 */
+    async loadAgentRuns(requestedSessionId?: string | null, requestedRevision?: number) {
+      const sessionId = requestedSessionId ?? this.activeSessionId;
+      const sessionRevision = requestedRevision ?? this._sessionRevision;
+      if (!sessionId) return;
       try {
-        const result = await api.listAgentRuns(this.activeSessionId, { limit: 100 });
+        const result = await api.listAgentRuns(sessionId, { limit: 100 });
+        if (!this.isCurrentSession(sessionId, sessionRevision)) return;
         this.agentRuns = result.items;
       } catch {
         // 静默处理
       }
     },
 
+    /** 获取单个 Agent Run 的详细信息（含 toolCalls、assistantMessage、a2uiEvents）。 */
     async loadAgentRunDetail(runId: string) {
       if (!this.activeSessionId) return null;
       try {
@@ -329,20 +405,29 @@ export const useWorkspaceStore = defineStore("workspace", {
     },
 
     // ─── A2UI / Snapshots ───
-    async loadA2UIEvents() {
-      if (!this.activeSessionId) return;
+
+    /** 加载当前会话的 A2UI Event 列表（最多 200 条）。 */
+    async loadA2UIEvents(requestedSessionId?: string | null, requestedRevision?: number) {
+      const sessionId = requestedSessionId ?? this.activeSessionId;
+      const sessionRevision = requestedRevision ?? this._sessionRevision;
+      if (!sessionId) return;
       try {
-        const result = await api.listA2UIEvents(this.activeSessionId, { limit: 200 });
+        const result = await api.listA2UIEvents(sessionId, { limit: 200 });
+        if (!this.isCurrentSession(sessionId, sessionRevision)) return;
         this.a2uiEvents = result.items.map(toWorkspaceA2UIEvent);
       } catch {
         // 静默处理
       }
     },
 
-    async loadSnapshots() {
-      if (!this.activeSessionId) return;
+    /** 加载当前会话的 Surface Snapshot 列表（最多 100 条）。 */
+    async loadSnapshots(requestedSessionId?: string | null, requestedRevision?: number) {
+      const sessionId = requestedSessionId ?? this.activeSessionId;
+      const sessionRevision = requestedRevision ?? this._sessionRevision;
+      if (!sessionId) return;
       try {
-        const result = await api.listSnapshots(this.activeSessionId, { limit: 100 });
+        const result = await api.listSnapshots(sessionId, { limit: 100 });
+        if (!this.isCurrentSession(sessionId, sessionRevision)) return;
         this.surfaceSnapshots = result.items.map(toWorkspaceSurfaceSnapshot);
       } catch {
         // 静默处理
@@ -350,21 +435,31 @@ export const useWorkspaceStore = defineStore("workspace", {
     },
 
     // ─── SSE ───
-    connectSSE() {
-      if (!this.activeSessionId) return;
+
+    /**
+     * 建立 SSE 连接，注册各类事件的回调处理器。
+     * 通过 sessionRevision 防止切换会话后的旧事件污染新状态。
+     */
+    connectSSE(requestedSessionId?: string | null, requestedRevision?: number) {
+      const sessionId = requestedSessionId ?? this.activeSessionId;
+      const sessionRevision = requestedRevision ?? this._sessionRevision;
+      if (!sessionId) return;
 
       this.streamStatus = "connecting";
       const renderer = useRendererStore();
-      const sid = shortId(this.activeSessionId);
+      const sid = shortId(sessionId);
+      const isCurrent = () => this.isCurrentSession(sessionId, sessionRevision);
 
       logger.info(`SSE 连接中 → session=${sid}`);
 
-      this._streamConnection = connectStream(this.activeSessionId, {
+      this._streamConnection = connectStream(sessionId, {
         heartbeat: (_data: { time: string }) => {
+          if (!isCurrent()) return;
           this.streamStatus = "connected";
         },
 
         agent_run_started: (data: { sessionId: string; agentRun: Pick<AgentRunDto, "id" | "status" | "attemptCount" | "maxAttempts"> }) => {
+          if (!isCurrent() || data.sessionId !== sessionId) return;
           this.streamStatus = "connected";
           this.isGenerating = true;
           logger.info(`← SSE ← BACKEND: agent_run_started → runId=${shortId(data.agentRun.id)}`);
@@ -378,6 +473,7 @@ export const useWorkspaceStore = defineStore("workspace", {
         },
 
         agent_run_attempt: (data: { sessionId: string; agentRunId: string; attemptIndex: number; phase: string; toolCall?: unknown }) => {
+          if (!isCurrent() || data.sessionId !== sessionId) return;
           // 更新对应 run 的 attempt
           const run = this.agentRuns.find((r) => r.id === data.agentRunId);
           if (run) {
@@ -389,6 +485,7 @@ export const useWorkspaceStore = defineStore("workspace", {
           sessionId: string;
           agentRun: Pick<AgentRunDto, "id" | "status" | "attemptCount" | "assistantMessageId" | "outputSnapshotId" | "completedAt">;
         }) => {
+          if (!isCurrent() || data.sessionId !== sessionId) return;
           logger.info(`← SSE ← BACKEND: agent_run_completed → runId=${shortId(data.agentRun.id)}`);
           const run = this.agentRuns.find((r) => r.id === data.agentRun.id);
           if (run) {
@@ -402,6 +499,7 @@ export const useWorkspaceStore = defineStore("workspace", {
         },
 
         assistant_message: (data: { sessionId: string; message: MessageDto }) => {
+          if (!isCurrent() || data.sessionId !== sessionId) return;
           // 追加 assistant 消息
           const existing = this.messages.find((m) => m.id === data.message.id);
           if (!existing) {
@@ -412,6 +510,7 @@ export const useWorkspaceStore = defineStore("workspace", {
         },
 
         a2ui_messages: (data: { sessionId: string; a2uiEvent: A2UIEventDto }) => {
+          if (!isCurrent() || data.sessionId !== sessionId) return;
           // 将 A2UI 消息交给 Renderer 处理
           const msgs = data.a2uiEvent.messages as A2UIServerMessage[];
           logger.info(`← SSE ← BACKEND: a2ui_messages → ${msgs.length}条 → RENDERER`);
@@ -427,6 +526,7 @@ export const useWorkspaceStore = defineStore("workspace", {
         },
 
         surface_snapshot: (data: { sessionId: string; snapshot: SurfaceSnapshotDto }) => {
+          if (!isCurrent() || data.sessionId !== sessionId) return;
           const snapshot = toWorkspaceSurfaceSnapshot(data.snapshot);
           logger.info(`← SSE ← BACKEND: surface_snapshot → surfaces=${data.snapshot.surfaceCount}, components=${data.snapshot.componentCount}`);
           const existingIdx = this.surfaceSnapshots.findIndex((s) => s.id === snapshot.id);
@@ -440,6 +540,7 @@ export const useWorkspaceStore = defineStore("workspace", {
           this.surfaceSnapshots.forEach((s, i) => {
             s.isCurrent = i === this.surfaceSnapshots.length - 1;
           });
+          restoreRendererFromSnapshot(data.snapshot);
         },
 
         agent_run_failed: (data: {
@@ -447,6 +548,7 @@ export const useWorkspaceStore = defineStore("workspace", {
           agentRun: Pick<AgentRunDto, "id" | "status" | "attemptCount" | "failureReason">;
           message: MessageDto;
         }) => {
+          if (!isCurrent() || data.sessionId !== sessionId) return;
           logger.warn(`← SSE ← BACKEND: agent_run_failed → runId=${shortId(data.agentRun.id)}, reason=${(data.agentRun.failureReason ?? "").slice(0, 80)}`);
           // 更新 run 状态
           const run = this.agentRuns.find((r) => r.id === data.agentRun.id);
@@ -465,20 +567,24 @@ export const useWorkspaceStore = defineStore("workspace", {
         },
 
         onError: (_error: Error) => {
+          if (!isCurrent()) return;
           this.streamStatus = "error";
           logger.error(`SSE 连接错误 → ${_error.message}`);
         },
 
         onReconnecting: (_attempt: number) => {
+          if (!isCurrent()) return;
           this.streamStatus = "connecting";
         },
 
         onClosed: () => {
+          if (!isCurrent()) return;
           this.streamStatus = "idle";
         },
       });
     },
 
+    /** 断开当前 SSE 连接并重置连接状态。 */
     disconnectSSE() {
       this._streamConnection?.close();
       this._streamConnection = null;
@@ -487,6 +593,9 @@ export const useWorkspaceStore = defineStore("workspace", {
   },
 });
 
+/**
+ * 将 A2UIEventDto 转换为 Store 内部使用的宽松类型（messages 和 validationResult 转为 unknown）。
+ */
 function toWorkspaceA2UIEvent(event: A2UIEventDto): WorkspaceA2UIEvent {
   return {
     ...event,
@@ -495,6 +604,9 @@ function toWorkspaceA2UIEvent(event: A2UIEventDto): WorkspaceA2UIEvent {
   };
 }
 
+/**
+ * 将 SurfaceSnapshotDto 转换为 Store 内部使用的宽松类型（snapshot 转为 unknown）。
+ */
 function toWorkspaceSurfaceSnapshot(snapshot: SurfaceSnapshotDto): WorkspaceSurfaceSnapshot {
   return {
     ...snapshot,
@@ -502,16 +614,22 @@ function toWorkspaceSurfaceSnapshot(snapshot: SurfaceSnapshotDto): WorkspaceSurf
   };
 }
 
+/**
+ * 从 Surface Snapshot 中提取 A2UI 消息，传入 Renderer 恢复渲染状态。
+ */
 function restoreRendererFromSnapshot(snapshot: SurfaceSnapshotDto | null): void {
   if (!snapshot) return;
 
   const renderer = useRendererStore();
   const messages = snapshotToRendererMessages(snapshot);
   if (messages.length > 0) {
-    renderer.processMessages(messages);
+    renderer.replaceMessages(messages);
   }
 }
 
+/**
+ * 将 Surface Snapshot 数据还原为 A2UI Server Message 序列（createSurface → updateComponents → updateDataModel）。
+ */
 function snapshotToRendererMessages(snapshot: SurfaceSnapshotDto): A2UIServerMessage[] {
   const version = snapshot.snapshot.version;
   const surfaces = Object.values(snapshot.snapshot.surfaces) as SurfaceState[];
@@ -552,6 +670,9 @@ function snapshotToRendererMessages(snapshot: SurfaceSnapshotDto): A2UIServerMes
   return messages;
 }
 
+/**
+ * 从消息内容生成会话标题（截取前 24 个字符）。
+ */
 function createSessionTitle(content: string): string {
   const normalized = content.replace(/\s+/g, " ").trim();
   return normalized.length > 24 ? `${normalized.slice(0, 24)}...` : normalized;

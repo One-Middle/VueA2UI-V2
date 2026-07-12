@@ -6,13 +6,18 @@ export const a2uiEventRepository = {
     return prisma.a2UIEvent.create({ data });
   },
 
-  findBySessionId(sessionId: string, options: { fromSequence?: number; limit?: number } = {}) {
+  findBySessionId(
+    sessionId: string,
+    options: { fromSequence?: number; limit?: number } = {},
+    tx?: Prisma.TransactionClient,
+  ) {
     const { fromSequence, limit = 50 } = options;
     const where: Prisma.A2UIEventWhereInput = { sessionId, deletedAt: null };
     if (fromSequence !== undefined) {
       where.sequence = { gte: fromSequence };
     }
-    return prisma.a2UIEvent.findMany({
+    const client = tx ?? prisma;
+    return client.a2UIEvent.findMany({
       where,
       orderBy: { sequence: "asc" },
       take: limit + 1,

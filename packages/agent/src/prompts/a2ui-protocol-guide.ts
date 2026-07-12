@@ -58,6 +58,7 @@ export function buildA2uiProtocolGuide(
     "",
     "### 8. 常见错误与禁止写法",
     '- Row/Column 的 children 只能写组件 id 字符串数组，不要写完整组件对象。',
+    '- Card 使用单个 child 字段，不要写 children；如果卡片内有多个内容，先创建一个 Column，再让 Card.child 指向这个 Column。',
     '- Button.action 必须是 { "name": "...", "context": { ... } }，不要写成字符串。',
     "- 禁止生成 table、div、input、select、Schedule、Calendar 等 Catalog 外组件。",
     "- 禁止使用 className、css、html、innerHTML、script、onClick、onInput、onChange 等非 Catalog 字段。",

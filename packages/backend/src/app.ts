@@ -1,3 +1,15 @@
+/**
+ * Express 应用工厂。
+ *
+ * 职责：
+ * - 创建并配置 Express 应用实例
+ * - 注册全局中间件（CORS、JSON 解析、调试日志）
+ * - 挂载所有路由模块
+ * - 注册 404 和全局错误处理中间件
+ *
+ * 不负责：HTTP 服务监听、数据库连接、业务逻辑。
+ */
+
 import cors from "cors";
 import express from "express";
 import { config } from "./config.js";
@@ -15,6 +27,11 @@ import { a2uiRouter } from "./routes/a2ui.js";
 import { rendererRouter } from "./routes/renderer.js";
 import { exportRouter } from "./routes/export.js";
 
+/**
+ * 创建并配置 Express 应用实例。
+ *
+ * @returns 配置完成的 Express 应用，可直接传入 app.listen()
+ */
 export function createApp() {
   const app = express();
 
@@ -33,7 +50,7 @@ export function createApp() {
   app.use(cors());
   app.use(express.json({ limit: "1mb" }));
 
-  // 健康检查
+  /** 健康检查端点 */
   app.get("/api/health", (_req, res) => {
     res.json({
       ok: true,
@@ -42,7 +59,7 @@ export function createApp() {
     });
   });
 
-  // Runtime 配置
+  /** Runtime 配置端点 */
   app.get("/api/runtime/config", (_req, res) => {
     res.json({
       modelProvider: "openai-compatible",

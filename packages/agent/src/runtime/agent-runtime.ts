@@ -1,3 +1,17 @@
+/**
+ * Agent Runtime 核心调度器。
+ *
+ * 职责：
+ * - 编排 Agent 运行的主循环（生成 → 校验 → 修复）
+ * - 调度模型调用（初始生成 / 修复模式）
+ * - 管理渐进式组件披露（progressive disclosure）流程
+ * - 调用 validateA2UI 校验模型输出
+ * - 记录工具调用和 Token 用量
+ *
+ * 不负责：上下文构建（见 AgentContextBuilder）、Prompt 组装（见 PromptComposer）、
+ * 模型 HTTP 通信（见 ModelClient）、A2UI 校验实现（见 tools/validate-a2ui）。
+ */
+
 import type {
   AgentRunInput,
   AgentRunResult,
@@ -18,7 +32,9 @@ import {
 } from "../tools/catalog-schema.js";
 import { logger, shortId } from "../logger.js";
 
+/** 最大生成 + 修复尝试次数 */
 const MAX_ATTEMPTS = 3;
+/** 渐进式组件披露的最大轮数 */
 const MAX_COMPONENT_DISCLOSURE_ROUNDS = 3;
 
 export class AgentRuntime {
@@ -36,6 +52,13 @@ export class AgentRuntime {
     this.contextBuilder = contextBuilder;
   }
 
+  /**
+   * 执行一次完整的 Agent 运行：构建上下文 → 循环生成/校验/修复（最多 3 次）。
+   *
+   * @param input - Agent 运行输入参数
+   * @param onToolCall - 工具调用回调，用于通知外部记录每次工具调用
+   * @returns Agent 运行结果（COMMITTED / TEXT_ONLY / FAILED）
+   */
   async run(
     input: AgentRunInput,
     onToolCall?: (record: ToolCallRecord) => void,
@@ -51,6 +74,7 @@ export class AgentRuntime {
     let componentDetails = "";
     const disclosedComponents = new Set<string>();
 
+    /** 累加 Token 用量到 totalTokens。 */
     const addUsage = (usage?: TokenUsage): void => {
       if (!usage) return;
       totalTokens = {
@@ -71,6 +95,7 @@ export class AgentRuntime {
 
       try {
         if (isRepair) {
+          // 修复模式：将上次失败的输出和校验错误注入修复 Prompt
           const { systemPrompt, userPrompt } = this.promptComposer.composeRepair(
             context,
             JSON.stringify({
@@ -91,6 +116,7 @@ export class AgentRuntime {
           ]);
           addUsage(modelResponse.usage);
         } else {
+          // 初始模式：带渐进式组件披露的生成流程
           const disclosureResult =
             await this.generateWithComponentDisclosure(
               context,
@@ -121,6 +147,7 @@ export class AgentRuntime {
         continue;
       }
 
+      // 解析模型输出，提取 assistant 文本和 A2UI 消息
       const parseResult = parseModelOutput(modelResponse.content);
 
       if (!parseResult.ok) {
@@ -145,6 +172,7 @@ export class AgentRuntime {
       lastAssistantMessage = assistantMessage;
       lastA2uiMessages = a2uiMessages;
 
+      // A2UI 校验
       const validateStartTime = Date.now();
       const validation = validateA2UI({
         messages: a2uiMessages,
@@ -158,6 +186,7 @@ export class AgentRuntime {
         `A2UI 校验 → ${validation.valid ? "通过" : "未通过"}, errors=${validation.errors.length}, warnings=${validation.warnings.length}, 耗时=${validateDuration}ms`,
       );
 
+      // 构建 validateA2UI 工具调用记录
       const toolCallRecord: ToolCallRecord = {
         toolName: "validateA2UI",
         status: validation.valid ? "succeeded" : "failed",
@@ -201,6 +230,7 @@ export class AgentRuntime {
           };
         }
 
+        // 校验通过但无 A2UI 消息 —— 纯文本响应
         logger.info(`Agent 完成 → TEXT_ONLY, attempts=${attempt}`);
         return {
           status: "TEXT_ONLY",
@@ -211,6 +241,7 @@ export class AgentRuntime {
         };
       }
 
+      // 已达最大尝试次数仍未通过校验
       if (attempt >= MAX_ATTEMPTS) {
         logger.warn(
           `Agent 完成 → FAILED, attempts=${MAX_ATTEMPTS}, errors=${validation.errors.length}`,
@@ -237,6 +268,18 @@ export class AgentRuntime {
     };
   }
 
+  /**
+   * 执行带渐进式组件披露的初始生成流程。
+   * 模型可请求查看组件的详细字段定义，每轮披露一部分组件，最多 3 轮后强制输出。
+   *
+   * @param context - Agent 上下文
+   * @param attempt - 当前尝试轮次
+   * @param disclosedComponents - 已披露的组件名称集合
+   * @param initialComponentDetails - 已累积的组件详情文本
+   * @param addUsage - Token 累加回调
+   * @param onToolCall - 工具调用回调
+   * @returns 模型响应和更新后的组件详情文本
+   */
   private async generateWithComponentDisclosure(
     context: AgentContext,
     attempt: number,
@@ -274,10 +317,12 @@ export class AgentRuntime {
       ]);
       addUsage(lastResponse.usage);
 
+      // 强制最终输出轮次 —— 不再解析组件请求，直接返回模型输出
       if (forceFinalOutput) {
         break;
       }
 
+      // 解析模型是否请求查看组件详情
       const requestResult = parseComponentInfoRequest(lastResponse.content);
       if (!requestResult.ok) {
         break;
@@ -291,6 +336,7 @@ export class AgentRuntime {
       const alreadyDisclosedComponents: string[] = [];
       const skippedComponents: string[] = [];
 
+      // 1. 分类请求的组件：新增 vs 已披露 vs 不在 Catalog 中
       for (const componentName of requestedComponents) {
         if (disclosedComponents.has(componentName)) {
           alreadyDisclosedComponents.push(componentName);
@@ -303,6 +349,7 @@ export class AgentRuntime {
         disclosedNow.push(componentName);
       }
 
+      // 2. 组装反馈文本
       const detailText = formatCatalogComponentDetails(disclosedNow);
       const feedback: string[] = [];
       if (detailText) {
@@ -331,10 +378,12 @@ export class AgentRuntime {
           .join("\n\n");
       }
 
+      // 3. 记录已披露组件
       for (const componentName of disclosedNow) {
         disclosedComponents.add(componentName);
       }
 
+      // 4. 记录工具调用
       const durationMs = Date.now() - disclosureStartTime;
       onToolCall?.({
         toolName: "getCatalogComponentDetails",
