@@ -12,6 +12,7 @@ export const useRendererStore = defineStore("renderer", {
   state: () => ({
     /** 累积收到的 A2UI 消息（供 Renderer 组件消费） */
     a2uiMessages: [] as unknown[],
+    revision: 0,
     /** Renderer 是否已就绪 */
     rendererReady: false,
   }),
@@ -30,11 +31,13 @@ export const useRendererStore = defineStore("renderer", {
     processMessages(messages: A2UIServerMessage[]) {
       const prev = this.a2uiMessages as A2UIServerMessage[];
       this.a2uiMessages = [...prev, ...messages];
+      this.revision += 1;
     },
 
     /** 清空所有状态（切换 session 时调用） */
     reset() {
       this.a2uiMessages = [];
+      this.revision += 1;
       this.rendererReady = false;
     },
 

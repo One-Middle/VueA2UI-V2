@@ -110,3 +110,23 @@
 - 验收标准：前端能展示失败说明。
 - 测试要求：模型失败、解析失败、校验失败。
 - 不允许做什么：不把完整敏感 prompt 返回前端。
+- 涓嶅厑璁稿仛浠€涔堬細涓嶆妸瀹屾暣鏁忔劅 prompt 杩斿洖鍓嶇銆?
+
+### TASK-AG-010：组件信息渐进式披露
+
+- 目标：将组件字段说明从初始 Prompt 中移除，改为组件摘要首轮暴露与 Runtime 按需补充详情。
+- 依赖任务：TASK-AG-003、TASK-AG-007、TASK-AG-008。
+- 涉及文件区域：`packages/agent/src/prompts`、`packages/agent/src/runtime`、`packages/agent/src/tools/catalog-schema.ts`。
+- 实现要求：
+  - 初始 Prompt 只暴露组件名称和一句话用途摘要。
+  - LLM 可输出 `componentInfoRequest.components` 请求组件详情。
+  - Runtime 通过 `getComponentDef(name)` 获取组件字段详情并注入下一轮 Prompt。
+  - 组件详情披露最多 3 轮，超过后强制输出最终 `{ assistantMessage, a2uiMessages }`。
+  - 新增 `getCatalogComponentDetails` ToolCallRecord。
+- 验收标准：
+  - 初始 Prompt 不包含 18 个组件的完整字段速查表。
+  - 请求未知组件会被跳过并记录。
+  - 重复请求已披露组件不会重复注入。
+  - 最终 A2UI 仍必须通过 `validateA2UI`。
+- 测试要求：Prompt、componentInfoRequest parser、Runtime 主路径单元测试。
+- 不允许做什么：不引入 function calling 强依赖，不改变 AgentRunResult 对外契约，不放宽 Catalog 校验。

@@ -145,7 +145,7 @@ Routes (routes/)  →  Services (services/)  →  Repositories (repositories/)  
 8. 更新 session（currentSnapshotId, lastAgentRunId）
 9. 更新 agent_run 为 committed
 
-**事务提交后**通过 SSE 推送：assistant_message → a2ui_messages → surface_snapshot
+**事务提交后**通过 SSE 推送：assistant_message → a2ui_messages → surface_snapshot → agent_run_completed
 
 ### 失败 Agent run（agentRunService.failRun）
 
@@ -160,12 +160,13 @@ Routes (routes/)  →  Services (services/)  →  Repositories (repositories/)  
 
 StreamService 维护 `sessionId → Response[]` 映射，支持一个 session 多个 SSE 客户端。
 
-推送的 6 类业务事件：
+推送的 7 类业务事件：
 
 | 事件 | 触发时机 | 数据 |
 |------|---------|------|
 | agent_run_started | Agent run 启动 | agentRun.id, status, attemptCount, maxAttempts |
 | agent_run_attempt | 每次 validateA2UI 调用 | agentRunId, attemptIndex, phase, toolCall |
+| agent_run_completed | Agent 成功提交后 | agentRun.id, status, attemptCount, completedAt |
 | assistant_message | Agent 成功提交后 | message.id, role, content |
 | a2ui_messages | Agent 成功提交后 | a2uiEvent.id, sequence, messages |
 | surface_snapshot | Agent 成功提交后 | snapshot.id, surfaceCount, componentCount |
@@ -181,7 +182,7 @@ StreamService 维护 `sessionId → Response[]` 映射，支持一个 session �
 - 使用环境变量中的 OpenAI-compatible 配置创建 `ModelClient`。
 - Runtime 内部执行模型生成、`validateA2UI` 校验和最多 3 次修复循环。
 - 每次 `validateA2UI` 调用会写入 `tool_calls`，并通过 SSE 推送 `agent_run_attempt`。
-- `COMMITTED` 创建 `a2ui_events` 和 `surface_snapshots`；`TEXT_ONLY` 只创建 assistant message；`FAILED` 创建 `validation_error` message。
+- `COMMITTED` 创建 `a2ui_events` 和 `surface_snapshots`；`TEXT_ONLY` 只创建 assistant message，但同样推送 `agent_run_completed` 结束前端 loading；`FAILED` 创建 `validation_error` message。
 
 ## 8. 环境配置
 

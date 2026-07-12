@@ -3,354 +3,543 @@
   "$id": "https://a2ui.org/specification/v0.9/catalogs/basic/catalog.json",
   "title": "A2UI Basic Catalog Component Schema",
   "description": "Basic Catalog 中 18 个组件的属性 JSON Schema 定义",
+  "$defs": {
+    "dataBinding": {
+      "type": "object",
+      "required": ["path"],
+      "properties": {
+        "path": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "stringOrBinding": {
+      "oneOf": [
+        { "type": "string" },
+        { "$ref": "#/$defs/dataBinding" }
+      ]
+    },
+    "numberOrBinding": {
+      "oneOf": [
+        { "type": "number" },
+        { "$ref": "#/$defs/dataBinding" }
+      ]
+    },
+    "booleanOrBinding": {
+      "oneOf": [
+        { "type": "boolean" },
+        { "$ref": "#/$defs/dataBinding" }
+      ]
+    },
+    "componentRef": {
+      "oneOf": [
+        { "type": "string" },
+        { "type": "object" }
+      ]
+    },
+    "controlledStyle": {
+      "type": "object",
+      "properties": {
+        "width": { "type": "string" },
+        "height": { "type": "string" },
+        "minWidth": { "type": "string" },
+        "maxWidth": { "type": "string" },
+        "minHeight": { "type": "string" },
+        "maxHeight": { "type": "string" },
+        "padding": { "type": "string" },
+        "paddingX": { "type": "string" },
+        "paddingY": { "type": "string" },
+        "margin": { "type": "string" },
+        "marginX": { "type": "string" },
+        "marginY": { "type": "string" },
+        "gap": { "type": "string" },
+        "color": { "type": "string" },
+        "backgroundColor": { "type": "string" },
+        "borderColor": { "type": "string" },
+        "borderWidth": { "type": "string" },
+        "borderRadius": { "type": "string" },
+        "fontSize": { "type": "string" },
+        "fontWeight": { "oneOf": [{ "type": "string" }, { "type": "number" }] },
+        "lineHeight": { "oneOf": [{ "type": "string" }, { "type": "number" }] },
+        "textAlign": { "type": "string", "enum": ["left", "center", "right", "justify", "start", "end"] },
+        "alignSelf": { "type": "string", "enum": ["auto", "start", "center", "end", "stretch"] },
+        "justifySelf": { "type": "string", "enum": ["auto", "start", "center", "end", "stretch"] },
+        "shadow": { "type": "string", "enum": ["none", "xs", "sm", "md", "lg"] },
+        "opacity": { "type": "number", "minimum": 0, "maximum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "visualProps": {
+      "style": { "$ref": "#/$defs/controlledStyle" },
+      "variant": {
+        "type": "string",
+        "enum": [
+          "primary",
+          "secondary",
+          "outline",
+          "ghost",
+          "filled",
+          "plain",
+          "elevated",
+          "interactive",
+          "underline",
+          "pills",
+          "segmented",
+          "solid",
+          "dashed",
+          "dotted",
+          "danger"
+        ]
+      },
+      "size": { "type": "string", "enum": ["sm", "md", "lg"] },
+      "tone": { "type": "string", "enum": ["neutral", "brand", "success", "warning", "danger"] },
+      "preset": {
+        "type": "string",
+        "enum": [
+          "title",
+          "subtitle",
+          "body",
+          "caption",
+          "metric",
+          "section",
+          "toolbar",
+          "grid",
+          "form",
+          "centered",
+          "summary",
+          "formPanel",
+          "media",
+          "avatar",
+          "thumbnail",
+          "hero",
+          "logo",
+          "inline",
+          "badge",
+          "buttonIcon",
+          "status",
+          "mediaCard",
+          "heroMedia",
+          "plain",
+          "dense",
+          "cardList"
+        ]
+      }
+    },
+    "formPlaceholder": { "type": "string" },
+    "formDisabled": { "type": "boolean" },
+    "formRequired": { "type": "boolean" },
+    "formHelpText": { "type": "string" },
+    "formErrorText": { "type": "string" },
+    "staticOrDynamicChildren": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          { "type": "string" },
+          {
+            "type": "object",
+            "required": ["path", "componentId"],
+            "properties": {
+              "path": { "type": "string" },
+              "componentId": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "action": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string" },
+        "context": {
+          "description": "动作上下文数据",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
   "definitions": {
     "Text": {
       "type": "object",
       "properties": {
-        "text": {
-          "description": "显示的文本内容，支持字符串或 { path } 绑定",
-          "oneOf": [
-            { "type": "string" },
-            { "type": "object", "required": ["path"], "properties": { "path": { "type": "string" } }, "additionalProperties": false }
-          ]
-        },
+        "id": { "type": "string" },
+        "component": { "type": "string" },
+        "text": { "$ref": "#/$defs/stringOrBinding" },
         "usageHint": {
-          "description": "文本样式提示",
+          "description": "文本语义提示",
           "type": "string",
           "enum": ["h1", "h2", "h3", "h4", "h5", "caption", "body"]
-        }
+        },
+        "maxLines": { "type": "number" },
+        "style": { "$ref": "#/$defs/visualProps/style" },
+        "variant": { "type": "string", "enum": ["title", "subtitle", "body", "caption", "metric"] },
+        "size": { "$ref": "#/$defs/visualProps/size" },
+        "tone": { "$ref": "#/$defs/visualProps/tone" },
+        "preset": { "$ref": "#/$defs/visualProps/preset" }
       },
       "additionalProperties": false
     },
     "Image": {
       "type": "object",
       "properties": {
-        "url": {
-          "description": "图片 URL，支持字符串或 { path } 绑定",
-          "oneOf": [
-            { "type": "string" },
-            { "type": "object", "required": ["path"], "properties": { "path": { "type": "string" } }, "additionalProperties": false }
-          ]
-        },
-        "alt": {
-          "description": "替代文本",
-          "type": "string"
-        },
-        "fit": {
-          "description": "图片适应方式",
-          "type": "string",
-          "enum": ["contain", "cover", "fill", "none", "scale-down"]
-        }
+        "id": { "type": "string" },
+        "component": { "type": "string" },
+        "url": { "$ref": "#/$defs/stringOrBinding" },
+        "alt": { "type": "string" },
+        "fit": { "type": "string", "enum": ["contain", "cover", "fill", "none", "scale-down"] },
+        "aspectRatio": { "type": "string" },
+        "loading": { "type": "string", "enum": ["lazy", "eager"] },
+        "style": { "$ref": "#/$defs/visualProps/style" },
+        "variant": { "$ref": "#/$defs/visualProps/variant" },
+        "size": { "$ref": "#/$defs/visualProps/size" },
+        "tone": { "$ref": "#/$defs/visualProps/tone" },
+        "preset": { "type": "string", "enum": ["avatar", "thumbnail", "hero", "logo"] }
       },
       "additionalProperties": false
     },
     "Icon": {
       "type": "object",
       "properties": {
-        "name": {
-          "description": "图标名称，支持字符串或 { path } 绑定",
-          "oneOf": [
-            { "type": "string" },
-            { "type": "object", "required": ["path"], "properties": { "path": { "type": "string" } }, "additionalProperties": false }
-          ]
-        }
+        "id": { "type": "string" },
+        "component": { "type": "string" },
+        "name": { "$ref": "#/$defs/stringOrBinding" },
+        "icon": {
+          "description": "兼容旧字段，建议改用 name",
+          "$ref": "#/$defs/stringOrBinding"
+        },
+        "style": { "$ref": "#/$defs/visualProps/style" },
+        "variant": { "$ref": "#/$defs/visualProps/variant" },
+        "size": { "$ref": "#/$defs/visualProps/size" },
+        "tone": { "$ref": "#/$defs/visualProps/tone" },
+        "preset": { "type": "string", "enum": ["inline", "badge", "buttonIcon", "status"] }
       },
       "additionalProperties": false
     },
     "Video": {
       "type": "object",
       "properties": {
-        "url": {
-          "description": "视频 URL，支持字符串或 { path } 绑定",
-          "oneOf": [
-            { "type": "string" },
-            { "type": "object", "required": ["path"], "properties": { "path": { "type": "string" } }, "additionalProperties": false }
-          ]
-        }
+        "id": { "type": "string" },
+        "component": { "type": "string" },
+        "url": { "$ref": "#/$defs/stringOrBinding" },
+        "poster": { "$ref": "#/$defs/stringOrBinding" },
+        "controls": { "type": "boolean" },
+        "autoplay": { "type": "boolean" },
+        "loop": { "type": "boolean" },
+        "muted": { "type": "boolean" },
+        "fit": { "type": "string", "enum": ["contain", "cover", "fill", "none", "scale-down"] },
+        "aspectRatio": { "type": "string" },
+        "density": { "type": "string", "enum": ["compact", "comfortable"] },
+        "style": { "$ref": "#/$defs/visualProps/style" },
+        "variant": { "$ref": "#/$defs/visualProps/variant" },
+        "size": { "$ref": "#/$defs/visualProps/size" },
+        "tone": { "$ref": "#/$defs/visualProps/tone" },
+        "preset": { "type": "string", "enum": ["inline", "mediaCard", "heroMedia"] }
       },
       "additionalProperties": false
     },
     "AudioPlayer": {
       "type": "object",
       "properties": {
-        "url": {
-          "description": "音频 URL，支持字符串或 { path } 绑定",
-          "oneOf": [
-            { "type": "string" },
-            { "type": "object", "required": ["path"], "properties": { "path": { "type": "string" } }, "additionalProperties": false }
-          ]
-        }
+        "id": { "type": "string" },
+        "component": { "type": "string" },
+        "url": { "$ref": "#/$defs/stringOrBinding" },
+        "controls": { "type": "boolean" },
+        "autoplay": { "type": "boolean" },
+        "loop": { "type": "boolean" },
+        "muted": { "type": "boolean" },
+        "density": { "type": "string", "enum": ["compact", "comfortable"] },
+        "style": { "$ref": "#/$defs/visualProps/style" },
+        "variant": { "$ref": "#/$defs/visualProps/variant" },
+        "size": { "$ref": "#/$defs/visualProps/size" },
+        "tone": { "$ref": "#/$defs/visualProps/tone" },
+        "preset": { "type": "string", "enum": ["inline", "mediaCard"] }
       },
       "additionalProperties": false
     },
     "Divider": {
       "type": "object",
-      "properties": {},
+      "properties": {
+        "id": { "type": "string" },
+        "component": { "type": "string" },
+        "orientation": { "type": "string", "enum": ["horizontal", "vertical"] },
+        "thickness": { "type": "number" },
+        "color": { "type": "string" },
+        "spacing": { "type": "number" },
+        "label": { "type": "string" },
+        "labelAlign": { "type": "string", "enum": ["start", "center", "end"] },
+        "style": { "$ref": "#/$defs/visualProps/style" },
+        "variant": { "type": "string", "enum": ["solid", "dashed", "dotted"] },
+        "size": { "$ref": "#/$defs/visualProps/size" },
+        "tone": { "$ref": "#/$defs/visualProps/tone" },
+        "preset": { "$ref": "#/$defs/visualProps/preset" }
+      },
       "additionalProperties": false
     },
     "Row": {
       "type": "object",
       "properties": {
-        "children": {
-          "description": "子组件 ID 列表",
-          "type": "array",
-          "items": { "type": "string" }
-        },
-        "distribution": {
-          "description": "主轴分布方式",
-          "type": "string",
-          "enum": ["start", "center", "end", "spaceBetween", "spaceAround", "spaceEvenly"]
-        },
-        "alignment": {
-          "description": "交叉轴对齐方式",
-          "type": "string",
-          "enum": ["start", "center", "end", "stretch"]
-        }
+        "id": { "type": "string" },
+        "component": { "type": "string" },
+        "children": { "$ref": "#/$defs/staticOrDynamicChildren" },
+        "distribution": { "type": "string", "enum": ["start", "center", "end", "spaceBetween", "spaceAround", "spaceEvenly"] },
+        "alignment": { "type": "string", "enum": ["start", "center", "end", "stretch"] },
+        "gap": { "type": "string" },
+        "wrap": { "type": "boolean" },
+        "style": { "$ref": "#/$defs/visualProps/style" },
+        "variant": { "$ref": "#/$defs/visualProps/variant" },
+        "size": { "$ref": "#/$defs/visualProps/size" },
+        "tone": { "$ref": "#/$defs/visualProps/tone" },
+        "preset": { "type": "string", "enum": ["section", "toolbar", "grid", "form", "centered"] }
       },
       "additionalProperties": false
     },
     "Column": {
       "type": "object",
       "properties": {
-        "children": {
-          "description": "子组件 ID 列表",
-          "type": "array",
-          "items": { "type": "string" }
-        },
-        "distribution": {
-          "description": "主轴分布方式",
-          "type": "string",
-          "enum": ["start", "center", "end", "spaceBetween", "spaceAround", "spaceEvenly"]
-        },
-        "alignment": {
-          "description": "交叉轴对齐方式",
-          "type": "string",
-          "enum": ["start", "center", "end", "stretch"]
-        }
+        "id": { "type": "string" },
+        "component": { "type": "string" },
+        "children": { "$ref": "#/$defs/staticOrDynamicChildren" },
+        "distribution": { "type": "string", "enum": ["start", "center", "end", "spaceBetween", "spaceAround", "spaceEvenly"] },
+        "alignment": { "type": "string", "enum": ["start", "center", "end", "stretch"] },
+        "gap": { "type": "string" },
+        "wrap": { "type": "boolean" },
+        "style": { "$ref": "#/$defs/visualProps/style" },
+        "variant": { "$ref": "#/$defs/visualProps/variant" },
+        "size": { "$ref": "#/$defs/visualProps/size" },
+        "tone": { "$ref": "#/$defs/visualProps/tone" },
+        "preset": { "type": "string", "enum": ["section", "toolbar", "grid", "form", "centered"] }
       },
       "additionalProperties": false
     },
     "List": {
       "type": "object",
       "properties": {
-        "children": {
-          "description": "列表子项，可为静态子组件 ID 数组或 { path, componentId } 模板",
-          "type": "array",
-          "items": {
-            "oneOf": [
-              { "type": "string" },
-              {
-                "type": "object",
-                "required": ["path", "componentId"],
-                "properties": {
-                  "path": { "type": "string" },
-                  "componentId": { "type": "string" }
-                },
-                "additionalProperties": false
-              }
-            ]
-          }
-        },
-        "direction": {
-          "description": "列表方向",
-          "type": "string",
-          "enum": ["vertical", "horizontal"]
-        }
+        "id": { "type": "string" },
+        "component": { "type": "string" },
+        "children": { "$ref": "#/$defs/staticOrDynamicChildren" },
+        "direction": { "type": "string", "enum": ["vertical", "horizontal"] },
+        "marker": { "type": "string", "enum": ["none", "disc", "decimal", "check"] },
+        "gap": { "type": "string" },
+        "divided": { "type": "boolean" },
+        "wrap": { "type": "boolean" },
+        "style": { "$ref": "#/$defs/visualProps/style" },
+        "variant": { "$ref": "#/$defs/visualProps/variant" },
+        "size": { "$ref": "#/$defs/visualProps/size" },
+        "tone": { "$ref": "#/$defs/visualProps/tone" },
+        "preset": { "type": "string", "enum": ["plain", "dense", "cardList", "grid"] }
       },
       "additionalProperties": false
     },
     "Card": {
       "type": "object",
       "properties": {
-        "child": {
-          "description": "卡片内嵌子组件（字符串 ID 或内联对象定义）",
-          "oneOf": [
-            { "type": "string" },
-            { "type": "object" }
-          ]
-        }
+        "id": { "type": "string" },
+        "component": { "type": "string" },
+        "child": { "$ref": "#/$defs/componentRef" },
+        "title": { "$ref": "#/$defs/stringOrBinding" },
+        "style": { "$ref": "#/$defs/visualProps/style" },
+        "variant": { "type": "string", "enum": ["plain", "outlined", "elevated", "filled", "interactive"] },
+        "size": { "$ref": "#/$defs/visualProps/size" },
+        "tone": { "$ref": "#/$defs/visualProps/tone" },
+        "preset": { "type": "string", "enum": ["summary", "metric", "formPanel", "media"] }
       },
       "additionalProperties": false
     },
     "Tabs": {
       "type": "object",
       "properties": {
+        "id": { "type": "string" },
+        "component": { "type": "string" },
         "tabItems": {
-          "description": "标签页列表",
           "type": "array",
           "items": {
             "type": "object",
             "required": ["title", "child"],
             "properties": {
               "title": { "type": "string" },
-              "child": {
-                "description": "标签页内容子组件（字符串 ID 或内联对象定义）",
-                "oneOf": [
-                  { "type": "string" },
-                  { "type": "object" }
-                ]
-              }
+              "child": { "$ref": "#/$defs/componentRef" }
             },
             "additionalProperties": false
           }
-        }
+        },
+        "align": { "type": "string", "enum": ["start", "center", "end", "stretch"] },
+        "fullWidth": { "type": "boolean" },
+        "style": { "$ref": "#/$defs/visualProps/style" },
+        "variant": { "type": "string", "enum": ["underline", "pills", "segmented"] },
+        "size": { "$ref": "#/$defs/visualProps/size" },
+        "tone": { "$ref": "#/$defs/visualProps/tone" },
+        "preset": { "$ref": "#/$defs/visualProps/preset" }
       },
       "additionalProperties": false
     },
     "Modal": {
       "type": "object",
       "properties": {
-        "child": {
-          "description": "模态框内容子组件（字符串 ID 或内联对象定义）",
-          "oneOf": [
-            { "type": "string" },
-            { "type": "object" }
-          ]
-        },
-        "trigger": {
-          "description": "触发打开模态框的子组件",
-          "oneOf": [
-            { "type": "string" },
-            { "type": "object" }
-          ]
-        }
+        "id": { "type": "string" },
+        "component": { "type": "string" },
+        "child": { "$ref": "#/$defs/componentRef" },
+        "trigger": { "$ref": "#/$defs/componentRef" },
+        "visible": { "$ref": "#/$defs/booleanOrBinding" },
+        "size": { "type": "string", "enum": ["sm", "md", "lg", "fullscreen"] },
+        "placement": { "type": "string", "enum": ["center", "right", "bottom"] },
+        "closeOnOverlayClick": { "type": "boolean" },
+        "showCloseButton": { "type": "boolean" },
+        "overlayOpacity": { "type": "number", "minimum": 0, "maximum": 1 },
+        "title": { "$ref": "#/$defs/stringOrBinding" },
+        "footer": { "$ref": "#/$defs/componentRef" },
+        "style": { "$ref": "#/$defs/visualProps/style" },
+        "variant": { "$ref": "#/$defs/visualProps/variant" },
+        "tone": { "$ref": "#/$defs/visualProps/tone" },
+        "preset": { "$ref": "#/$defs/visualProps/preset" }
       },
       "additionalProperties": false
     },
     "Button": {
       "type": "object",
       "properties": {
-        "child": {
-          "description": "按钮内容子组件（字符串 ID 或内联对象定义）",
-          "oneOf": [
-            { "type": "string" },
-            { "type": "object" }
-          ]
-        },
-        "action": {
-          "description": "按钮动作定义",
-          "type": "object",
-          "required": ["name"],
-          "properties": {
-            "name": { "type": "string" },
-            "context": {
-              "description": "动作上下文数据",
-              "type": "object"
-            }
-          },
-          "additionalProperties": false
-        }
+        "id": { "type": "string" },
+        "component": { "type": "string" },
+        "child": { "$ref": "#/$defs/componentRef" },
+        "action": { "$ref": "#/$defs/action" },
+        "fullWidth": { "type": "boolean" },
+        "disabled": { "type": "boolean" },
+        "loading": { "type": "boolean" },
+        "iconPosition": { "type": "string", "enum": ["left", "right"] },
+        "style": { "$ref": "#/$defs/visualProps/style" },
+        "variant": { "type": "string", "enum": ["primary", "secondary", "outline", "ghost", "danger"] },
+        "size": { "$ref": "#/$defs/visualProps/size" },
+        "tone": { "$ref": "#/$defs/visualProps/tone" },
+        "preset": { "$ref": "#/$defs/visualProps/preset" }
       },
       "additionalProperties": false
     },
     "TextField": {
       "type": "object",
       "properties": {
-        "label": {
-          "description": "输入框标签",
-          "type": "string"
-        },
-        "text": {
-          "description": "输入框值，支持字符串或 { path } 绑定",
-          "oneOf": [
-            { "type": "string" },
-            { "type": "object", "required": ["path"], "properties": { "path": { "type": "string" } }, "additionalProperties": false }
-          ]
-        },
-        "usageHint": {
-          "description": "输入类型提示",
-          "type": "string",
-          "enum": ["shortText", "longText", "number", "obscured"]
-        }
+        "id": { "type": "string" },
+        "component": { "type": "string" },
+        "label": { "type": "string" },
+        "text": { "$ref": "#/$defs/stringOrBinding" },
+        "usageHint": { "type": "string", "enum": ["shortText", "longText", "number", "obscured"] },
+        "rows": { "type": "number" },
+        "minRows": { "type": "number" },
+        "placeholder": { "$ref": "#/$defs/formPlaceholder" },
+        "disabled": { "$ref": "#/$defs/formDisabled" },
+        "required": { "$ref": "#/$defs/formRequired" },
+        "helpText": { "$ref": "#/$defs/formHelpText" },
+        "errorText": { "$ref": "#/$defs/formErrorText" },
+        "style": { "$ref": "#/$defs/visualProps/style" },
+        "variant": { "type": "string", "enum": ["outline", "filled", "plain"] },
+        "size": { "$ref": "#/$defs/visualProps/size" },
+        "tone": { "$ref": "#/$defs/visualProps/tone" },
+        "preset": { "$ref": "#/$defs/visualProps/preset" }
       },
       "additionalProperties": false
     },
     "CheckBox": {
       "type": "object",
       "properties": {
-        "label": {
-          "description": "复选框标签",
-          "type": "string"
-        },
-        "value": {
-          "description": "复选框值，支持字符串或 { path } 绑定",
-          "oneOf": [
-            { "type": "string" },
-            { "type": "object", "required": ["path"], "properties": { "path": { "type": "string" } }, "additionalProperties": false }
-          ]
-        }
+        "id": { "type": "string" },
+        "component": { "type": "string" },
+        "label": { "type": "string" },
+        "value": { "$ref": "#/$defs/booleanOrBinding" },
+        "description": { "type": "string" },
+        "labelPosition": { "type": "string", "enum": ["left", "right"] },
+        "disabled": { "$ref": "#/$defs/formDisabled" },
+        "required": { "$ref": "#/$defs/formRequired" },
+        "helpText": { "$ref": "#/$defs/formHelpText" },
+        "errorText": { "$ref": "#/$defs/formErrorText" },
+        "style": { "$ref": "#/$defs/visualProps/style" },
+        "variant": { "type": "string", "enum": ["outline", "filled", "plain"] },
+        "size": { "$ref": "#/$defs/visualProps/size" },
+        "tone": { "$ref": "#/$defs/visualProps/tone" },
+        "preset": { "$ref": "#/$defs/visualProps/preset" }
       },
       "additionalProperties": false
     },
     "ChoicePicker": {
       "type": "object",
       "properties": {
-        "label": {
-          "description": "选择器标签",
-          "type": "string"
-        },
+        "id": { "type": "string" },
+        "component": { "type": "string" },
+        "label": { "type": "string" },
         "options": {
-          "description": "可选项数组",
           "type": "array",
           "items": {
             "type": "object",
             "required": ["label", "value"],
             "properties": {
               "label": { "type": "string" },
-              "value": { "type": "string" }
+              "value": { "oneOf": [{ "type": "string" }, { "type": "number" }, { "type": "boolean" }] }
             },
             "additionalProperties": false
           }
         },
         "value": {
-          "description": "当前选中值，支持字符串或 { path } 绑定",
           "oneOf": [
             { "type": "string" },
-            { "type": "object", "required": ["path"], "properties": { "path": { "type": "string" } }, "additionalProperties": false }
+            { "type": "number" },
+            { "type": "boolean" },
+            { "$ref": "#/$defs/dataBinding" }
           ]
-        }
+        },
+        "placeholder": { "$ref": "#/$defs/formPlaceholder" },
+        "disabled": { "$ref": "#/$defs/formDisabled" },
+        "required": { "$ref": "#/$defs/formRequired" },
+        "helpText": { "$ref": "#/$defs/formHelpText" },
+        "errorText": { "$ref": "#/$defs/formErrorText" },
+        "style": { "$ref": "#/$defs/visualProps/style" },
+        "variant": { "type": "string", "enum": ["outline", "filled", "plain"] },
+        "size": { "$ref": "#/$defs/visualProps/size" },
+        "tone": { "$ref": "#/$defs/visualProps/tone" },
+        "preset": { "$ref": "#/$defs/visualProps/preset" }
       },
       "additionalProperties": false
     },
     "Slider": {
       "type": "object",
       "properties": {
-        "label": {
-          "description": "滑块标签",
-          "type": "string"
-        },
-        "min": {
-          "description": "最小值",
-          "type": "number"
-        },
-        "max": {
-          "description": "最大值",
-          "type": "number"
-        },
-        "value": {
-          "description": "当前值，支持字符串或 { path } 绑定",
-          "oneOf": [
-            { "type": "string" },
-            { "type": "object", "required": ["path"], "properties": { "path": { "type": "string" } }, "additionalProperties": false }
-          ]
-        }
+        "id": { "type": "string" },
+        "component": { "type": "string" },
+        "label": { "type": "string" },
+        "min": { "$ref": "#/$defs/numberOrBinding" },
+        "max": { "$ref": "#/$defs/numberOrBinding" },
+        "value": { "$ref": "#/$defs/numberOrBinding" },
+        "step": { "type": "number" },
+        "showValue": { "type": "boolean" },
+        "valuePrefix": { "type": "string" },
+        "valueSuffix": { "type": "string" },
+        "disabled": { "$ref": "#/$defs/formDisabled" },
+        "required": { "$ref": "#/$defs/formRequired" },
+        "helpText": { "$ref": "#/$defs/formHelpText" },
+        "errorText": { "$ref": "#/$defs/formErrorText" },
+        "style": { "$ref": "#/$defs/visualProps/style" },
+        "variant": { "type": "string", "enum": ["outline", "filled", "plain"] },
+        "size": { "$ref": "#/$defs/visualProps/size" },
+        "tone": { "$ref": "#/$defs/visualProps/tone" },
+        "preset": { "$ref": "#/$defs/visualProps/preset" }
       },
       "additionalProperties": false
     },
     "DateTimeInput": {
       "type": "object",
       "properties": {
-        "label": {
-          "description": "日期时间选择器标签",
-          "type": "string"
-        },
-        "value": {
-          "description": "当前值，支持字符串或 { path } 绑定",
-          "oneOf": [
-            { "type": "string" },
-            { "type": "object", "required": ["path"], "properties": { "path": { "type": "string" } }, "additionalProperties": false }
-          ]
-        }
+        "id": { "type": "string" },
+        "component": { "type": "string" },
+        "label": { "type": "string" },
+        "value": { "$ref": "#/$defs/stringOrBinding" },
+        "usageHint": { "type": "string", "enum": ["date", "time", "datetime"] },
+        "placeholder": { "$ref": "#/$defs/formPlaceholder" },
+        "disabled": { "$ref": "#/$defs/formDisabled" },
+        "required": { "$ref": "#/$defs/formRequired" },
+        "helpText": { "$ref": "#/$defs/formHelpText" },
+        "errorText": { "$ref": "#/$defs/formErrorText" },
+        "style": { "$ref": "#/$defs/visualProps/style" },
+        "variant": { "type": "string", "enum": ["outline", "filled", "plain"] },
+        "size": { "$ref": "#/$defs/visualProps/size" },
+        "tone": { "$ref": "#/$defs/visualProps/tone" },
+        "preset": { "$ref": "#/$defs/visualProps/preset" }
       },
       "additionalProperties": false
     }

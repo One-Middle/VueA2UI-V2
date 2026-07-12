@@ -1,6 +1,5 @@
 import type { MessageDto, SendMessageResponse } from "@a2ui-platform/shared";
 import type { Prisma } from "@prisma/client";
-import { prisma } from "../db.js";
 import { logger } from "../logger.js";
 import { messageRepository } from "../repositories/message.repository.js";
 import { agentRunRepository } from "../repositories/agent-run.repository.js";

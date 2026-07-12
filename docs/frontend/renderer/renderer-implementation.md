@@ -8,6 +8,7 @@
 
 - `docs/frontend/renderer/protocol/A2UI协议认识.md`
 - `docs/frontend/renderer/a2ui-renderer-v0_9-guide.md`
+- `docs/frontend/renderer/basic-catalog-component-optimization.md`
 - `docs/product/agent-platform-design.md`
 - `docs/product/agent-platform-api.md`
 - `docs/development-start.md`
@@ -107,6 +108,7 @@
 ## 8. 渲染样式与属性映射
 
 - Renderer 包入口必须加载 `styles.css`，确保工作台预览区使用 Basic Catalog 样式，而不是浏览器默认纯文本样式。
+- Basic Catalog 组件能力升级应遵守 `docs/frontend/renderer/basic-catalog-component-optimization.md` 中的受控样式协议：只消费白名单样式字段和预定义枚举，不接收任意 CSS、HTML、脚本或事件处理器字段。
 - `Row` 和 `Column` 需要把 A2UI 协议值映射为合法 CSS flex 值：`start -> flex-start`、`end -> flex-end`、`spaceBetween -> space-between`、`spaceAround -> space-around`、`spaceEvenly -> space-evenly`。
 - `Button.action` 按 Catalog 契约解析为 `{ name, context }`，点击时派发 `a2ui:action`。
 - `TextField.usageHint` 使用 `shortText`、`longText`、`number`、`obscured`，分别映射到单行输入、多行输入、数字输入和密码输入。

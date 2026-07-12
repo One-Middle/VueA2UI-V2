@@ -7,6 +7,7 @@ import type {
   SkillDto,
   SurfaceSnapshotDto,
   A2UIServerMessage,
+  SurfaceState,
 } from "@a2ui-platform/shared";
 import { defineStore } from "pinia";
 import * as api from "../services/api";
@@ -130,7 +131,7 @@ export const useWorkspaceStore = defineStore("workspace", {
       this.loadAgentRuns();
       this.loadA2UIEvents();
       this.loadSnapshots();
-      this.loadSessionDetail();
+      void this.loadSessionDetail(sessionId);
 
       // 建立 SSE 连接
       this.connectSSE();
@@ -159,16 +160,19 @@ export const useWorkspaceStore = defineStore("workspace", {
       }
     },
 
-    async loadSessionDetail() {
-      if (!this.activeSessionId) return;
+    async loadSessionDetail(sessionId?: string | null) {
+      const targetSessionId = sessionId ?? this.activeSessionId;
+      if (!targetSessionId) return;
       try {
-        const result = await api.getSession(this.activeSessionId);
+        const result = await api.getSession(targetSessionId);
+        if (this.activeSessionId !== targetSessionId) return;
         // 更新 sessions 列表中对应的项
-        const idx = this.sessions.findIndex((s) => s.id === this.activeSessionId);
+        const idx = this.sessions.findIndex((s) => s.id === targetSessionId);
         if (idx >= 0) {
           this.sessions[idx] = result.session;
         }
         this.enabledSkillIds = result.enabledSkillIds ?? [];
+        restoreRendererFromSnapshot(result.currentSnapshot);
       } catch {
         // 静默处理
       }
@@ -381,6 +385,22 @@ export const useWorkspaceStore = defineStore("workspace", {
           }
         },
 
+        agent_run_completed: (data: {
+          sessionId: string;
+          agentRun: Pick<AgentRunDto, "id" | "status" | "attemptCount" | "assistantMessageId" | "outputSnapshotId" | "completedAt">;
+        }) => {
+          logger.info(`← SSE ← BACKEND: agent_run_completed → runId=${shortId(data.agentRun.id)}`);
+          const run = this.agentRuns.find((r) => r.id === data.agentRun.id);
+          if (run) {
+            run.status = data.agentRun.status;
+            run.attemptCount = data.agentRun.attemptCount;
+            run.assistantMessageId = data.agentRun.assistantMessageId;
+            run.outputSnapshotId = data.agentRun.outputSnapshotId;
+            run.completedAt = data.agentRun.completedAt;
+          }
+          this.isGenerating = false;
+        },
+
         assistant_message: (data: { sessionId: string; message: MessageDto }) => {
           // 追加 assistant 消息
           const existing = this.messages.find((m) => m.id === data.message.id);
@@ -480,6 +500,56 @@ function toWorkspaceSurfaceSnapshot(snapshot: SurfaceSnapshotDto): WorkspaceSurf
     ...snapshot,
     snapshot: snapshot.snapshot,
   };
+}
+
+function restoreRendererFromSnapshot(snapshot: SurfaceSnapshotDto | null): void {
+  if (!snapshot) return;
+
+  const renderer = useRendererStore();
+  const messages = snapshotToRendererMessages(snapshot);
+  if (messages.length > 0) {
+    renderer.processMessages(messages);
+  }
+}
+
+function snapshotToRendererMessages(snapshot: SurfaceSnapshotDto): A2UIServerMessage[] {
+  const version = snapshot.snapshot.version;
+  const surfaces = Object.values(snapshot.snapshot.surfaces) as SurfaceState[];
+  const messages: A2UIServerMessage[] = [];
+
+  for (const surface of surfaces) {
+    messages.push({
+      version,
+      createSurface: {
+        surfaceId: surface.surfaceId,
+        catalogId: surface.catalogId,
+        theme: surface.theme,
+        sendDataModel: surface.sendDataModel,
+      },
+    });
+
+    const components = Object.values(surface.components);
+    if (components.length > 0) {
+      messages.push({
+        version,
+        updateComponents: {
+          surfaceId: surface.surfaceId,
+          components,
+        },
+      });
+    }
+
+    messages.push({
+      version,
+      updateDataModel: {
+        surfaceId: surface.surfaceId,
+        path: "/",
+        value: surface.dataModel,
+      },
+    });
+  }
+
+  return messages;
 }
 
 function createSessionTitle(content: string): string {

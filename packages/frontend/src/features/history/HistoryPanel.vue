@@ -1,5 +1,15 @@
 <script setup lang="ts">
-import { NButton, NEmpty, NPopconfirm, NTabPane, NTabs, NTag } from "naive-ui";
+import {
+  NButton,
+  NCode,
+  NCollapse,
+  NCollapseItem,
+  NEmpty,
+  NPopconfirm,
+  NTabPane,
+  NTabs,
+  NTag,
+} from "naive-ui";
 import { useWorkspaceStore } from "../../stores/workspace";
 
 const workspace = useWorkspaceStore();
@@ -8,8 +18,37 @@ async function handleDelete(sessionId: string) {
   try {
     await workspace.deleteSession(sessionId);
   } catch {
-    // 删除失败静默处理
+    // 删除失败时保持当前列表状态，由后续统一错误提示承接。
   }
+}
+
+function openSession(sessionId: string) {
+  workspace.setActiveSessionId(sessionId);
+  workspace.setActiveTab("conversation");
+}
+
+function formatDate(value: string): string {
+  return new Date(value).toLocaleString();
+}
+
+function shortId(value?: string | null): string {
+  return value ? value.slice(0, 8) : "-";
+}
+
+function eventStatusType(status: string): "success" | "warning" | "default" {
+  if (status === "committed") return "success";
+  if (status === "reverted") return "warning";
+  return "default";
+}
+
+function surfaceLabel(surfaceIds?: string[]): string {
+  if (!surfaceIds || surfaceIds.length === 0) return "无 Surface";
+  if (surfaceIds.length === 1) return surfaceIds[0] ?? "无 Surface";
+  return `${surfaceIds.length} 个 Surface`;
+}
+
+function formatJson(value: unknown): string {
+  return JSON.stringify(value, null, 2);
 }
 </script>
 
@@ -18,7 +57,7 @@ async function handleDelete(sessionId: string) {
     <div class="panel-heading">
       <div>
         <h2>历史记录</h2>
-        <p>查看会话、A2UI 事件和最近生成结果，点击会话可回到创作工作台。</p>
+        <p>查看会话、恢复曾经生成的 A2UI 内容，并通过事件调试排查渲染链路。</p>
       </div>
     </div>
 
@@ -35,18 +74,18 @@ async function handleDelete(sessionId: string) {
             :class="{ active: s.id === workspace.activeSessionId }"
             role="button"
             tabindex="0"
-            @click="workspace.setActiveSessionId(s.id); workspace.setActiveTab('conversation')"
-            @keydown.enter="workspace.setActiveSessionId(s.id); workspace.setActiveTab('conversation')"
+            @click="openSession(s.id)"
+            @keydown.enter="openSession(s.id)"
           >
             <span class="record-info">
               <strong>{{ s.title }}</strong>
-              <small>{{ s.modelName }} · {{ new Date(s.updatedAt).toLocaleString() }}</small>
+              <small>{{ s.modelName }} · {{ formatDate(s.updatedAt) }}</small>
             </span>
             <span class="record-actions">
-              <n-tag size="small" :type="s.id === workspace.activeSessionId ? 'success' : 'default'">{{ s.status }}</n-tag>
-              <n-popconfirm
-                :on-positive-click="() => handleDelete(s.id)"
-              >
+              <n-tag size="small" :type="s.id === workspace.activeSessionId ? 'success' : 'default'">
+                {{ s.status }}
+              </n-tag>
+              <n-popconfirm :on-positive-click="() => handleDelete(s.id)">
                 <template #trigger>
                   <n-button size="tiny" quaternary type="error" @click.stop>
                     删除
@@ -59,16 +98,44 @@ async function handleDelete(sessionId: string) {
         </div>
       </n-tab-pane>
 
-      <n-tab-pane name="events" tab="A2UI Events">
-        <div v-if="workspace.a2uiEvents.length === 0" class="panel-center">
-          <n-empty description="暂无事件" />
+      <n-tab-pane name="events" tab="A2UI 调试">
+        <div class="debug-intro">
+          <strong>A2UI 事件记录</strong>
+          <span>这里展示后端提交给 Renderer 的消息批次，用于确认生成结果是否被提交、包含哪些 Surface，以及校验结果。</span>
         </div>
-        <div v-else class="record-list">
-          <div v-for="e in workspace.a2uiEvents" :key="e.id" class="event-row">
-            <span class="seq">#{{ e.sequence }}</span>
-            <span class="event-main">{{ e.surfaceIds?.join(", ") || "（无）" }}</span>
-            <small>{{ (e.messages as unknown[])?.length ?? 0 }} 条消息 · {{ new Date(e.createdAt).toLocaleString() }}</small>
-          </div>
+
+        <div v-if="workspace.a2uiEvents.length === 0" class="panel-center">
+          <n-empty description="当前会话暂无 A2UI 事件" />
+        </div>
+        <div v-else class="event-list">
+          <section v-for="e in workspace.a2uiEvents" :key="e.id" class="event-card">
+            <div class="event-summary">
+              <div class="event-title">
+                <span class="seq">#{{ e.sequence }}</span>
+                <strong>{{ surfaceLabel(e.surfaceIds) }}</strong>
+                <n-tag size="small" :type="eventStatusType(e.status)">
+                  {{ e.status }}
+                </n-tag>
+              </div>
+              <div class="event-meta">
+                <span>{{ (e.messages as unknown[])?.length ?? 0 }} 条消息</span>
+                <span>Run {{ shortId(e.agentRunId) }}</span>
+                <span>{{ formatDate(e.createdAt) }}</span>
+              </div>
+              <div class="surface-list">
+                {{ e.surfaceIds?.join(", ") || "没有关联 Surface" }}
+              </div>
+            </div>
+
+            <n-collapse arrow-placement="right" class="event-detail">
+              <n-collapse-item title="查看 messages JSON" name="messages">
+                <n-code :code="formatJson(e.messages)" language="json" word-wrap />
+              </n-collapse-item>
+              <n-collapse-item title="查看 validationResult JSON" name="validation">
+                <n-code :code="formatJson(e.validationResult)" language="json" word-wrap />
+              </n-collapse-item>
+            </n-collapse>
+          </section>
         </div>
       </n-tab-pane>
     </n-tabs>
@@ -85,7 +152,8 @@ async function handleDelete(sessionId: string) {
   min-height: 0;
 }
 
-.record-list {
+.record-list,
+.event-list {
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -132,8 +200,7 @@ async function handleDelete(sessionId: string) {
   font-size: 14px;
 }
 
-.record-info small,
-.event-row small {
+.record-info small {
   display: block;
   margin-top: 5px;
   color: #64748b;
@@ -147,16 +214,62 @@ async function handleDelete(sessionId: string) {
   flex-shrink: 0;
 }
 
-.event-row {
-  display: grid;
-  grid-template-columns: 70px minmax(160px, 1fr) auto;
-  gap: 12px;
-  align-items: center;
+.debug-intro {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
   padding: 12px 14px;
+  border: 1px solid rgb(15 159 143 / 18%);
+  border-radius: 8px;
+  background: rgb(236 253 249 / 72%);
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.debug-intro strong {
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.event-card {
+  padding: 14px;
   border: 1px solid #dbe5f2;
   border-radius: 8px;
   background: #ffffff;
   box-shadow: 0 8px 20px rgb(15 23 42 / 4%);
+}
+
+.event-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.event-title,
+.event-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.event-title strong {
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.event-meta,
+.surface-list {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.surface-list {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .seq {
@@ -165,11 +278,13 @@ async function handleDelete(sessionId: string) {
   font-weight: 800;
 }
 
-.event-main {
-  overflow: hidden;
-  color: #0f172a;
-  font-size: 13px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.event-detail {
+  margin-top: 10px;
+}
+
+.event-detail :deep(.n-code) {
+  max-height: 360px;
+  overflow: auto;
+  border-radius: 8px;
 }
 </style>

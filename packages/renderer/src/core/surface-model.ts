@@ -99,9 +99,7 @@ export class SurfaceModel {
   /** 更新 dataModel 中指定路径的值。 path 为 undefined 时用 value 替换整个 model。 */
   updateDataModel(path: string | undefined, value: JsonValue): void {
     if (path === undefined || path === "/") {
-      // 替换整个 model
-      this.dataModel.destroy();
-      this.dataModel = new DataModel(value);
+      this.dataModel.set("/", value);
     } else {
       this.dataModel.set(path, value);
     }

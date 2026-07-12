@@ -19,7 +19,7 @@
                               ↓
                          事务提交（message + event + snapshot + session 更新）
                               ↓
-                         SSE 推送 assistant_message + a2ui_messages + surface_snapshot
+                         SSE 推送 assistant_message + a2ui_messages + surface_snapshot + agent_run_completed
                               ↓
 Frontend SSE 接收 → workspace store 更新
                               ↓
@@ -100,7 +100,7 @@ type AgentRunResult =
 ```
 
 ### SSE Events
-- `heartbeat`、`agent_run_started`、`agent_run_attempt`、`assistant_message`、`a2ui_messages`、`surface_snapshot`、`agent_run_failed`
+- `heartbeat`、`agent_run_started`、`agent_run_attempt`、`agent_run_completed`、`assistant_message`、`a2ui_messages`、`surface_snapshot`、`agent_run_failed`
 
 ## 6. 正式端到端链路
 

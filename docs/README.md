@@ -67,6 +67,7 @@
 
 - [Frontend Renderer 模块实现说明](./frontend/renderer/renderer-implementation.md)：Renderer 定位、核心对象、消息支持和 MVP 组件范围。
 - [Frontend Renderer 模块任务清单](./frontend/renderer/tasks.md)：Renderer 任务拆分。
+- [Basic Catalog 组件能力优化方案](./frontend/renderer/basic-catalog-component-optimization.md)：组件样式参数、预定义视觉能力和 Agent/Renderer 同步改造方案。
 - [A2UI 协议认识](./frontend/renderer/protocol/A2UI协议认识.md)：A2UI 协议概念、价值和核心模型。
 - [A2UI v0.9 渲染器实现指南](./frontend/renderer/a2ui-renderer-v0_9-guide.md)：渲染器实现路径和能力要求。
 - [Renderer 模块实现详情](./renderer/renderer-implementation-details.md)：Renderer 内部模型、消息处理和组件实现细节。
@@ -123,6 +124,7 @@
 
 - [Frontend Renderer 模块实现说明](./frontend/renderer/renderer-implementation.md)
 - [Frontend Renderer 模块任务清单](./frontend/renderer/tasks.md)
+- [Basic Catalog 组件能力优化方案](./frontend/renderer/basic-catalog-component-optimization.md)
 - [A2UI 协议认识](./frontend/renderer/protocol/A2UI协议认识.md)
 - [A2UI v0.9 渲染器实现指南](./frontend/renderer/a2ui-renderer-v0_9-guide.md)
 - [Renderer 模块实现详情](./renderer/renderer-implementation-details.md)

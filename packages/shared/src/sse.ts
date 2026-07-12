@@ -13,6 +13,7 @@ export type ServerSentEventName =
   | "heartbeat"
   | "agent_run_started"
   | "agent_run_attempt"
+  | "agent_run_completed"
   | "assistant_message"
   | "a2ui_messages"
   | "surface_snapshot"
@@ -35,6 +36,16 @@ export type PlatformSseEvent =
         attemptIndex: number;
         phase: AgentRunPhase;
         toolCall?: ToolCallDto;
+      };
+    }
+  | {
+      event: "agent_run_completed";
+      data: {
+        sessionId: string;
+        agentRun: Pick<
+          AgentRunDto,
+          "id" | "status" | "attemptCount" | "assistantMessageId" | "outputSnapshotId" | "completedAt"
+        >;
       };
     }
   | {

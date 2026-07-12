@@ -50,6 +50,12 @@ MVP tab：
 
 默认进入“创作工作台”tab，但当没有当前会话时，应先展示中心化的初始创建页，用户输入需求并提交后才自动创建会话并进入双栏创作工作台。“新建创作”入口只重置到初始创建页，不提前创建空会话。创作工作台采用双栏布局，左侧为需求对话和输入区，右侧为 A2UI Renderer 实时预览区；在窄屏下允许上下堆叠展示。实时预览区除渲染画布外，还展示当前 Surface 的 `component` 与 `dataModel` JSON 结构，二者直接来自 Renderer 使用的同一个 `SurfaceModel`，当用户在页面中修改合法 JSON 时，应实时更新同源模型并刷新渲染结果。历史记录、Skills、导入导出和 Runtime 作为辅助页面保留原有功能入口。
 
+### 历史恢复与 A2UI 调试
+
+点击历史会话时，前端应加载 `GET /api/sessions/:sessionId` 返回的 `currentSnapshot`，并将快照中的每个 surface 转换为标准 A2UI 消息序列后交给 Renderer：先 `createSurface`，再 `updateComponents`，最后 `updateDataModel`。该恢复过程只用于重建预览状态，不改变后端存储，也不新增 A2UI 协议字段。异步加载完成前如果用户已经切换到其他会话，旧会话响应必须被丢弃，避免预览内容串会话。
+
+历史记录中的 A2UI 调试页保留底层事件信息，但默认以调试记录形式展示：序号、提交状态、关联 surface、消息数量、Agent Run、创建时间，并支持展开查看 `messages` 与 `validationResult` JSON。该页面用于确认后端提交给 Renderer 的消息批次，不作为普通用户理解生成结果的唯一入口。
+
 ## 5. 职责边界
 
 负责：

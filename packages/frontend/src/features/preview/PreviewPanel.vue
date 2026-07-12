@@ -35,17 +35,17 @@ const statusTag = computed(() => {
 });
 
 const processRendererMessages = () => {
+  surfaceGroup.destroy();
+  surfaceIds.value = [];
+
   if (renderer.messagesForRenderer.length > 0) {
     messageProcessor.processMessages(renderer.messagesForRenderer);
   }
-  const ids = surfaceGroup.getSurfaceIds();
-  if (ids.length > 0) {
-    surfaceIds.value = ids;
-  }
+  surfaceIds.value = surfaceGroup.getSurfaceIds();
   syncEditorsFromSurface();
 };
 
-watch(() => renderer.messagesForRenderer.length, processRendererMessages, { immediate: true });
+watch(() => renderer.revision, processRendererMessages, { immediate: true });
 watch(activeSurfaceId, () => {
   unsubscribeDataModel?.();
   unsubscribeDataModel = activeSurface.value?.dataModel.subscribe("/", syncEditorsFromSurface);

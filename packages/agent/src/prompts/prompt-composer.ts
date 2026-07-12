@@ -1,42 +1,48 @@
 import type { AgentContext } from "../context/context-builder.js";
 import type { ValidationIssue } from "@a2ui-platform/shared";
-import { getAllCatalogComponentNames } from "../tools/catalog-schema.js";
+import { formatCatalogComponentSummaries } from "../tools/catalog-schema.js";
 import { buildA2uiProtocolGuide } from "./a2ui-protocol-guide.js";
 
-// ─── PromptComposer ─────────────────────────────────────────
+export interface PromptDisclosureOptions {
+  componentDetails?: string;
+  forceFinalOutput?: boolean;
+}
 
 export class PromptComposer {
-  /**
-   * 生成初始请求的 system prompt 和 user prompt。
-   */
-  composeInitial(context: AgentContext): {
+  composeInitial(
+    context: AgentContext,
+    options: PromptDisclosureOptions = {},
+  ): {
     systemPrompt: string;
     userPrompt: string;
   } {
-    const componentList = getAllCatalogComponentNames().join("、");
-    const systemPrompt = this.buildBaseSystemPrompt(componentList);
+    const componentSummaries = formatCatalogComponentSummaries();
+    const systemPrompt = this.buildBaseSystemPrompt(
+      componentSummaries,
+      options,
+    );
     const userPrompt = this.buildUserPrompt(context);
 
     return { systemPrompt, userPrompt };
   }
 
-  /**
-   * 生成修复请求的 system prompt 和 user prompt。
-   * 修复时要求模型只修正校验错误，不要重新设计整个 UI。
-   */
   composeRepair(
     context: AgentContext,
     previousOutput: string,
     errors: ValidationIssue[],
+    options: PromptDisclosureOptions = {},
   ): { systemPrompt: string; userPrompt: string } {
-    const componentList = getAllCatalogComponentNames().join("、");
+    const componentSummaries = formatCatalogComponentSummaries();
     const systemPrompt =
-      this.buildBaseSystemPrompt(componentList) +
+      this.buildBaseSystemPrompt(componentSummaries, {
+        ...options,
+        forceFinalOutput: true,
+      }) +
       "\n\n你现在处于修复模式。请只修复下面列出的校验错误，不要重新设计整个 UI。保持已有的正确部分不变。";
 
     const errorLines = errors.map(
       (e, i) =>
-        `[${i + 1}] 错误码: ${e.code}，路径: ${e.path ?? "(无)"}，信息: ${e.message}`,
+        `[${i + 1}] 错误码 ${e.code}，路径 ${e.path ?? "(无)"}，信息 ${e.message}`,
     );
 
     const userPrompt = [
@@ -44,7 +50,7 @@ export class PromptComposer {
       previousOutput,
       "",
       "## 校验失败详情",
-      "以上输出经 A2UI v0.9 校验后未通过。请修复以下错误：",
+      "以上输出经过 A2UI v0.9 校验后未通过。请修复以下错误：",
       ...errorLines,
       "",
       "## 用户原始需求（参考）",
@@ -56,17 +62,19 @@ export class PromptComposer {
     return { systemPrompt, userPrompt };
   }
 
-  // ─── 私有方法 ─────────────────────────────────────────
-
-  /**
-   * 构建基础 system prompt（初始和修复共用）。
-   */
-  private buildBaseSystemPrompt(componentList: string): string {
+  private buildBaseSystemPrompt(
+    componentSummaries: string,
+    options: PromptDisclosureOptions,
+  ): string {
     return [
       "## 角色",
       "你是一个 A2UI 页面生成助手。你的任务是根据用户的自然语言描述，使用固定的 Basic Catalog 组件生成符合 A2UI v0.9 规范的 UI 界面。",
       "",
-      buildA2uiProtocolGuide(componentList),
+      buildA2uiProtocolGuide({
+        componentSummaries,
+        componentDetails: options.componentDetails,
+        forceFinalOutput: options.forceFinalOutput,
+      }),
       "",
       "## 禁止事项",
       "- 禁止生成任意 HTML、JavaScript 或 CSS。",
@@ -82,9 +90,6 @@ export class PromptComposer {
     ].join("\n");
   }
 
-  /**
-   * 构建用户 prompt（拼接用户消息和上下文）。
-   */
   private buildUserPrompt(context: AgentContext): string {
     const parts: string[] = [];
 
@@ -108,7 +113,7 @@ export class PromptComposer {
     parts.push("");
 
     parts.push(
-      "请根据以上用户需求和上下文信息，生成符合 A2UI v0.9 规范的 UI 界面。如果用户没有要求修改 UI，则只需回复文本，a2uiMessages 设为空数组。",
+      "请根据以上用户需求和上下文信息生成 A2UI。若需要组件字段详情，请先输出 componentInfoRequest；若已有足够信息，请输出最终 { assistantMessage, a2uiMessages } JSON。",
     );
 
     return parts.join("\n");

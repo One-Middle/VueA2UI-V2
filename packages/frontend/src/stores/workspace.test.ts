@@ -1,0 +1,200 @@
+import type { SessionDetailResponse, SessionDto, SurfaceSnapshotDto } from "@a2ui-platform/shared";
+import { createPinia, setActivePinia } from "pinia";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import * as api from "../services/api";
+import { connectStream, type StreamHandlers } from "../services/stream";
+import { useRendererStore } from "./renderer";
+import { useWorkspaceStore } from "./workspace";
+
+vi.mock("../services/api", () => ({
+  getSession: vi.fn(),
+  listMessages: vi.fn(() => Promise.resolve({ items: [], pageInfo: { nextCursor: null, hasMore: false } })),
+  listFiles: vi.fn(() => Promise.resolve({ items: [] })),
+  listAgentRuns: vi.fn(() => Promise.resolve({ items: [], pageInfo: { nextCursor: null, hasMore: false } })),
+  listA2UIEvents: vi.fn(() => Promise.resolve({ items: [], pageInfo: { nextCursor: null, hasMore: false } })),
+  listSnapshots: vi.fn(() => Promise.resolve({ items: [], pageInfo: { nextCursor: null, hasMore: false } })),
+}));
+
+vi.mock("../services/stream", () => ({
+  connectStream: vi.fn(() => ({ close: vi.fn() })),
+}));
+
+describe("workspace store session restore", () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+  });
+
+  it("restores renderer messages from the current session snapshot", async () => {
+    vi.mocked(api.getSession).mockResolvedValue(makeSessionDetail("session-a", "surface-a"));
+
+    const workspace = useWorkspaceStore();
+    const renderer = useRendererStore();
+
+    workspace.setActiveSessionId("session-a");
+
+    await vi.waitFor(() => {
+      expect(renderer.messagesForRenderer).toHaveLength(3);
+    });
+
+    expect(renderer.revision).toBeGreaterThan(0);
+    expect(renderer.messagesForRenderer[0]).toMatchObject({
+      createSurface: { surfaceId: "surface-a" },
+    });
+    expect(renderer.messagesForRenderer[1]).toMatchObject({
+      updateComponents: { surfaceId: "surface-a" },
+    });
+    expect(renderer.messagesForRenderer[2]).toMatchObject({
+      updateDataModel: {
+        surfaceId: "surface-a",
+        path: "/",
+        value: { title: "surface-a 标题" },
+      },
+    });
+  });
+
+  it("ignores a stale snapshot response after switching sessions", async () => {
+    const first = deferred<SessionDetailResponse>();
+    const second = deferred<SessionDetailResponse>();
+    vi.mocked(api.getSession)
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise);
+
+    const workspace = useWorkspaceStore();
+    const renderer = useRendererStore();
+
+    workspace.setActiveSessionId("session-a");
+    const revisionAfterFirstReset = renderer.revision;
+    workspace.setActiveSessionId("session-b");
+    expect(renderer.revision).toBeGreaterThan(revisionAfterFirstReset);
+    second.resolve(makeSessionDetail("session-b", "surface-b"));
+
+    await vi.waitFor(() => {
+      expect(renderer.messagesForRenderer[0]).toMatchObject({
+        createSurface: { surfaceId: "surface-b" },
+      });
+    });
+
+    first.resolve(makeSessionDetail("session-a", "surface-a"));
+    await Promise.resolve();
+
+    expect(renderer.messagesForRenderer[0]).toMatchObject({
+      createSurface: { surfaceId: "surface-b" },
+    });
+  });
+
+  it("clears generating state when a text-only agent run completes", async () => {
+    vi.mocked(api.getSession).mockResolvedValue({
+      session: makeSession("session-a"),
+      enabledSkillIds: [],
+      currentSnapshot: null,
+    });
+
+    const workspace = useWorkspaceStore();
+    workspace.setActiveSessionId("session-a");
+
+    const handlers = vi.mocked(connectStream).mock.calls.at(-1)?.[1] as StreamHandlers;
+    handlers.agent_run_started?.({
+      sessionId: "session-a",
+      agentRun: {
+        id: "run-text-only",
+        status: "running",
+        attemptCount: 0,
+        maxAttempts: 3,
+      },
+    });
+
+    expect(workspace.isGenerating).toBe(true);
+
+    handlers.agent_run_completed?.({
+      sessionId: "session-a",
+      agentRun: {
+        id: "run-text-only",
+        status: "committed",
+        attemptCount: 1,
+        assistantMessageId: "message-a",
+        outputSnapshotId: null,
+        completedAt: "2026-01-01T00:00:01.000Z",
+      },
+    });
+
+    expect(workspace.isGenerating).toBe(false);
+    expect(workspace.agentRuns[0]).toMatchObject({
+      id: "run-text-only",
+      status: "committed",
+      assistantMessageId: "message-a",
+      outputSnapshotId: null,
+    });
+  });
+});
+
+function makeSessionDetail(sessionId: string, surfaceId: string): SessionDetailResponse {
+  return {
+    session: makeSession(sessionId),
+    enabledSkillIds: [],
+    currentSnapshot: makeSnapshot(sessionId, surfaceId),
+  };
+}
+
+function makeSession(sessionId: string): SessionDto {
+  return {
+    id: sessionId,
+    title: sessionId,
+    description: null,
+    status: "active",
+    catalogId: "basic",
+    catalogVersion: "v0.9",
+    rendererVersion: "0.1.0",
+    modelProvider: "test",
+    modelName: "test-model",
+    currentSnapshotId: "snapshot-1",
+    lastAgentRunId: null,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+  };
+}
+
+function makeSnapshot(sessionId: string, surfaceId: string): SurfaceSnapshotDto {
+  return {
+    id: `snapshot-${surfaceId}`,
+    sessionId,
+    a2uiEventId: "event-1",
+    agentRunId: "run-1",
+    sequence: 1,
+    isCurrent: true,
+    catalogId: "basic",
+    catalogVersion: "v0.9",
+    rendererVersion: "0.1.0",
+    surfaceCount: 1,
+    componentCount: 1,
+    summary: null,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    snapshot: {
+      version: "v0.9",
+      surfaces: {
+        [surfaceId]: {
+          surfaceId,
+          catalogId: "basic",
+          components: {
+            root: {
+              id: "root",
+              component: "Text",
+              text: { path: "/title" },
+            },
+          },
+          dataModel: {
+            title: `${surfaceId} 标题`,
+          },
+        },
+      },
+    },
+  };
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}

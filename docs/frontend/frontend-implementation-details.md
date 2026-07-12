@@ -140,6 +140,7 @@ Store 中注册的事件处理器：
 | heartbeat | streamStatus = "connected" |
 | agent_run_started | 添加/更新 agentRun |
 | agent_run_attempt | 更新 attemptCount |
+| agent_run_completed | 更新成功状态，isGenerating = false |
 | assistant_message | 追加消息 + 重新加载列表 |
 | a2ui_messages | `renderer.processMessages()` + 追加 event |
 | surface_snapshot | 追加/更新 snapshot，重排 isCurrent |

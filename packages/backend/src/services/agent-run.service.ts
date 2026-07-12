@@ -278,7 +278,8 @@ export const agentRunService = {
         },
       });
 
-      await tx.agentRun.update({
+      const completedAt = new Date();
+      const updatedRun = await tx.agentRun.update({
         where: { id: agentRunId },
         data: {
           status: "committed",
@@ -287,7 +288,7 @@ export const agentRunService = {
           assistantMessageId: assistantMessage.id,
           validationSummary: result.validation as unknown as Prisma.InputJsonValue,
           tokenUsage: (result.tokenUsage ?? {}) as Prisma.InputJsonValue,
-          completedAt: new Date(),
+          completedAt,
         },
       });
 
@@ -306,8 +307,23 @@ export const agentRunService = {
         data: { sessionId, snapshot: buildSnapshotDto(newSnapshot, sessionId) },
       });
 
+      streamService.send(sessionId, {
+        event: "agent_run_completed",
+        data: {
+          sessionId,
+          agentRun: {
+            id: updatedRun.id,
+            status: updatedRun.status as AgentRunDto["status"],
+            attemptCount: updatedRun.attemptCount,
+            assistantMessageId: updatedRun.assistantMessageId,
+            outputSnapshotId: updatedRun.outputSnapshotId,
+            completedAt: updatedRun.completedAt?.toISOString() ?? completedAt.toISOString(),
+          },
+        },
+      });
+
       logger.info(`Agent run 提交 -> session=${SID(sessionId)}, runId=${SID(agentRunId)}, sequence=${sequence}`);
-      logger.debug("-> SSE -> FRONTEND: assistant_message + a2ui_messages + surface_snapshot");
+      logger.debug("-> SSE -> FRONTEND: assistant_message + a2ui_messages + surface_snapshot + agent_run_completed");
     });
   },
 
@@ -338,20 +354,36 @@ export const agentRunService = {
         data: { lastAgentRunId: agentRunId },
       });
 
-      await tx.agentRun.update({
+      const completedAt = new Date();
+      const updatedRun = await tx.agentRun.update({
         where: { id: agentRunId },
         data: {
           status: "committed",
           attemptCount: result.attemptCount,
           assistantMessageId: assistantMessage.id,
           tokenUsage: (result.tokenUsage ?? {}) as Prisma.InputJsonValue,
-          completedAt: new Date(),
+          completedAt,
         },
       });
 
       streamService.send(sessionId, {
         event: "assistant_message",
         data: { sessionId, message: buildMessageDto(assistantMessage) },
+      });
+
+      streamService.send(sessionId, {
+        event: "agent_run_completed",
+        data: {
+          sessionId,
+          agentRun: {
+            id: updatedRun.id,
+            status: updatedRun.status as AgentRunDto["status"],
+            attemptCount: updatedRun.attemptCount,
+            assistantMessageId: updatedRun.assistantMessageId,
+            outputSnapshotId: updatedRun.outputSnapshotId,
+            completedAt: updatedRun.completedAt?.toISOString() ?? completedAt.toISOString(),
+          },
+        },
       });
 
       logger.info(`Agent run 文本回复提交 -> session=${SID(sessionId)}, runId=${SID(agentRunId)}`);

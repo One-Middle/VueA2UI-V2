@@ -6,19 +6,20 @@ import type {
   A2UIServerMessage,
   JsonObject,
 } from "@a2ui-platform/shared";
-import { AgentContextBuilder } from "../context/context-builder.js";
+import { AgentContextBuilder, type AgentContext } from "../context/context-builder.js";
 import { PromptComposer } from "../prompts/prompt-composer.js";
-import { ModelClient } from "../model/model-client.js";
+import { ModelClient, type ModelResponse, type TokenUsage } from "../model/model-client.js";
 import { parseModelOutput } from "./output-parser.js";
+import { parseComponentInfoRequest } from "./component-info-request-parser.js";
 import { validateA2UI } from "../tools/validate-a2ui.js";
+import {
+  formatCatalogComponentDetails,
+  getComponentDef,
+} from "../tools/catalog-schema.js";
 import { logger, shortId } from "../logger.js";
 
-// ─── 常量 ──────────────────────────────────────────────────
-
-/** 最大尝试次数：1 次初始 + 2 次修复 */
 const MAX_ATTEMPTS = 3;
-
-// ─── AgentRuntime ──────────────────────────────────────────
+const MAX_COMPONENT_DISCLOSURE_ROUNDS = 3;
 
 export class AgentRuntime {
   private modelClient: ModelClient;
@@ -35,98 +36,97 @@ export class AgentRuntime {
     this.contextBuilder = contextBuilder;
   }
 
-  /**
-   * 执行完整的 Agent 运行流程。
-   *
-   * @param input Agent 运行输入
-   * @param onToolCall 每次工具调用（校验）后的回调，用于实时上报 ToolCallRecord
-   * @returns AgentRunResult
-   */
   async run(
     input: AgentRunInput,
     onToolCall?: (record: ToolCallRecord) => void,
   ): Promise<AgentRunResult> {
     const sid = shortId(input.sessionId);
-
-    // ── 阶段 PREPARE_CONTEXT ──
     const context = this.contextBuilder.buildContext(input);
-    logger.info(
-      `准备上下文 → session=${sid}, model=${input.model.name}`,
-    );
+    logger.info(`准备上下文 → session=${sid}, model=${input.model.name}`);
 
     let lastAssistantMessage = "";
     let lastA2uiMessages: A2UIServerMessage[] = [];
     let lastValidation: ValidateA2UIResult | undefined;
     let totalTokens: JsonObject | undefined;
+    let componentDetails = "";
+    const disclosedComponents = new Set<string>();
 
-    // ── 尝试循环（初始 + 修复） ──
+    const addUsage = (usage?: TokenUsage): void => {
+      if (!usage) return;
+      totalTokens = {
+        ...(totalTokens ?? {}),
+        promptTokens:
+          ((totalTokens?.["promptTokens"] as number) ?? 0) + usage.promptTokens,
+        completionTokens:
+          ((totalTokens?.["completionTokens"] as number) ?? 0) +
+          usage.completionTokens,
+        totalTokens:
+          ((totalTokens?.["totalTokens"] as number) ?? 0) + usage.totalTokens,
+      };
+    };
+
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       const isRepair = attempt > 1;
+      let modelResponse: ModelResponse;
 
-      // ── 阶段 GENERATE_DRAFT（或 REPAIR_DRAFT）──
-      const { systemPrompt, userPrompt } = isRepair
-        ? this.promptComposer.composeRepair(
+      try {
+        if (isRepair) {
+          const { systemPrompt, userPrompt } = this.promptComposer.composeRepair(
             context,
             JSON.stringify({
               assistantMessage: lastAssistantMessage,
               a2uiMessages: lastA2uiMessages,
             }),
             lastValidation?.errors ?? [],
-          )
-        : this.promptComposer.composeInitial(context);
+            { componentDetails },
+          );
 
-      logger.info(
-        isRepair
-          ? `修复模式 → attempt=${attempt}/${MAX_ATTEMPTS}, 上次错误数=${lastValidation?.errors.length ?? 0}`
-          : `调用模型 → attempt=${attempt}/${MAX_ATTEMPTS}`,
-      );
+          logger.info(
+            `修复模式 → attempt=${attempt}/${MAX_ATTEMPTS}, 上次错误数=${lastValidation?.errors.length ?? 0}`,
+          );
 
-      let modelResponse;
-      try {
-        modelResponse = await this.modelClient.generate([
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ]);
+          modelResponse = await this.modelClient.generate([
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ]);
+          addUsage(modelResponse.usage);
+        } else {
+          const disclosureResult =
+            await this.generateWithComponentDisclosure(
+              context,
+              attempt,
+              disclosedComponents,
+              componentDetails,
+              addUsage,
+              onToolCall,
+            );
+          modelResponse = disclosureResult.modelResponse;
+          componentDetails = disclosureResult.componentDetails;
+        }
       } catch (err) {
-        // 模型调用失败 → 如果不是最后一次，继续尝试
         const errMsg = err instanceof Error ? err.message : String(err);
-        logger.warn(`模型调用失败 → attempt=${attempt}/${MAX_ATTEMPTS}, error=${errMsg.slice(0, 120)}`);
+        logger.warn(
+          `模型调用失败 → attempt=${attempt}/${MAX_ATTEMPTS}, error=${errMsg.slice(0, 120)}`,
+        );
         if (attempt >= MAX_ATTEMPTS) {
           return {
             status: "FAILED",
             assistantMessage: lastAssistantMessage || "模型调用失败",
             attemptCount: attempt,
-            failureReason: `模型调用失败：${err instanceof Error ? err.message : String(err)}`,
+            failureReason: `模型调用失败：${errMsg}`,
           };
         }
-        // 继续下次尝试
-        lastAssistantMessage = `模型调用失败：${err instanceof Error ? err.message : String(err)}`;
+        lastAssistantMessage = `模型调用失败：${errMsg}`;
         lastA2uiMessages = [];
         continue;
       }
 
-      // 累积 token 用量
-      if (modelResponse.usage) {
-        totalTokens = {
-          ...(totalTokens ?? {}),
-          promptTokens:
-            ((totalTokens?.["promptTokens"] as number) ?? 0) +
-            modelResponse.usage.promptTokens,
-          completionTokens:
-            ((totalTokens?.["completionTokens"] as number) ?? 0) +
-            modelResponse.usage.completionTokens,
-          totalTokens:
-            ((totalTokens?.["totalTokens"] as number) ?? 0) +
-            modelResponse.usage.totalTokens,
-        };
-      }
-
-      // 解析模型输出
       const parseResult = parseModelOutput(modelResponse.content);
 
       if (!parseResult.ok) {
-        logger.warn(`解析失败 → attempt=${attempt}/${MAX_ATTEMPTS}, error=${parseResult.error.slice(0, 120)}`);
-        // 解析失败 → 如果不是最后一次，继续尝试
+        logger.warn(
+          `解析失败 → attempt=${attempt}/${MAX_ATTEMPTS}, error=${parseResult.error.slice(0, 120)}`,
+        );
         lastAssistantMessage = modelResponse.content;
         lastA2uiMessages = [];
 
@@ -145,7 +145,6 @@ export class AgentRuntime {
       lastAssistantMessage = assistantMessage;
       lastA2uiMessages = a2uiMessages;
 
-      // ── 阶段 VALIDATE_DRAFT ──
       const validateStartTime = Date.now();
       const validation = validateA2UI({
         messages: a2uiMessages,
@@ -156,10 +155,9 @@ export class AgentRuntime {
       lastValidation = validation;
 
       logger.info(
-        `A2UI 校验 → ${validation.valid ? "✅ 通过" : "❌ 未通过"}, errors=${validation.errors.length}, warnings=${validation.warnings.length}, 耗时=${validateDuration}ms`,
+        `A2UI 校验 → ${validation.valid ? "通过" : "未通过"}, errors=${validation.errors.length}, warnings=${validation.warnings.length}, 耗时=${validateDuration}ms`,
       );
 
-      // 记录 ToolCallRecord 并回调
       const toolCallRecord: ToolCallRecord = {
         toolName: "validateA2UI",
         status: validation.valid ? "succeeded" : "failed",
@@ -185,12 +183,14 @@ export class AgentRuntime {
 
       onToolCall?.(toolCallRecord);
 
-      // 校验通过
       if (validation.valid) {
-        // 有 A2UI 消息 → COMMITTED
         if (a2uiMessages.length > 0) {
-          logger.info(`Agent 完成 → ✅ COMMITTED, attempts=${attempt}, messages=${a2uiMessages.length}, tokens=${totalTokens?.["totalTokens"] ?? "?"}`);
-          logger.info(`📦 最终提交的 A2UI 消息:\n${JSON.stringify(a2uiMessages, null, 2)}`);
+          logger.info(
+            `Agent 完成 → COMMITTED, attempts=${attempt}, messages=${a2uiMessages.length}, tokens=${totalTokens?.["totalTokens"] ?? "?"}`,
+          );
+          logger.info(
+            `最终提交的 A2UI 消息:\n${JSON.stringify(a2uiMessages, null, 2)}`,
+          );
           return {
             status: "COMMITTED",
             assistantMessage,
@@ -201,7 +201,6 @@ export class AgentRuntime {
           };
         }
 
-        // 无 A2UI 消息 → TEXT_ONLY
         logger.info(`Agent 完成 → TEXT_ONLY, attempts=${attempt}`);
         return {
           status: "TEXT_ONLY",
@@ -212,9 +211,10 @@ export class AgentRuntime {
         };
       }
 
-      // 校验未通过，且已是最后一次尝试
       if (attempt >= MAX_ATTEMPTS) {
-        logger.warn(`Agent 完成 → ❌ FAILED, attempts=${MAX_ATTEMPTS}, errors=${validation.errors.length}`);
+        logger.warn(
+          `Agent 完成 → FAILED, attempts=${MAX_ATTEMPTS}, errors=${validation.errors.length}`,
+        );
         return {
           status: "FAILED",
           assistantMessage,
@@ -226,11 +226,8 @@ export class AgentRuntime {
             .join("; ")}${validation.errors.length > 5 ? ` 等共 ${validation.errors.length} 个错误` : ""}`,
         };
       }
-
-      // 继续修复循环
     }
 
-    // 不应到达这里（循环内必定 return），但 TypeScript 要求有返回值
     return {
       status: "FAILED",
       assistantMessage: lastAssistantMessage,
@@ -238,5 +235,134 @@ export class AgentRuntime {
       validation: lastValidation,
       failureReason: "达到最大尝试次数",
     };
+  }
+
+  private async generateWithComponentDisclosure(
+    context: AgentContext,
+    attempt: number,
+    disclosedComponents: Set<string>,
+    initialComponentDetails: string,
+    addUsage: (usage?: TokenUsage) => void,
+    onToolCall?: (record: ToolCallRecord) => void,
+  ): Promise<{ modelResponse: ModelResponse; componentDetails: string }> {
+    let componentDetails = initialComponentDetails;
+    let lastResponse: ModelResponse | undefined;
+
+    for (
+      let round = 1;
+      round <= MAX_COMPONENT_DISCLOSURE_ROUNDS + 1;
+      round++
+    ) {
+      const forceFinalOutput = round > MAX_COMPONENT_DISCLOSURE_ROUNDS;
+      const { systemPrompt, userPrompt } = this.promptComposer.composeInitial(
+        context,
+        {
+          componentDetails,
+          forceFinalOutput,
+        },
+      );
+
+      logger.info(
+        forceFinalOutput
+          ? `调用模型 → attempt=${attempt}/${MAX_ATTEMPTS}, 强制最终输出`
+          : `调用模型 → attempt=${attempt}/${MAX_ATTEMPTS}, 组件披露轮=${round}/${MAX_COMPONENT_DISCLOSURE_ROUNDS}`,
+      );
+
+      lastResponse = await this.modelClient.generate([
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ]);
+      addUsage(lastResponse.usage);
+
+      if (forceFinalOutput) {
+        break;
+      }
+
+      const requestResult = parseComponentInfoRequest(lastResponse.content);
+      if (!requestResult.ok) {
+        break;
+      }
+
+      const disclosureStartTime = Date.now();
+      const requestedComponents = Array.from(
+        new Set(requestResult.request.components),
+      );
+      const disclosedNow: string[] = [];
+      const alreadyDisclosedComponents: string[] = [];
+      const skippedComponents: string[] = [];
+
+      for (const componentName of requestedComponents) {
+        if (disclosedComponents.has(componentName)) {
+          alreadyDisclosedComponents.push(componentName);
+          continue;
+        }
+        if (!getComponentDef(componentName)) {
+          skippedComponents.push(componentName);
+          continue;
+        }
+        disclosedNow.push(componentName);
+      }
+
+      const detailText = formatCatalogComponentDetails(disclosedNow);
+      const feedback: string[] = [];
+      if (detailText) {
+        feedback.push(detailText);
+      }
+      if (skippedComponents.length > 0) {
+        feedback.push(
+          [
+            "### 组件详情请求反馈",
+            `以下组件不在 Basic Catalog 中，不能使用：${skippedComponents.join("、")}`,
+          ].join("\n"),
+        );
+      }
+      if (alreadyDisclosedComponents.length > 0) {
+        feedback.push(
+          [
+            "### 已披露组件提醒",
+            `以下组件详情已经提供过，不会重复注入：${alreadyDisclosedComponents.join("、")}`,
+          ].join("\n"),
+        );
+      }
+
+      if (feedback.length > 0) {
+        componentDetails = [componentDetails, ...feedback]
+          .filter((part) => part.trim().length > 0)
+          .join("\n\n");
+      }
+
+      for (const componentName of disclosedNow) {
+        disclosedComponents.add(componentName);
+      }
+
+      const durationMs = Date.now() - disclosureStartTime;
+      onToolCall?.({
+        toolName: "getCatalogComponentDetails",
+        status: disclosedNow.length > 0 ? "succeeded" : "failed",
+        attemptIndex: attempt,
+        inputSummary: {
+          requestedComponents,
+          skippedComponents,
+          alreadyDisclosedComponents,
+        },
+        output: {
+          disclosedComponents: disclosedNow,
+        },
+        durationMs,
+        ...(disclosedNow.length === 0
+          ? { errorMessage: "没有新增可披露组件详情" }
+          : {}),
+      });
+
+      logger.info(
+        `组件详情披露 → requested=${requestedComponents.length}, disclosed=${disclosedNow.length}, skipped=${skippedComponents.length}, already=${alreadyDisclosedComponents.length}`,
+      );
+    }
+
+    if (!lastResponse) {
+      throw new Error("模型未返回任何内容");
+    }
+
+    return { modelResponse: lastResponse, componentDetails };
   }
 }

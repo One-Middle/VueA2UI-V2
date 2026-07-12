@@ -884,7 +884,29 @@ data: {
 }
 ```
 
-### 10.9 agent_run_failed
+### 10.9 agent_run_completed
+
+```text
+event: agent_run_completed
+data: {
+  "sessionId": "uuid",
+  "agentRun": {
+    "id": "uuid",
+    "status": "committed",
+    "attemptCount": 1,
+    "assistantMessageId": "uuid",
+    "outputSnapshotId": "uuid|null",
+    "completedAt": "2026-07-05T13:43:49.000Z"
+  }
+}
+```
+
+说明：
+- Agent run 成功提交后发送。
+- `TEXT_ONLY` 成功回复也必须发送该事件，此时 `outputSnapshotId` 为 `null`。
+- 前端以该事件作为成功结束 loading 的准确信号。
+
+### 10.10 agent_run_failed
 
 ```text
 event: agent_run_failed
@@ -1105,6 +1127,7 @@ INVALID_RENDERER_ERROR
    - `assistant_message`
    - `a2ui_messages`
    - `surface_snapshot`
+   - `agent_run_completed`
    - 或 `agent_run_failed`
 
 ### 14.3 Renderer action

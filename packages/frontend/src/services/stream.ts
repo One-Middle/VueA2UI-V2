@@ -81,6 +81,9 @@ export function connectStream(sessionId: string, handlers: StreamHandlers): Stre
 
       const decoder = new TextDecoder("utf-8");
       let buffer = "";
+      let currentEvent: string | null = null;
+      let currentData: string | null = null;
+      let currentId: string | null = null;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -93,15 +96,12 @@ export function connectStream(sessionId: string, handlers: StreamHandlers): Stre
         // 保留最后一个可能不完整的行
         buffer = lines.pop() ?? "";
 
-        let currentEvent: string | null = null;
-        let currentData: string | null = null;
-        let currentId: string | null = null;
-
         for (const line of lines) {
           if (line.startsWith("event: ")) {
             currentEvent = line.slice(7).trim();
           } else if (line.startsWith("data: ")) {
-            currentData = line.slice(6);
+            const dataLine = line.slice(6);
+            currentData = currentData === null ? dataLine : `${currentData}\n${dataLine}`;
           } else if (line.startsWith("id: ")) {
             currentId = line.slice(4).trim();
           } else if (line === "") {

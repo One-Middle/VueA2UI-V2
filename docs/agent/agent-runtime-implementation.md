@@ -95,3 +95,25 @@ Prompt 必须同时约束协议合法性和渲染可用性：
 - 非 JSON 输出被捕获。
 - Catalog 外组件被校验工具拒绝或修复。
 - Agent 不读取任意本地路径。
+- Agent 涓嶈鍙栦换鎰忔湰鍦拌矾寰勩€?
+
+## 10. 组件信息渐进式披露
+
+Agent Runtime 在初始生成阶段增加组件详情披露循环：
+
+1. 初始 Prompt 只提供 Basic Catalog 组件名称和一句话用途摘要。
+2. 如果模型缺少组件字段信息，应输出 `componentInfoRequest`。
+3. Runtime 解析请求后，通过 `getComponentDef(name)` 查询对应组件详情。
+4. Runtime 把已请求组件的字段、必填项、类型和枚举值注入下一轮 Prompt。
+5. 披露循环最多 3 轮；超过后强制模型输出最终 `{ assistantMessage, a2uiMessages }`。
+6. 最终输出仍进入 `parseModelOutput` 和 `validateA2UI`，修复流程保持最多 3 次。
+
+新增内部工具记录：
+
+- `toolName: "getCatalogComponentDetails"`
+- `inputSummary.requestedComponents`：模型请求的组件列表。
+- `inputSummary.skippedComponents`：不存在于 Basic Catalog 的组件。
+- `inputSummary.alreadyDisclosedComponents`：本次跳过的已披露组件。
+- `output.disclosedComponents`：本次实际注入详情的组件。
+
+该机制只改变 Prompt 上下文组织，不改变 backend/frontend 的 Agent 最终结果契约，也不放宽 Catalog 校验。
