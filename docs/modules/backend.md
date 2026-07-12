@@ -174,3 +174,10 @@ Agent 成功提交：
 - 修改 API 路由时，同步更新 `docs/contracts/api.md`。
 - 修改 Prisma schema 或事务边界时，同步更新 `docs/contracts/db-schema.md`。
 - 修改 Agent 编排时，同步更新 `docs/modules/agent.md` 和 `docs/modules/integration.md`。
+
+## 12. 详细档案索引
+
+更细的历史设计和实现细节维护在 `docs/archive/backend/`：
+
+- [Backend 实施说明](../archive/backend/implementation.md)
+- [Backend 实现细节](../archive/backend/implementation-details.md)

@@ -6,9 +6,9 @@
 
 历史参考资料已归档：
 
-- `docs/archive/legacy-2026-07/frontend/renderer/protocol/A2UI协议认识.md`
-- `docs/archive/legacy-2026-07/frontend/renderer/a2ui-renderer-v0_9-guide.md`
-- `docs/archive/legacy-2026-07/frontend/renderer/basic-catalog-component-optimization.md`
+- `docs/archive/renderer/a2ui-protocol-notes.md`
+- `docs/archive/renderer/a2ui-renderer-v0_9-guide.md`
+- `docs/archive/renderer/basic-catalog-component-optimization.md`
 
 ## 2. 服务端到客户端消息
 
@@ -34,7 +34,60 @@ Renderer 可通过前端回传：
 - `action`：用户交互事件。
 - `error`：渲染、绑定或组件解析错误。
 
-Frontend 只负责转发，Backend 负责记录，Agent 不直接接收 Renderer 回传。
+### 3.1 Button action 契约决策
+
+`Button.action` 的目标契约按 A2UI 官网式结构整理，不采用项目早期实现中的扁平结构：
+
+```json
+{
+  "action": {
+    "event": {
+      "name": "submit",
+      "context": {
+        "data": { "path": "/form" }
+      }
+    }
+  }
+}
+```
+
+客户端到服务端的 `action` 消息结构为：
+
+```json
+{
+  "version": "v0.9",
+  "action": {
+    "name": "submit",
+    "surfaceId": "main",
+    "sourceComponentId": "submitButton",
+    "timestamp": "2026-07-12T00:00:00.000Z",
+    "context": {}
+  }
+}
+```
+
+`action.functionCall` 进入 A2UI 契约作为未来能力：
+
+```json
+{
+  "action": {
+    "functionCall": {
+      "call": "openUrl",
+      "args": {
+        "url": "https://a2ui.org"
+      }
+    }
+  }
+}
+```
+
+当前实现状态：
+
+- `action.event` 是后续代码需要对齐的正式格式。
+- `action.functionCall` 只作为未来契约保留，当前 Renderer 暂不执行，Agent 当前也不应主动生成。
+- 项目早期代码中存在 `{ "name": "...", "context": {} }` 扁平格式；这是待迁移的历史实现差异，不作为新文档口径。
+
+Frontend 负责监听并转发 Renderer action/error，Backend 负责记录，Agent 不直接接收 Renderer 回传。
 
 ## 4. 组件树规则
 
@@ -66,6 +119,12 @@ Frontend 只负责转发，Backend 负责记录，Agent 不直接接收 Renderer
 - `Slider`
 - `DateTimeInput`
 - `Divider`
+
+注意：
+
+- 本节说明 Basic Catalog 的协议层组件集合和字段校验来源。
+- 字段通过校验只表示该字段是合法 A2UI 输入，不等于当前 Renderer 已完整消费该字段。
+- Renderer 对各字段的实际渲染支持程度见 [Renderer Basic Catalog 能力矩阵](../archive/renderer/basic-catalog-capabilities.md)。
 
 组件字段和校验约束由以下文件共同维护：
 

@@ -77,6 +77,7 @@ packages/renderer/src/
       TextComponent.vue
       TextFieldComponent.vue
       VideoComponent.vue
+      visual-props.ts
 ```
 
 ## 5. 文件职责说明
@@ -101,6 +102,7 @@ packages/renderer/src/
 | `src/vue/A2uiComponent.vue` | 递归渲染组件模型，并处理 unknown component fallback。 |
 | `src/components/index.ts` | Basic 组件统一导出。 |
 | `src/components/basic/*.vue` | 各 Basic Catalog 组件实现。 |
+| `src/components/basic/visual-props.ts` | Basic 组件通用受控视觉属性解析。 |
 
 ## 6. Basic 组件职责
 
@@ -142,11 +144,18 @@ packages/renderer/src/
 3. Renderer 派发 action/error 给宿主前端。
 4. 前端调用后端 Renderer 回传 API。
 
+Action 格式说明：
+
+- A2UI 契约目标以官网式 `Button.action.event` 为准，详见 [A2UI v0.9 契约](../contracts/a2ui-v0.9.md)。
+- `action.functionCall` 已纳入契约作为未来能力，但当前 Renderer 暂不执行。
+- Renderer 当前 action 字段消费状态以 [Renderer Basic Catalog 能力矩阵](../archive/renderer/basic-catalog-capabilities.md) 为准；旧版扁平 `{ name, context }` 实现属于待迁移差异。
+
 ## 8. 依赖契约
 
 - A2UI：[../contracts/a2ui-v0.9.md](../contracts/a2ui-v0.9.md)
 - Shared 类型：[../contracts/shared-types.md](../contracts/shared-types.md)
 - 集成说明：[./integration.md](./integration.md)
+- Renderer Basic Catalog 能力矩阵：[../archive/renderer/basic-catalog-capabilities.md](../archive/renderer/basic-catalog-capabilities.md)
 
 ## 9. 测试与验收
 
@@ -160,3 +169,20 @@ packages/renderer/src/
 
 - 新增 Basic 组件时，同步更新 `catalog-registry.ts`、Agent schema、shared 类型和 `docs/contracts/a2ui-v0.9.md`。
 - 修改消息处理逻辑时，同步更新 A2UI 契约和集成说明。
+
+## 11. Basic Catalog 能力说明
+
+Renderer 对 Basic Catalog 字段的实际消费状态维护在 [Renderer Basic Catalog 能力矩阵](../archive/renderer/basic-catalog-capabilities.md)。
+
+本文档只维护模块定位、工程结构、核心流程和维护规则，不重复列出每个组件的字段能力，避免与能力矩阵产生冲突。
+
+## 12. 详细档案索引
+
+更细的历史设计、协议说明和能力矩阵维护在 `docs/archive/renderer/`：
+
+- [Renderer 实施说明](../archive/renderer/implementation.md)
+- [Renderer 实现细节](../archive/renderer/implementation-details.md)
+- [A2UI Renderer v0.9 指南](../archive/renderer/a2ui-renderer-v0_9-guide.md)
+- [A2UI 协议认识](../archive/renderer/a2ui-protocol-notes.md)
+- [Basic Catalog 组件优化](../archive/renderer/basic-catalog-component-optimization.md)
+- [Basic Catalog 能力矩阵](../archive/renderer/basic-catalog-capabilities.md)

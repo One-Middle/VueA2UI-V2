@@ -4,13 +4,13 @@
 
 `agent` 是受控 Agent Runtime。它负责把用户意图转换成合法 A2UI v0.9 消息，并通过强制 `validateA2UI` 工具保证只有合法消息才能交给 `backend` 提交。
 
-## 2. 输入文档
+## 2. 当前权威入口
 
-- `docs/product/agent-platform-prd.md`
-- `docs/product/agent-platform-design.md`
-- `docs/product/agent-platform-api.md`
-- `docs/development-start.md`
-- `docs/agent/tasks.md`
+- `docs/product/prd.md`
+- `docs/architecture/system-design.md`
+- `docs/contracts/a2ui-v0.9.md`
+- `docs/contracts/shared-types.md`
+- `docs/modules/agent.md`
 
 ## 3. 已确定技术选型
 

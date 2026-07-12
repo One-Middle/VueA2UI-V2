@@ -77,3 +77,9 @@ Frontend MessageInput
 - Agent 校验失败后不提交 events。
 - Renderer action/error 可被后端记录。
 - 导出会话、A2UI JSONL 和当前 snapshot。
+
+## 7. 详细档案索引
+
+更细的历史集成说明维护在 `docs/archive/integration/`：
+
+- [集成实现细节](../archive/integration/implementation-details.md)

@@ -4,15 +4,13 @@
 
 `frontend/renderer` 是 Vue3 A2UI v0.9 Renderer。它负责消费已通过后端校验的 A2UI 消息，维护 surface 状态，渲染固定 Basic Catalog 组件，并派发 action/error。
 
-## 2. 输入文档
+## 2. 当前权威入口
 
-- `docs/frontend/renderer/protocol/A2UI协议认识.md`
-- `docs/frontend/renderer/a2ui-renderer-v0_9-guide.md`
-- `docs/frontend/renderer/basic-catalog-component-optimization.md`
-- `docs/product/agent-platform-design.md`
-- `docs/product/agent-platform-api.md`
-- `docs/development-start.md`
-- `docs/frontend/renderer/tasks.md`
+- `docs/contracts/a2ui-v0.9.md`
+- `docs/modules/renderer.md`
+- `docs/archive/renderer/a2ui-protocol-notes.md`
+- `docs/archive/renderer/a2ui-renderer-v0_9-guide.md`
+- `docs/archive/renderer/basic-catalog-component-optimization.md`
 
 ## 3. 已确定技术选型
 

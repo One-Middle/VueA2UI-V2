@@ -1,6 +1,6 @@
 # A2UI Agent 平台文档入口
 
-本文档是 `docs/` 的唯一入口。新的文档结构按“一个事实只有一个权威位置”整理，旧版长文档已归档到 `docs/archive/legacy-2026-07/`，仅作为历史参考。
+本文档是 `docs/` 的唯一入口。新的文档结构按“一个事实只有一个权威位置”整理，详细历史文档已按模块归档到 `docs/archive/`，仅作为迁移参考。
 
 ## 1. 文档结构
 
@@ -31,7 +31,15 @@ docs/
   tasks/
     current.md               # 当前任务清单
   archive/
-    legacy-2026-07/          # 旧文档归档
+    README.md                # 详细归档入口
+    project/                 # 项目级历史资料、合并稿和冲突表
+    product/                 # 产品、API、DB 和模块规格旧稿
+    agent/                   # Agent Runtime 详细资料
+    backend/                 # Backend 详细资料
+    frontend/                # Frontend 详细资料
+    renderer/                # Renderer 与 A2UI 详细资料
+    shared/                  # Shared 类型详细资料
+    integration/             # 集成详细资料
 ```
 
 ## 2. 阅读路径
@@ -64,6 +72,7 @@ docs/
 - HTTP/SSE 接口只维护在 [API 契约](./contracts/api.md)。
 - 数据库表、字段、事务边界只维护在 [数据库契约](./contracts/db-schema.md)。
 - A2UI 协议、消息顺序和 Basic Catalog 只维护在 [A2UI 契约](./contracts/a2ui-v0.9.md)。
+- Renderer 对 Basic Catalog 字段的实际渲染支持程度维护在 [Renderer Basic Catalog 能力矩阵](./archive/renderer/basic-catalog-capabilities.md)，由 [Renderer 模块总领](./modules/renderer.md) 索引。
 - 代码目录、文件作用和模块内部流程只维护在 `docs/modules/*.md`。
 - 当前开发任务只维护在 [当前任务清单](./tasks/current.md)。
 
@@ -74,4 +83,4 @@ docs/
 - 修改 API、DB、A2UI 或 shared 类型时，必须同步更新 `docs/contracts/`。
 - 修改模块功能逻辑时，必须同步更新对应 `docs/modules/*.md`。
 - 设计功能逻辑发生变化时，必须更新 [CHANGELOG](./CHANGELOG.md)，并记录日期。
-- `docs/archive/legacy-2026-07/` 中的内容不作为当前实现契约；如发现有价值内容，应迁移到新的权威文档后再引用。
+- `docs/archive/` 中的详细文档不作为当前实现契约；归档内的 `project/consolidated.md` 只作历史合并索引，`project/conflicts.md` 只记录冲突裁决和待迁移差异。

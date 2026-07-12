@@ -70,3 +70,9 @@ packages/shared/src/
 - 跨模块字段变更先改 `shared`，再改调用方。
 - 修改 API DTO 同步更新 `docs/contracts/api.md`。
 - 修改 A2UI 类型同步更新 `docs/contracts/a2ui-v0.9.md`。
+
+## 9. 详细档案索引
+
+更细的历史类型规格维护在 `docs/archive/shared/`：
+
+- [Shared 类型旧规格](../archive/shared/types-spec.md)

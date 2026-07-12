@@ -4,13 +4,12 @@
 
 `backend` 是平台业务后端，负责 HTTP API、PostgreSQL 持久化、SSE 推送、文件处理、skills、A2UI events、surface snapshots 和 Agent run 编排。
 
-## 2. 输入文档
+## 2. 当前权威入口
 
-- `docs/product/agent-platform-design.md`
-- `docs/product/agent-platform-db-schema.md`
-- `docs/product/agent-platform-api.md`
-- `docs/development-start.md`
-- `docs/backend/tasks.md`
+- `docs/architecture/system-design.md`
+- `docs/contracts/api.md`
+- `docs/contracts/db-schema.md`
+- `docs/modules/backend.md`
 
 ## 3. 已确定技术选型
 

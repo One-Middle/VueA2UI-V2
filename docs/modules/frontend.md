@@ -140,3 +140,10 @@ packages/frontend/src/
 - 修改页面结构、工作台状态或 SSE 消费逻辑时，同步更新本文档。
 - 修改 HTTP/SSE 调用时，同步更新 `docs/contracts/api.md`。
 - 修改 Renderer 输入模型时，同步更新 `docs/modules/renderer.md`。
+
+## 10. 详细档案索引
+
+更细的历史设计和实现细节维护在 `docs/archive/frontend/`：
+
+- [Frontend 实施说明](../archive/frontend/implementation.md)
+- [Frontend 实现细节](../archive/frontend/implementation-details.md)

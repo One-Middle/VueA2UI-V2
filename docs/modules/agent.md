@@ -53,9 +53,12 @@ packages/agent/src/
     prompt-composer.ts
   runtime/
     agent-runtime.ts
+    create-agent-runtime.ts
     component-info-request-parser.ts
+    skill-info-request-parser.ts
     output-parser.ts
     progressive-disclosure.test.ts
+    create-agent-runtime.test.ts
   schemas/
     a2ui-v0.9-schema.json
     basic-catalog-schema.json
@@ -69,21 +72,46 @@ packages/agent/src/
 
 | 文件 / 目录 | 作用 |
 | --- | --- |
-| `src/index.ts` | Agent 包导出入口。 |
+| `src/index.ts` | Agent 包公共 API 入口，只暴露工厂函数、解析工具和校验/Catalog 工具。 |
 | `src/logger.ts` | Agent 日志辅助。 |
 | `src/context/context-builder.ts` | 构建 Agent 上下文，汇总用户输入、历史消息、文件、skills、snapshot 和 Catalog 摘要。 |
 | `src/model/model-client.ts` | OpenAI-compatible API 客户端，负责模型请求与错误处理。 |
 | `src/prompts/prompt-composer.ts` | 拼装 system prompt、user prompt、组件详情 prompt 和 repair prompt。 |
 | `src/prompts/a2ui-protocol-guide.ts` | A2UI 协议教学内容，包括输出 envelope、消息顺序、组件规则、常见错误和示例。 |
-| `src/runtime/agent-runtime.ts` | Runtime 主状态机，协调上下文、模型调用、解析、校验、组件信息披露和修复循环。 |
+| `src/runtime/agent-runtime.ts` | Runtime 主状态机，实现 `IAgentRuntime` 接口，协调上下文、模型调用、解析、校验、组件信息披露和修复循环。 |
+| `src/runtime/create-agent-runtime.ts` | **工厂函数（唯一对外暴露的运行时 API）**，封装 ModelClient、PromptComposer、AgentContextBuilder 的创建与组装。 |
 | `src/runtime/output-parser.ts` | 解析模型输出中的 JSON envelope。 |
 | `src/runtime/component-info-request-parser.ts` | 解析模型对组件详情的结构化请求。 |
+| `src/runtime/skill-info-request-parser.ts` | 解析模型对 Skill 内容的结构化请求。 |
 | `src/runtime/progressive-disclosure.test.ts` | 组件信息渐进式披露流程测试。 |
+| `src/runtime/create-agent-runtime.test.ts` | 工厂函数测试。 |
 | `src/schemas/a2ui-v0.9-schema.json` | A2UI v0.9 JSON Schema。 |
 | `src/schemas/basic-catalog-schema.json` | Basic Catalog JSON Schema。 |
 | `src/tools/catalog-schema.ts` | Catalog 组件定义、详情查询和 schema 辅助。 |
 | `src/tools/validate-a2ui.ts` | A2UI 校验入口，执行 schema、Catalog、引用和安全约束校验。 |
 | `src/tools/validate-a2ui.test.ts` | A2UI 校验测试。 |
+
+## 5. 公共 API 与模块边界
+
+Agent 包通过 `index.ts` 暴露三层公共 API：
+
+**运行时入口**（后端唯一需要的 API）：
+
+- `createAgentRuntime(config)` → `IAgentRuntime`：工厂函数，封装内部 ModelClient、PromptComposer、AgentContextBuilder 的组装。
+
+**解析工具**：
+
+- `parseModelOutput(raw)` → 解析模型 JSON 输出。
+- `parseComponentInfoRequest(raw)` → 解析组件详情请求。
+
+**校验与 Catalog 工具**：
+
+- `validateA2UI(input)` → A2UI 消息校验。
+- `getCatalogComponents()` 等 Catalog 查询函数。
+
+**不暴露的类**：`AgentRuntime`、`ModelClient`、`PromptComposer`、`AgentContextBuilder` 均为内部实现。外部只能通过 `IAgentRuntime` 接口与 `createAgentRuntime()` 工厂使用 Agent。
+
+**接口契约**：`IAgentRuntime`、`AgentRuntimeFactoryConfig` 定义在 `packages/shared/src/agent.ts` 中。任何替代 Agent 实现只需实现 `IAgentRuntime` 接口并提供同签名工厂函数即可替换。
 
 ## 6. 核心流程
 
@@ -105,6 +133,14 @@ packages/agent/src/
 - `REPAIR_DRAFT`
 - `COMMIT`
 - `FAILED`
+
+## 7.1 Skill 渐进式披露
+
+- 初始 Prompt 只包含已启用 Skill 的 `id`、`name` 和 `description` 摘要，不直接注入完整 `content`。
+- 当模型需要完整 Skill 规则时，输出 `skillInfoRequest`，由 Runtime 从本次 `AgentRunInput.enabledSkills` 中按 `id` 优先、`name` 其次精确匹配。
+- Runtime 通过 `getSkillContent` 工具调用记录披露结果，并把匹配到的 Markdown 内容注入下一轮 Prompt。
+- Runtime 不访问数据库、不读取本地文件、不执行 Skill 脚本；Skill 内容只来自后端传入的启用 Skill 列表。
+- Skill 内容披露和组件详情披露共用渐进式披露轮次，达到上限后强制输出最终 `{ assistantMessage, a2uiMessages }`。
 
 ## 8. 输出契约
 
@@ -140,3 +176,12 @@ packages/agent/src/
 - 修改 Prompt 或输出契约时，同步更新 `docs/contracts/a2ui-v0.9.md`。
 - 修改 Agent result 类型时，同步更新 `docs/contracts/shared-types.md`。
 - 修改校验规则时，同步更新 Renderer 和 Backend 相关说明。
+
+## 12. 详细档案索引
+
+更细的历史设计和实现细节维护在 `docs/archive/agent/`：
+
+- [上下文编排与组成](../archive/agent/context-orchestration.md)
+- [Agent LLM A2UI 生成指南](../archive/agent/agent-llm-a2ui-guide.md)
+- [Runtime 实施说明](../archive/agent/runtime-implementation.md)
+- [Runtime 实现细节](../archive/agent/runtime-implementation-details.md)

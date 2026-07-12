@@ -2,10 +2,51 @@
 
 ## 2026-07-12
 
+### Agent Runtime
+
+- **模块解耦重构**：将 Agent 公共 API 从直接暴露内部类（`AgentRuntime`、`ModelClient`、`PromptComposer`、`AgentContextBuilder`）改为暴露 `createAgentRuntime()` 工厂函数 + `IAgentRuntime` 接口。后端不再感知 Agent 内部组装细节。
+- 新增 `IAgentRuntime` 接口（定义在 `packages/shared/src/agent.ts`），任何 Agent 实现只需实现此接口即可被后端调用。
+- 新增 `AgentRuntimeFactoryConfig` 配置类型和 `AgentRuntimeFactory` 工厂签名，替换 Agent 实现只需改一行 import。
+- 新增 `create-agent-runtime.ts` 工厂函数，封装内部依赖创建与组装。
+- `AgentRuntime` 显式声明 `implements IAgentRuntime`。
+- 新增工厂函数单元测试。
+- 更新 `docs/modules/agent.md`：新增公共 API 与模块边界章节，更新文件职责表。
+- 更新 `docs/contracts/shared-types.md`：补充 Agent Runtime 共享字段说明。
+- 新增 `docs/archive/agent/context-orchestration.md`：Agent 上下文编排与组成技术文档。
+
+### Backend
+
+- `agent-run.service.ts` 移除对 `AgentRuntime`、`ModelClient`、`PromptComposer`、`AgentContextBuilder` 的直接依赖，改为使用 `createAgentRuntime()` 工厂 + `IAgentRuntime` 接口。
+
+### Renderer
+
+- 新增 Basic Catalog 受控视觉属性解析工具，Renderer 开始消费既有协议中的 `style`、`variant`、`size`、`tone`、`preset` 字段。
+- `Card`、`Button`、`Icon`、`Image`、`Row`、`Column`、`Slider`、`Text` 接入受控样式和视觉修饰类，补齐音乐卡片等场景所需的基础渲染能力。
+- 修复 `Icon` 只读取旧字段 `icon` 的问题，现在优先读取协议推荐的 `name` 并兼容 `icon`。
+- `Image` 支持 `fit`、`aspectRatio`、`loading`，并兼容 `1:1` 形式的比例写法。
+- `Slider` 支持 `step`、`disabled`、`showValue`、数值前后缀，`showValue: false` 不再显示当前值。
+- 新增 Renderer 视觉属性回归测试，覆盖图标字段兼容、图片/布局样式透传和 Slider 数值隐藏。
+- 新增 `docs/archive/renderer/basic-catalog-capabilities.md`，区分 A2UI 协议合法字段与 Renderer 当前实际渲染能力，并由 Renderer 模块总领文档索引。
+
+### Agent Runtime
+
+- 将 Skill 注入升级为渐进式披露：初始 Prompt 只暴露 Skill 摘要，模型可通过 `skillInfoRequest` 主动请求完整 Skill 内容。
+- 新增 `getSkillContent` runtime tool call，按已启用 Skill 的 `id` 或 `name` 精确匹配并披露 Markdown 内容，不访问数据库、不读取本地路径、不执行脚本。
+- 统一 Skill 内容披露与组件详情披露流程，修复模式会继续携带已披露 Skill 内容和组件详情。
+
+### Backend / Frontend
+
+- `AgentRunInput.enabledSkills` 增加 `description` 字段，后端触发 Agent Run 时同步传入 Skill 描述。
+- `ToolCallRecord` 增加 `phase` 字段，SSE `agent_run_attempt` 会携带 `getSkillContent` 工具调用供前端展示。
+- 前端工作台新增运行期 tool call 状态，对话页可显示 Skill 调用提示，Runtime 面板可查看实时或历史工具调用记录。
+
 ### 文档结构
 
 - 重构 `docs/` 文档体系，新增 `overview`、`product`、`architecture`、`contracts`、`modules`、`tasks`、`archive` 分层。
-- 将旧版重复文档归档到 `docs/archive/legacy-2026-07/`，仅作为历史参考，不再作为当前实现契约。
+- 将旧版重复文档按模块归档到 `docs/archive/`，仅作为历史参考，不再作为当前实现契约。
+- 新增 `docs/archive/README.md`、`docs/archive/project/consolidated.md` 和 `docs/archive/project/conflicts.md`，按主题合并旧文档内容，并记录 Button action、`functionCall`、Skill 注入方式等冲突处理决策。
+- 删除过时的旧任务清单、开发启动说明和阶段实施计划，当前任务只维护在 `docs/tasks/current.md`。
+- A2UI 文档明确 `Button.action` 目标契约采用官网式 `action.event`，`action.functionCall` 作为未来能力进入契约；Renderer 能力矩阵同步标注当前代码仍存在扁平 action 待迁移差异。
 - 重写 `docs/README.md`，明确“一个事实只有一个权威位置”的维护规则。
 - 新增 `docs/modules/frontend.md`、`renderer.md`、`backend.md`、`agent.md`、`shared.md`、`integration.md`，统一记录模块功能定位、技术栈、代码工程结构和文件职责。
 - 新增 `docs/contracts/api.md`、`db-schema.md`、`a2ui-v0.9.md`、`shared-types.md`，作为跨模块契约入口。

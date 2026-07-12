@@ -4,14 +4,12 @@
 
 `frontend` 是平台工作台模块，负责产品/设计用户的主要操作界面。它不实现 A2UI 协议渲染核心，不直接调用模型，不执行 A2UI 校验；它通过 HTTP/SSE 与 `backend` 通信，并把已提交的 A2UI 消息交给 `frontend/renderer`。
 
-## 2. 输入文档
+## 2. 当前权威入口
 
-- `docs/product/agent-platform-prd.md`
-- `docs/product/agent-platform-design.md`
-- `docs/product/agent-platform-api.md`
-- `docs/product/agent-platform-module-specs.md`
-- `docs/development-start.md`
-- `docs/frontend/tasks.md`
+- `docs/product/prd.md`
+- `docs/architecture/system-design.md`
+- `docs/contracts/api.md`
+- `docs/modules/frontend.md`
 
 ## 3. 已确定技术选型
 

@@ -287,7 +287,6 @@ docs/
 ├─ README.md                         # 文档入口
 ├─ project-feature-structure.md      # 主要功能结构
 ├─ project-structure.md              # 项目结构说明
-├─ development-start.md              # 开发启动说明
 ├─ product/                          # 产品、设计、API、DB、模块规格
 ├─ frontend/                         # 前端工作台和 Renderer 文档
 ├─ backend/                          # 后端文档
@@ -348,7 +347,6 @@ pnpm test
 
 - [文档入口](./README.md)
 - [项目主要功能结构](./project-feature-structure.md)
-- [开发启动说明](./development-start.md)
 - [模块实现规格](./product/agent-platform-module-specs.md)
 - [Backend 模块实现说明](./backend/backend-implementation.md)
 - [Frontend 模块实现说明](./frontend/frontend-implementation.md)

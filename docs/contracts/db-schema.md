@@ -4,7 +4,7 @@
 
 本文档是 PostgreSQL / Prisma 数据模型的唯一权威入口。实际 schema 位于 `packages/backend/prisma/schema.prisma`，两者必须保持一致。
 
-历史完整数据库设计稿已归档到 `docs/archive/legacy-2026-07/product/agent-platform-db-schema.md`；如需要恢复详细字段说明，应迁移到本文档。
+历史完整数据库设计稿已归档到 `docs/archive/product/db-schema.md`；如需要恢复详细字段说明，应迁移到本文档。
 
 ## 2. 核心表
 
