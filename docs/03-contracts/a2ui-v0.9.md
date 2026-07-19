@@ -87,7 +87,7 @@ Renderer 可通过前端回传：
 - `action.event` 是当前正式格式，Agent 应按该格式生成，Renderer 按该格式解析并派发。
 - Renderer 回传的 action payload 使用 `kind: "event"`，供后端 action handler 稳定分发。
 - `action.functionCall` 只作为未来契约保留，当前 Agent schema 不放行，Renderer 暂不执行。
-- 项目早期代码中存在 `{ "name": "...", "context": {} }` 扁平格式；Renderer 可做历史兼容，但该格式不作为新文档口径，也不应由 Agent 继续生成。
+- 项目早期代码中存在 `{ "name": "...", "context": {} }` 扁平格式；当前 Renderer 不再兼容该格式，Agent 不应生成。
 
 Frontend 负责监听并转发 Renderer action/error，Backend 负责记录，Agent 不直接接收 Renderer 回传。
 

@@ -167,7 +167,7 @@ describe("Basic Catalog 视觉属性", () => {
     });
   });
 
-  it("兼容历史扁平 action 并派发标准消息", async () => {
+  it("不再兼容历史扁平 action", async () => {
     const actions: unknown[] = [];
     const handler = (event: Event) => {
       actions.push((event as CustomEvent<unknown>).detail);
@@ -197,16 +197,7 @@ describe("Basic Catalog 视觉属性", () => {
     container.querySelector("button")?.dispatchEvent(new MouseEvent("click"));
     window.removeEventListener("a2ui:action", handler);
 
-    expect(actions[0]).toMatchObject({
-      version: "v0.9",
-      action: {
-        kind: "event",
-        name: "legacyPlay",
-        context: {
-          trackId: "song-1",
-        },
-      },
-    });
+    expect(actions).toHaveLength(0);
   });
 
   it("当前不执行 action.functionCall", async () => {

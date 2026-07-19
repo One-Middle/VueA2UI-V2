@@ -3,7 +3,6 @@
  *
  * 职责：
  * - 解析当前正式的 action.event 声明
- * - 为历史扁平 action 声明提供兼容
  * - 预留 functionCall 识别接口但不执行
  * - 生成标准 A2UI client-to-server action 消息
  *
@@ -76,14 +75,6 @@ export function resolveComponentAction(
     return call
       ? { kind: "functionCall", call, args: toRecord(functionCall.args) }
       : null;
-  }
-
-  if (typeof action.name === "string" && action.name.trim()) {
-    return {
-      kind: "event",
-      name: action.name.trim(),
-      context: toRecord(action.context),
-    };
   }
 
   return null;

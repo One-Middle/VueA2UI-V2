@@ -18,6 +18,10 @@
 - 更新模块文档，补充关键类、核心对象和关键文件说明。
 - 更新 `docs/README.md`，明确新的文档结构、权威来源规则和维护约定。
 
+### Renderer
+
+- 移除 `Button.action` 旧版扁平 `{ name, context }` 的历史兼容逻辑；Renderer 当前只派发正式 `action.event`，`action.functionCall` 仍只识别不执行。
+
 ## 2026-07-12
 
 ### Agent Runtime
