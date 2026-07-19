@@ -1,5 +1,17 @@
 # 更新日志
 
+## 2026-07-19
+
+### 文档治理
+
+- 将 `docs/` 调整为编号化分层：`00-meta`、`01-product`、`02-architecture`、`03-contracts`、`04-modules`、`05-operations`、`06-planning`、`90-notes`、`99-archive`。
+- 新增 `docs/00-meta/taxonomy.md`、`maintenance.md` 和 `reading-paths.md`，明确文档分类、权威等级、事实归属、冲突规则和阅读路径。
+- 将 `06-planning/` 从单一当前任务清单升级为平台改造计划区；每次较大改造使用独立子目录记录背景、计划、清单、进展、决策和结果。
+- 新增 `docs/90-notes/README.md`，规定 AI/人工阅读笔记默认非权威，并提供笔记元信息模板。
+- 将 Renderer Basic Catalog 当前能力矩阵从历史归档移动到 `docs/04-modules/renderer-basic-catalog-capabilities.md`。
+- 更新模块文档，补充关键类、核心对象和关键文件说明。
+- 更新 `docs/README.md`，明确新的文档结构、权威来源规则和维护约定。
+
 ## 2026-07-12
 
 ### Agent Runtime

@@ -4,7 +4,7 @@
 
 本文档是 HTTP API 与 SSE 事件的唯一权威入口。接口 DTO 类型应优先维护在 `packages/shared/src/api.ts` 与 `packages/shared/src/sse.ts`，后端路由实现必须与本文档保持一致。
 
-历史完整接口稿已归档到 `docs/archive/product/api.md`；如需要补充详细字段，应迁移到本文档，不再直接引用归档文件作为当前契约。
+历史完整接口稿已归档到 `docs/99-archive/product/api.md`；如需要补充详细字段，应迁移到本文档，不再直接引用归档文件作为当前契约。
 
 ## 2. 通用约定
 

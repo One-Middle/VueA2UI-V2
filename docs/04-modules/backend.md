@@ -113,7 +113,19 @@ packages/backend/
 | `src/utils/validation.ts` | Zod 校验辅助。 |
 | `src/scripts/repair-current-snapshots.ts` | 从 committed A2UI events 修复 current snapshot 的维护脚本。 |
 
-## 6. 路由职责
+## 6. 关键类 / 核心对象 / 关键文件
+
+| 名称 | 位置 | 作用 | 为什么重要 |
+| --- | --- | --- | --- |
+| Express App | `src/app.ts` | 注册中间件、错误处理和全部路由。 | 后端 HTTP/SSE 能力的组装入口。 |
+| `AgentRunService` | `src/services/agent-run.service.ts` | 编排 Agent run、提交 assistant message、A2UI events 和 snapshot。 | 串联后端、Agent、A2UI 校验和持久化事务的核心链路。 |
+| `MessageService` | `src/services/message.service.ts` | 保存用户消息并触发 Agent run。 | 用户对话进入后端业务流程的主入口。 |
+| `SnapshotService` | `src/services/snapshot.service.ts` | 从 committed A2UI events 回放并物化 current snapshot。 | 决定历史会话和实时预览能否恢复一致 UI 状态。 |
+| `StreamService` | `src/services/stream.service.ts` | 管理 SSE 客户端并广播 run、message、event、snapshot。 | 负责后端向前端推送实时状态。 |
+| `skillService` | `src/services/skill.service.ts` | 管理 Skill CRUD、会话启用关系和内置 Skill upsert。 | 支撑 Agent Runtime 的可选能力注入。 |
+| Prisma Client | `src/db.ts` | 数据库访问入口。 | 所有 repository 和事务边界的基础设施。 |
+
+## 7. 路由职责
 
 | 文件 | 作用 |
 | --- | --- |
@@ -127,7 +139,7 @@ packages/backend/
 | `routes/export.ts` | 会话、A2UI JSONL 和 snapshot 导出。 |
 | `routes/stream.ts` | 会话级 SSE 连接。 |
 
-## 7. Service 职责
+## 8. Service 职责
 
 | 文件 | 作用 |
 | --- | --- |
@@ -142,7 +154,7 @@ packages/backend/
 | `renderer-event.service.ts` | Renderer action/error 持久化。 |
 | `export.service.ts` | 会话、JSONL 和 snapshot 导出。 |
 
-## 8. 核心流程
+## 9. 核心流程
 
 Agent 成功提交：
 
@@ -153,14 +165,14 @@ Agent 成功提交：
 5. 后端在单个事务内写入 run、assistant message、event、snapshot。
 6. 事务提交后通过 `StreamService` 推送 SSE。
 
-## 9. 依赖契约
+## 10. 依赖契约
 
-- API：[../contracts/api.md](../contracts/api.md)
-- DB：[../contracts/db-schema.md](../contracts/db-schema.md)
-- A2UI：[../contracts/a2ui-v0.9.md](../contracts/a2ui-v0.9.md)
+- API：[../03-contracts/api.md](../03-contracts/api.md)
+- DB：[../03-contracts/db-schema.md](../03-contracts/db-schema.md)
+- A2UI：[../03-contracts/a2ui-v0.9.md](../03-contracts/a2ui-v0.9.md)
 - Agent：[./agent.md](./agent.md)
 
-## 10. 测试与验收
+## 11. 测试与验收
 
 - `pnpm --filter @a2ui-platform/backend typecheck`
 - `pnpm --filter @a2ui-platform/backend test`
@@ -169,15 +181,15 @@ Agent 成功提交：
 - 事务内 snapshot 生成复用同一个 Prisma 事务客户端。
 - SSE 只在事务提交后发送。
 
-## 11. 维护规则
+## 12. 维护规则
 
-- 修改 API 路由时，同步更新 `docs/contracts/api.md`。
-- 修改 Prisma schema 或事务边界时，同步更新 `docs/contracts/db-schema.md`。
-- 修改 Agent 编排时，同步更新 `docs/modules/agent.md` 和 `docs/modules/integration.md`。
+- 修改 API 路由时，同步更新 `docs/03-contracts/api.md`。
+- 修改 Prisma schema 或事务边界时，同步更新 `docs/03-contracts/db-schema.md`。
+- 修改 Agent 编排时，同步更新 `docs/04-modules/agent.md` 和 `docs/04-modules/integration.md`。
 
-## 12. 详细档案索引
+## 13. 详细档案索引
 
-更细的历史设计和实现细节维护在 `docs/archive/backend/`：
+更细的历史设计和实现细节维护在 `docs/99-archive/backend/`：
 
-- [Backend 实施说明](../archive/backend/implementation.md)
-- [Backend 实现细节](../archive/backend/implementation-details.md)
+- [Backend 实施说明](../99-archive/backend/implementation.md)
+- [Backend 实现细节](../99-archive/backend/implementation-details.md)

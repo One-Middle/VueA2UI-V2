@@ -4,11 +4,11 @@
 
 本文档记录 `packages/renderer` 对 A2UI v0.9 Basic Catalog 的当前实际渲染能力，是 Renderer 组件实现状态的权威说明。
 
-本文档只描述 Renderer 已实现的行为，不定义 A2UI 协议合法性。协议字段、校验约束和 Agent 可输出字段以 [A2UI v0.9 契约](../contracts/a2ui-v0.9.md) 为准。
+本文档只描述 Renderer 已实现的行为，不定义 A2UI 协议合法性。协议字段、校验约束和 Agent 可输出字段以 [A2UI v0.9 契约](../03-contracts/a2ui-v0.9.md) 为准。
 
 ## 2. 与其他文档的关系
 
-- [A2UI v0.9 契约](../contracts/a2ui-v0.9.md)：定义消息结构、组件树规则、Basic Catalog 字段合法性和校验约束。
+- [A2UI v0.9 契约](../03-contracts/a2ui-v0.9.md)：定义消息结构、组件树规则、Basic Catalog 字段合法性和校验约束。
 - [Renderer 模块说明](./renderer.md)：定义 Renderer 模块边界、工程结构、核心流程和维护规则。
 - 本文档：定义 Renderer 对 Basic Catalog 字段的实际消费能力、已知缺口和测试验收范围。
 

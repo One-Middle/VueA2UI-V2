@@ -52,27 +52,37 @@ packages/shared/src/
 | `src/logger.ts` | 共享日志类型或辅助工具。 |
 | `src/index.ts` | 统一导出入口。 |
 
-## 6. 依赖契约
+## 6. 关键类型 / 核心对象 / 关键文件
 
-- Shared 类型：[../contracts/shared-types.md](../contracts/shared-types.md)
-- API：[../contracts/api.md](../contracts/api.md)
-- A2UI：[../contracts/a2ui-v0.9.md](../contracts/a2ui-v0.9.md)
+| 名称 | 位置 | 作用 | 为什么重要 |
+| --- | --- | --- | --- |
+| A2UI 类型 | `src/a2ui.ts` | 定义 A2UI message、surface、component 和 Catalog 类型。 | Agent、Backend、Frontend、Renderer 对 A2UI 的共享语言。 |
+| API DTO | `src/api.ts` | 定义 HTTP API 请求和响应类型。 | 前后端接口协作的类型来源。 |
+| Agent 类型 | `src/agent.ts` | 定义 Agent 输入、输出、validation result 和 tool call。 | 隔离 Backend 与 Agent Runtime 的关键契约。 |
+| SSE 类型 | `src/sse.ts` | 定义服务端推送事件。 | 前端实时状态消费和后端事件广播的共同契约。 |
+| 统一导出 | `src/index.ts` | 聚合导出共享类型。 | 业务模块应优先从这里导入跨模块类型。 |
 
-## 7. 测试与验收
+## 7. 依赖契约
+
+- Shared 类型：[../03-contracts/shared-types.md](../03-contracts/shared-types.md)
+- API：[../03-contracts/api.md](../03-contracts/api.md)
+- A2UI：[../03-contracts/a2ui-v0.9.md](../03-contracts/a2ui-v0.9.md)
+
+## 8. 测试与验收
 
 - `pnpm --filter @a2ui-platform/shared typecheck`
 - `pnpm --filter @a2ui-platform/shared test`
 - 所有跨模块 DTO 从 `shared` 导入，不在业务模块重复定义。
 
-## 8. 维护规则
+## 9. 维护规则
 
 - 所有 export 函数、接口、类型定义必须使用中文 JSDoc。
 - 跨模块字段变更先改 `shared`，再改调用方。
-- 修改 API DTO 同步更新 `docs/contracts/api.md`。
-- 修改 A2UI 类型同步更新 `docs/contracts/a2ui-v0.9.md`。
+- 修改 API DTO 同步更新 `docs/03-contracts/api.md`。
+- 修改 A2UI 类型同步更新 `docs/03-contracts/a2ui-v0.9.md`。
 
-## 9. 详细档案索引
+## 10. 详细档案索引
 
-更细的历史类型规格维护在 `docs/archive/shared/`：
+更细的历史类型规格维护在 `docs/99-archive/shared/`：
 
-- [Shared 类型旧规格](../archive/shared/types-spec.md)
+- [Shared 类型旧规格](../99-archive/shared/types-spec.md)

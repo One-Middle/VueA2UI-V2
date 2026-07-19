@@ -6,9 +6,9 @@
 
 历史参考资料已归档：
 
-- `docs/archive/renderer/a2ui-protocol-notes.md`
-- `docs/archive/renderer/a2ui-renderer-v0_9-guide.md`
-- `docs/archive/renderer/basic-catalog-component-optimization.md`
+- `docs/99-archive/renderer/a2ui-protocol-notes.md`
+- `docs/99-archive/renderer/a2ui-renderer-v0_9-guide.md`
+- `docs/99-archive/renderer/basic-catalog-component-optimization.md`
 
 ## 2. 服务端到客户端消息
 
@@ -124,7 +124,7 @@ Frontend 负责监听并转发 Renderer action/error，Backend 负责记录，Ag
 
 - 本节说明 Basic Catalog 的协议层组件集合和字段校验来源。
 - 字段通过校验只表示该字段是合法 A2UI 输入，不等于当前 Renderer 已完整消费该字段。
-- Renderer 对各字段的实际渲染支持程度见 [Renderer Basic Catalog 能力矩阵](../archive/renderer/basic-catalog-capabilities.md)。
+- Renderer 对各字段的实际渲染支持程度见 [Renderer Basic Catalog 能力矩阵](../04-modules/renderer-basic-catalog-capabilities.md)。
 
 组件字段和校验约束由以下文件共同维护：
 

@@ -60,8 +60,8 @@ pnpm --filter @a2ui-platform/agent typecheck
 - 先共享类型，后模块实现；跨模块契约优先放入 `packages/shared`。
 - 后端只提交通过 `validateA2UI` 的 A2UI 消息。
 - Renderer 不接收未通过后端校验的消息作为正式状态。
-- 修改模块功能逻辑时，同步更新 `docs/modules/*.md`。
-- 修改 API、DB、A2UI、shared 类型时，同步更新 `docs/contracts/`。
+- 修改模块功能逻辑时，同步更新 `docs/04-modules/*.md`。
+- 修改 API、DB、A2UI、shared 类型时，同步更新 `docs/03-contracts/`。
 - 设计功能逻辑变更时，同步更新 `docs/CHANGELOG.md`。
 
 ## 5. 不优先修改的目录
@@ -77,8 +77,8 @@ pnpm --filter @a2ui-platform/agent typecheck
 
 ## 6. 模块入口
 
-- Frontend：[modules/frontend.md](./modules/frontend.md)
-- Renderer：[modules/renderer.md](./modules/renderer.md)
-- Backend：[modules/backend.md](./modules/backend.md)
-- Agent：[modules/agent.md](./modules/agent.md)
-- Shared：[modules/shared.md](./modules/shared.md)
+- Frontend：[../04-modules/frontend.md](../04-modules/frontend.md)
+- Renderer：[../04-modules/renderer.md](../04-modules/renderer.md)
+- Backend：[../04-modules/backend.md](../04-modules/backend.md)
+- Agent：[../04-modules/agent.md](../04-modules/agent.md)
+- Shared：[../04-modules/shared.md](../04-modules/shared.md)

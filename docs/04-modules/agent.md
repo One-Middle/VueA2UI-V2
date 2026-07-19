@@ -91,7 +91,19 @@ packages/agent/src/
 | `src/tools/validate-a2ui.ts` | A2UI 校验入口，执行 schema、Catalog、引用和安全约束校验。 |
 | `src/tools/validate-a2ui.test.ts` | A2UI 校验测试。 |
 
-## 5. 公共 API 与模块边界
+## 6. 关键类 / 核心对象 / 关键文件
+
+| 名称 | 位置 | 作用 | 为什么重要 |
+| --- | --- | --- | --- |
+| `createAgentRuntime` | `src/runtime/create-agent-runtime.ts` | 创建 `IAgentRuntime` 实例。 | 后端唯一需要依赖的 Agent Runtime 工厂 API。 |
+| `AgentRuntime` | `src/runtime/agent-runtime.ts` | 协调上下文构建、模型调用、输出解析、校验和修复循环。 | Agent 生成 A2UI 的主状态机。 |
+| `AgentContextBuilder` | `src/context/context-builder.ts` | 汇总用户输入、历史、文件、skills、snapshot 和 Catalog 摘要。 | 决定模型可见上下文的边界。 |
+| `PromptComposer` | `src/prompts/prompt-composer.ts` | 拼装初始 prompt、组件详情 prompt、Skill 详情 prompt 和 repair prompt。 | 控制模型输出格式和修复策略。 |
+| `ModelClient` | `src/model/model-client.ts` | 调用 OpenAI-compatible API。 | Agent 与模型服务之间的隔离层。 |
+| `validateA2UI` | `src/tools/validate-a2ui.ts` | 校验 A2UI schema、Catalog、引用和安全约束。 | 保证后端只提交合法 A2UI 消息的关键工具。 |
+| `BUILTIN_SKILLS` | `src/skills/registry.ts` | 声明内置 Skill 元数据。 | 后端同步内置 Skill 的数据源。 |
+
+## 7. 公共 API 与模块边界
 
 Agent 包通过 `index.ts` 暴露三层公共 API：
 
@@ -113,7 +125,7 @@ Agent 包通过 `index.ts` 暴露三层公共 API：
 
 **接口契约**：`IAgentRuntime`、`AgentRuntimeFactoryConfig` 定义在 `packages/shared/src/agent.ts` 中。任何替代 Agent 实现只需实现 `IAgentRuntime` 接口并提供同签名工厂函数即可替换。
 
-## 6. 核心流程
+## 8. 核心流程
 
 1. `AgentRuntime` 接收后端传入的运行输入。
 2. `ContextBuilder` 构建上下文。
@@ -125,7 +137,7 @@ Agent 包通过 `index.ts` 暴露三层公共 API：
 8. 校验失败时构建 repair prompt，最多重试 3 次。
 9. 成功返回合法 messages，失败返回结构化错误。
 
-## 7. Runtime 状态
+## 9. Runtime 状态
 
 - `PREPARE_CONTEXT`
 - `GENERATE_DRAFT`
@@ -134,7 +146,7 @@ Agent 包通过 `index.ts` 暴露三层公共 API：
 - `COMMIT`
 - `FAILED`
 
-## 7.1 Skill 渐进式披露
+## 10. Skill 渐进式披露
 
 - 初始 Prompt 只包含已启用 Skill 的 `id`、`name` 和 `description` 摘要，不直接注入完整 `content`。
 - 当模型需要完整 Skill 规则时，输出 `skillInfoRequest`，由 Runtime 从本次 `AgentRunInput.enabledSkills` 中按 `id` 优先、`name` 其次精确匹配。
@@ -142,7 +154,7 @@ Agent 包通过 `index.ts` 暴露三层公共 API：
 - Runtime 不访问数据库、不读取本地文件、不执行 Skill 脚本；Skill 内容只来自后端传入的启用 Skill 列表。
 - Skill 内容披露和组件详情披露共用渐进式披露轮次，达到上限后强制输出最终 `{ assistantMessage, a2uiMessages }`。
 
-## 8. 输出契约
+## 11. 输出契约
 
 模型最终必须返回：
 
@@ -155,13 +167,13 @@ Agent 包通过 `index.ts` 暴露三层公共 API：
 
 `a2uiMessages` 非空时必须经过 `validateA2UI`。
 
-## 9. 依赖契约
+## 12. 依赖契约
 
-- A2UI：[../contracts/a2ui-v0.9.md](../contracts/a2ui-v0.9.md)
-- Shared 类型：[../contracts/shared-types.md](../contracts/shared-types.md)
+- A2UI：[../03-contracts/a2ui-v0.9.md](../03-contracts/a2ui-v0.9.md)
+- Shared 类型：[../03-contracts/shared-types.md](../03-contracts/shared-types.md)
 - Backend 提交：[./backend.md](./backend.md)
 
-## 10. 测试与验收
+## 13. 测试与验收
 
 - `pnpm --filter @a2ui-platform/agent typecheck`
 - `pnpm --filter @a2ui-platform/agent test`
@@ -171,17 +183,17 @@ Agent 包通过 `index.ts` 暴露三层公共 API：
 - 失败 3 次后返回 `FAILED`。
 - Agent 不读取任意本地路径。
 
-## 11. 维护规则
+## 14. 维护规则
 
-- 修改 Prompt 或输出契约时，同步更新 `docs/contracts/a2ui-v0.9.md`。
-- 修改 Agent result 类型时，同步更新 `docs/contracts/shared-types.md`。
+- 修改 Prompt 或输出契约时，同步更新 `docs/03-contracts/a2ui-v0.9.md`。
+- 修改 Agent result 类型时，同步更新 `docs/03-contracts/shared-types.md`。
 - 修改校验规则时，同步更新 Renderer 和 Backend 相关说明。
 
-## 12. 详细档案索引
+## 15. 详细档案索引
 
-更细的历史设计和实现细节维护在 `docs/archive/agent/`：
+更细的历史设计和实现细节维护在 `docs/99-archive/agent/`：
 
-- [上下文编排与组成](../archive/agent/context-orchestration.md)
-- [Agent LLM A2UI 生成指南](../archive/agent/agent-llm-a2ui-guide.md)
-- [Runtime 实施说明](../archive/agent/runtime-implementation.md)
-- [Runtime 实现细节](../archive/agent/runtime-implementation-details.md)
+- [上下文编排与组成](../99-archive/agent/context-orchestration.md)
+- [Agent LLM A2UI 生成指南](../99-archive/agent/agent-llm-a2ui-guide.md)
+- [Runtime 实施说明](../99-archive/agent/runtime-implementation.md)
+- [Runtime 实现细节](../99-archive/agent/runtime-implementation-details.md)

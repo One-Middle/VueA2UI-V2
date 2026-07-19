@@ -11,14 +11,15 @@
 开始任务前按需阅读：
 
 - `docs/README.md`：文档入口与权威来源规则。
-- `docs/overview.md`：项目概览和 MVP 边界。
-- `docs/development.md`：开发命令、工程结构和通用约定。
-- `docs/architecture/system-design.md`：系统架构、模块边界和端到端链路。
-- `docs/contracts/`：API、DB、A2UI、shared 类型契约。
-- `docs/modules/`：各模块功能定位、技术栈、代码结构和文件职责。
-- `docs/tasks/current.md`：当前任务清单。
+- `docs/00-meta/`：文档分类、维护规则和阅读路径。
+- `docs/02-architecture/overview.md`：项目概览和 MVP 边界。
+- `docs/05-operations/development.md`：开发命令、工程结构和通用约定。
+- `docs/02-architecture/system-design.md`：系统架构、模块边界和端到端链路。
+- `docs/03-contracts/`：API、DB、A2UI、shared 类型契约。
+- `docs/04-modules/`：各模块功能定位、关键类、核心链路和文件职责。
+- `docs/06-planning/current.md`：当前活跃平台改造计划索引。
 
-`docs/archive/legacy-2026-07/` 仅为历史归档，不作为当前实现契约。
+`docs/90-notes/` 默认保存 AI/人工阅读辅助材料，不作为权威事实来源。`docs/99-archive/` 仅为历史归档，不作为当前实现契约。
 
 ## 3. 项目结构
 
@@ -53,10 +54,11 @@ packages/
 
 ## 5. 文档维护
 
-- 新增或修改产品能力：更新 `docs/product/prd.md`、相关架构/契约/模块文档和 `docs/CHANGELOG.md`。
-- 修改 API、DB、A2UI 或 shared 类型：更新 `docs/contracts/` 对应文档。
-- 修改模块功能逻辑或代码结构：更新 `docs/modules/` 对应文档。
-- 当前任务状态只维护在 `docs/tasks/current.md`，不要重新创建分散的模块任务清单。
+- 新增或修改产品能力：更新 `docs/01-product/prd.md`、相关架构/契约/模块文档和 `docs/CHANGELOG.md`。
+- 修改 API、DB、A2UI 或 shared 类型：更新 `docs/03-contracts/` 对应文档。
+- 修改模块功能逻辑或代码结构：更新 `docs/04-modules/` 对应文档，并维护关键类或核心链路说明。
+- 较大的平台改造：在 `docs/06-planning/` 下创建独立计划目录，`current.md` 只维护活跃计划索引。
+- AI 生成的阅读辅助材料默认放入 `docs/90-notes/`，不要直接作为权威契约。
 
 ## 6. 命令约定
 
@@ -76,9 +78,9 @@ pnpm lint
 
 - 使用 TypeScript。
 - 优先复用 `packages/shared` 类型。
-- API 请求/响应遵守 `docs/contracts/api.md`。
-- Prisma schema 遵守 `docs/contracts/db-schema.md`。
-- A2UI 协议遵守 `docs/contracts/a2ui-v0.9.md`。
+- API 请求/响应遵守 `docs/03-contracts/api.md`。
+- Prisma schema 遵守 `docs/03-contracts/db-schema.md`。
+- A2UI 协议遵守 `docs/03-contracts/a2ui-v0.9.md`。
 - API DTO 校验使用 Zod。
 - A2UI JSON Schema 校验使用 Ajv。
 - 后端日志使用 pino，避免散落 `console.log`。

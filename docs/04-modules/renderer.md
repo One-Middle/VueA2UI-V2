@@ -104,7 +104,20 @@ packages/renderer/src/
 | `src/components/basic/*.vue` | 各 Basic Catalog 组件实现。 |
 | `src/components/basic/visual-props.ts` | Basic 组件通用受控视觉属性解析。 |
 
-## 6. Basic 组件职责
+## 6. 关键类 / 核心对象 / 关键文件
+
+| 名称 | 位置 | 作用 | 为什么重要 |
+| --- | --- | --- | --- |
+| `MessageProcessor` | `src/core/message-processor.ts` | 按 A2UI 消息类型更新 surface group。 | Renderer 消费协议消息的入口。 |
+| `SurfaceGroupModel` | `src/core/surface-model.ts` | 管理多个 surface、组件集合和 data model。 | Renderer 顶层运行时状态容器。 |
+| `SurfaceModel` | `src/core/surface-model.ts` | 管理单个 surface 的 root、组件和数据。 | 单个 UI surface 的核心状态模型。 |
+| `ComponentModel` | `src/core/component-model.ts` | 保存组件类型、props、children 引用等。 | 组件树渲染和更新的基础数据结构。 |
+| `DataModel` | `src/core/data-model.ts` | 处理 JSON Pointer 数据读写与订阅。 | 支撑数据绑定和动态 UI 更新。 |
+| `ComponentContext` | `src/core/component-context.ts` | 封装 action/error 派发和动态上下文。 | Basic 组件与宿主前端交互的边界。 |
+| `A2uiComponent` | `src/vue/A2uiComponent.vue` | 递归渲染组件模型。 | 组件树从模型到 Vue 视图的核心入口。 |
+| `catalog-registry` | `src/catalog-registry.ts` | 注册 Basic Catalog 类型与 Vue 组件映射。 | 新增或调整 Basic 组件时必须同步维护。 |
+
+## 7. Basic 组件职责
 
 | 组件文件 | 作用 |
 | --- | --- |
@@ -127,7 +140,7 @@ packages/renderer/src/
 | `DateTimeInputComponent.vue` | 日期时间输入。 |
 | `DividerComponent.vue` | 分隔线。 |
 
-## 7. 核心流程
+## 8. 核心流程
 
 消息处理：
 
@@ -146,18 +159,18 @@ packages/renderer/src/
 
 Action 格式说明：
 
-- A2UI 契约目标以官网式 `Button.action.event` 为准，详见 [A2UI v0.9 契约](../contracts/a2ui-v0.9.md)。
+- A2UI 契约目标以官网式 `Button.action.event` 为准，详见 [A2UI v0.9 契约](../03-contracts/a2ui-v0.9.md)。
 - `action.functionCall` 已纳入契约作为未来能力，但当前 Renderer 暂不执行。
-- Renderer 当前 action 字段消费状态以 [Renderer Basic Catalog 能力矩阵](../archive/renderer/basic-catalog-capabilities.md) 为准；旧版扁平 `{ name, context }` 实现属于待迁移差异。
+- Renderer 当前 action 字段消费状态以 [Renderer Basic Catalog 能力矩阵](./renderer-basic-catalog-capabilities.md) 为准；旧版扁平 `{ name, context }` 实现属于待迁移差异。
 
-## 8. 依赖契约
+## 9. 依赖契约
 
-- A2UI：[../contracts/a2ui-v0.9.md](../contracts/a2ui-v0.9.md)
-- Shared 类型：[../contracts/shared-types.md](../contracts/shared-types.md)
+- A2UI：[../03-contracts/a2ui-v0.9.md](../03-contracts/a2ui-v0.9.md)
+- Shared 类型：[../03-contracts/shared-types.md](../03-contracts/shared-types.md)
 - 集成说明：[./integration.md](./integration.md)
-- Renderer Basic Catalog 能力矩阵：[../archive/renderer/basic-catalog-capabilities.md](../archive/renderer/basic-catalog-capabilities.md)
+- Renderer Basic Catalog 能力矩阵：[./renderer-basic-catalog-capabilities.md](./renderer-basic-catalog-capabilities.md)
 
-## 9. 测试与验收
+## 10. 测试与验收
 
 - `pnpm --filter @a2ui-platform/renderer typecheck`
 - `pnpm --filter @a2ui-platform/renderer test`
@@ -165,24 +178,23 @@ Action 格式说明：
 - unknown component、missing child、绑定错误有可见 fallback 或 error。
 - Renderer 状态不进入 Pinia。
 
-## 10. 维护规则
+## 11. 维护规则
 
-- 新增 Basic 组件时，同步更新 `catalog-registry.ts`、Agent schema、shared 类型和 `docs/contracts/a2ui-v0.9.md`。
+- 新增 Basic 组件时，同步更新 `catalog-registry.ts`、Agent schema、shared 类型和 `docs/03-contracts/a2ui-v0.9.md`。
 - 修改消息处理逻辑时，同步更新 A2UI 契约和集成说明。
 
-## 11. Basic Catalog 能力说明
+## 12. Basic Catalog 能力说明
 
-Renderer 对 Basic Catalog 字段的实际消费状态维护在 [Renderer Basic Catalog 能力矩阵](../archive/renderer/basic-catalog-capabilities.md)。
+Renderer 对 Basic Catalog 字段的实际消费状态维护在 [Renderer Basic Catalog 能力矩阵](./renderer-basic-catalog-capabilities.md)。
 
 本文档只维护模块定位、工程结构、核心流程和维护规则，不重复列出每个组件的字段能力，避免与能力矩阵产生冲突。
 
-## 12. 详细档案索引
+## 13. 详细档案索引
 
-更细的历史设计、协议说明和能力矩阵维护在 `docs/archive/renderer/`：
+更细的历史设计和协议说明维护在 `docs/99-archive/renderer/`：
 
-- [Renderer 实施说明](../archive/renderer/implementation.md)
-- [Renderer 实现细节](../archive/renderer/implementation-details.md)
-- [A2UI Renderer v0.9 指南](../archive/renderer/a2ui-renderer-v0_9-guide.md)
-- [A2UI 协议认识](../archive/renderer/a2ui-protocol-notes.md)
-- [Basic Catalog 组件优化](../archive/renderer/basic-catalog-component-optimization.md)
-- [Basic Catalog 能力矩阵](../archive/renderer/basic-catalog-capabilities.md)
+- [Renderer 实施说明](../99-archive/renderer/implementation.md)
+- [Renderer 实现细节](../99-archive/renderer/implementation-details.md)
+- [A2UI Renderer v0.9 指南](../99-archive/renderer/a2ui-renderer-v0_9-guide.md)
+- [A2UI 协议认识](../99-archive/renderer/a2ui-protocol-notes.md)
+- [Basic Catalog 组件优化](../99-archive/renderer/basic-catalog-component-optimization.md)

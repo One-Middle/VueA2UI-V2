@@ -57,7 +57,7 @@
 
 ## 6. 相关文档
 
-- 产品需求：[product/prd.md](./product/prd.md)
-- 系统设计：[architecture/system-design.md](./architecture/system-design.md)
-- 开发说明：[development.md](./development.md)
-- 当前任务：[tasks/current.md](./tasks/current.md)
+- 产品需求：[../01-product/prd.md](../01-product/prd.md)
+- 系统设计：[./system-design.md](./system-design.md)
+- 开发说明：[../05-operations/development.md](../05-operations/development.md)
+- 当前活跃计划：[../06-planning/current.md](../06-planning/current.md)

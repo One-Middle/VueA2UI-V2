@@ -64,9 +64,9 @@ Frontend MessageInput
 - Renderer：[./renderer.md](./renderer.md)
 - Backend：[./backend.md](./backend.md)
 - Agent：[./agent.md](./agent.md)
-- API：[../contracts/api.md](../contracts/api.md)
-- A2UI：[../contracts/a2ui-v0.9.md](../contracts/a2ui-v0.9.md)
-- DB：[../contracts/db-schema.md](../contracts/db-schema.md)
+- API：[../03-contracts/api.md](../03-contracts/api.md)
+- A2UI：[../03-contracts/a2ui-v0.9.md](../03-contracts/a2ui-v0.9.md)
+- DB：[../03-contracts/db-schema.md](../03-contracts/db-schema.md)
 
 ## 6. 验收场景
 
@@ -80,6 +80,6 @@ Frontend MessageInput
 
 ## 7. 详细档案索引
 
-更细的历史集成说明维护在 `docs/archive/integration/`：
+更细的历史集成说明维护在 `docs/99-archive/integration/`：
 
-- [集成实现细节](../archive/integration/implementation-details.md)
+- [集成实现细节](../99-archive/integration/implementation-details.md)

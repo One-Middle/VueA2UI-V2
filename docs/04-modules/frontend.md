@@ -102,7 +102,19 @@ packages/frontend/src/
 | `src/features/import-export/ImportExportPanel.vue` | 会话、A2UI JSONL 和 snapshot 导出入口。 |
 | `src/features/runtime/RuntimePanel.vue` | Runtime 配置、Agent runs 和 tool calls 展示。 |
 
-## 6. 核心流程
+## 6. 关键类 / 核心对象 / 关键文件
+
+| 名称 | 位置 | 作用 | 为什么重要 |
+| --- | --- | --- | --- |
+| `WorkspacePage` | `src/views/WorkspacePage.vue` | 组织工作台导航、顶部状态和各功能面板。 | 前端用户体验的页面骨架。 |
+| `workspace` store | `src/stores/workspace.ts` | 管理会话、消息、文件、skills、runtime、导出和异步请求。 | 平台工作台业务状态中心。 |
+| `renderer` store | `src/stores/renderer.ts` | 管理传给 Renderer 的消息、快照替换和会话重置。 | 隔离前端会话状态与 Renderer 输入状态。 |
+| API Client | `src/services/api.ts` | 封装后端 HTTP API 调用。 | 前后端契约落地位置。 |
+| Stream Client | `src/services/stream.ts` | 管理 SSE 连接、重连和事件分发。 | 决定实时消息、A2UI events 和 snapshot 能否及时进入 UI。 |
+| `PreviewPanel` | `src/features/preview/PreviewPanel.vue` | 创建 Renderer surface group 并展示当前 surface。 | 前端与 `packages/renderer` 的主要集成点。 |
+| `SkillsPanel` | `src/features/skills/SkillsPanel.vue` | Skill 创建、查看、编辑和会话启用控制。 | 支撑 Agent 能力管理和渐进式 Skill 注入。 |
+
+## 7. 核心流程
 
 发送消息：
 
@@ -120,14 +132,14 @@ packages/frontend/src/
 3. 前端生成会话修订号，拦截旧响应和旧 SSE。
 4. `renderer` store 以快照全量替换模式重建 Renderer 状态。
 
-## 7. 依赖契约
+## 8. 依赖契约
 
-- API：[../contracts/api.md](../contracts/api.md)
-- A2UI：[../contracts/a2ui-v0.9.md](../contracts/a2ui-v0.9.md)
-- Shared 类型：[../contracts/shared-types.md](../contracts/shared-types.md)
-- 系统边界：[../architecture/system-design.md](../architecture/system-design.md)
+- API：[../03-contracts/api.md](../03-contracts/api.md)
+- A2UI：[../03-contracts/a2ui-v0.9.md](../03-contracts/a2ui-v0.9.md)
+- Shared 类型：[../03-contracts/shared-types.md](../03-contracts/shared-types.md)
+- 系统边界：[../02-architecture/system-design.md](../02-architecture/system-design.md)
 
-## 8. 测试与验收
+## 9. 测试与验收
 
 - `pnpm --filter @a2ui-platform/frontend typecheck`
 - `pnpm --filter @a2ui-platform/frontend test`
@@ -135,15 +147,15 @@ packages/frontend/src/
 - 历史 snapshot 可恢复 Renderer 预览。
 - Agent run 失败时不更新 Renderer 正式状态。
 
-## 9. 维护规则
+## 10. 维护规则
 
 - 修改页面结构、工作台状态或 SSE 消费逻辑时，同步更新本文档。
-- 修改 HTTP/SSE 调用时，同步更新 `docs/contracts/api.md`。
-- 修改 Renderer 输入模型时，同步更新 `docs/modules/renderer.md`。
+- 修改 HTTP/SSE 调用时，同步更新 `docs/03-contracts/api.md`。
+- 修改 Renderer 输入模型时，同步更新 `docs/04-modules/renderer.md`。
 
-## 10. 详细档案索引
+## 11. 详细档案索引
 
-更细的历史设计和实现细节维护在 `docs/archive/frontend/`：
+更细的历史设计和实现细节维护在 `docs/99-archive/frontend/`：
 
-- [Frontend 实施说明](../archive/frontend/implementation.md)
-- [Frontend 实现细节](../archive/frontend/implementation-details.md)
+- [Frontend 实施说明](../99-archive/frontend/implementation.md)
+- [Frontend 实现细节](../99-archive/frontend/implementation-details.md)
