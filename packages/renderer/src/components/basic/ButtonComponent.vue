@@ -4,6 +4,10 @@
  */
 import { computed, inject } from "vue";
 import { type ComponentContext, componentContextKey } from "../../vue/context";
+import {
+  resolveActionContext,
+  resolveComponentAction,
+} from "../../core/action";
 import A2uiComponent from "../../vue/A2uiComponent.vue";
 import {
   resolveBooleanProp,
@@ -21,27 +25,10 @@ const childComponentId = computed(() => {
   return ctx.resolveValue(raw) as string | undefined;
 });
 
-/** action 名称 */
-const actionName = computed(() => {
+/** action 声明 */
+const componentAction = computed(() => {
   const raw = ctx.componentModel.getProperty("action");
-  const resolved = ctx.resolveValue(raw);
-  if (resolved && typeof resolved === "object" && "name" in resolved) {
-    return String((resolved as { name?: unknown }).name ?? "");
-  }
-  return String(resolved ?? "");
-});
-
-/** action 上下文 */
-const actionContext = computed(() => {
-  const raw = ctx.componentModel.getProperty("action");
-  const resolved = ctx.resolveValue(raw);
-  if (!resolved || typeof resolved !== "object" || !("context" in resolved)) {
-    return {};
-  }
-  const value = (resolved as { context?: unknown }).context;
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : {};
+  return resolveComponentAction(raw, ctx.resolveValue);
 });
 
 const isDisabled = computed(() => resolveBooleanProp(ctx, "disabled"));
@@ -66,11 +53,12 @@ function handleClick(): void {
   if (isDisabled.value || isLoading.value) {
     return;
   }
-  const context: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(actionContext.value)) {
-    context[key] = ctx.resolveValue(value);
+  const action = componentAction.value;
+  if (!action || action.kind !== "event") {
+    return;
   }
-  ctx.dispatchAction(actionName.value as string, context);
+  const context = resolveActionContext(action.context, ctx.resolveValue);
+  ctx.dispatchAction(action.name, context);
 }
 </script>
 

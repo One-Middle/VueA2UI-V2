@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { A2uiSurface, MessageProcessor, SurfaceGroupModel, registerBasicCatalog } from "@a2ui-platform/renderer";
-import type { A2UIComponent, JsonValue } from "@a2ui-platform/shared";
+import type { A2UIClientMessage, A2UIComponent, JsonValue } from "@a2ui-platform/shared";
 import { NAlert, NEmpty, NInput, NSpin, NTag } from "naive-ui";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import * as api from "../../services/api";
 import { useRendererStore } from "../../stores/renderer";
 import { useWorkspaceStore } from "../../stores/workspace";
 
@@ -70,9 +71,15 @@ watch(activeSurfaceId, () => {
 watch(componentJson, () => scheduleApplyEditors("components"));
 watch(dataModelJson, () => scheduleApplyEditors("dataModel"));
 
-onMounted(processRendererMessages);
+onMounted(() => {
+  processRendererMessages();
+  window.addEventListener("a2ui:action", handleRendererAction);
+  window.addEventListener("a2ui:error", handleRendererError);
+});
 
 onBeforeUnmount(() => {
+  window.removeEventListener("a2ui:action", handleRendererAction);
+  window.removeEventListener("a2ui:error", handleRendererError);
   unsubscribeDataModel?.();
   Object.values(applyTimers).forEach((timer) => {
     if (timer) clearTimeout(timer);
@@ -178,6 +185,36 @@ function assertPlainObject(value: unknown): Record<string, unknown> {
 
 function stringifyJson(value: unknown): string {
   return JSON.stringify(value, null, 2);
+}
+
+function handleRendererAction(event: Event): void {
+  const sessionId = workspace.activeSessionId;
+  const payload = (event as CustomEvent<unknown>).detail;
+  if (!sessionId || !isA2UIActionMessage(payload)) {
+    return;
+  }
+  void api.recordAction(sessionId, payload);
+}
+
+function handleRendererError(event: Event): void {
+  const sessionId = workspace.activeSessionId;
+  const payload = (event as CustomEvent<unknown>).detail;
+  if (!sessionId || !isA2UIErrorMessage(payload)) {
+    return;
+  }
+  void api.recordError(sessionId, payload);
+}
+
+function isA2UIActionMessage(value: unknown): value is A2UIClientMessage {
+  return isPlainObject(value) && value.version === "v0.9" && isPlainObject(value.action);
+}
+
+function isA2UIErrorMessage(value: unknown): value is A2UIClientMessage {
+  return isPlainObject(value) && value.version === "v0.9" && isPlainObject(value.error);
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 </script>
 

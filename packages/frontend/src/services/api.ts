@@ -8,6 +8,7 @@
 import type {
   AgentRunDetailResponse,
   AgentRunDto,
+  A2UIClientMessage,
   A2UIEventDto,
   CreateSessionRequest,
   CreateSkillRequest,
@@ -310,12 +311,12 @@ export function getCurrentSnapshot(sessionId: string): Promise<{ snapshot: Surfa
 // ─── Renderer 回传 ─────────────────────────────────────────
 
 /** 提交 Renderer action */
-export function recordAction(sessionId: string, action: Record<string, unknown>): Promise<{ rendererEvent: RendererEventDto }> {
+export function recordAction(sessionId: string, action: A2UIClientMessage): Promise<{ rendererEvent: RendererEventDto }> {
   return request("POST", `/sessions/${sessionId}/renderer/action`, action);
 }
 
 /** 提交 Renderer error */
-export function recordError(sessionId: string, error: Record<string, unknown>): Promise<{ rendererEvent: RendererEventDto }> {
+export function recordError(sessionId: string, error: A2UIClientMessage): Promise<{ rendererEvent: RendererEventDto }> {
   return request("POST", `/sessions/${sessionId}/renderer/error`, error);
 }
 

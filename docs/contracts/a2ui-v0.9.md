@@ -36,7 +36,7 @@ Renderer 可通过前端回传：
 
 ### 3.1 Button action 契约决策
 
-`Button.action` 的目标契约按 A2UI 官网式结构整理，不采用项目早期实现中的扁平结构：
+`Button.action` 的当前正式契约按 A2UI 官网式结构整理，不采用项目早期实现中的扁平结构：
 
 ```json
 {
@@ -58,6 +58,7 @@ Renderer 可通过前端回传：
   "version": "v0.9",
   "action": {
     "name": "submit",
+    "kind": "event",
     "surfaceId": "main",
     "sourceComponentId": "submitButton",
     "timestamp": "2026-07-12T00:00:00.000Z",
@@ -66,7 +67,7 @@ Renderer 可通过前端回传：
 }
 ```
 
-`action.functionCall` 进入 A2UI 契约作为未来能力：
+`action.functionCall` 作为未来能力保留在协议讨论和 shared 类型中，但不属于当前可生成、可校验、可执行的正式输入。当前 Agent schema 不放行该字段，Renderer 也不执行该字段：
 
 ```json
 {
@@ -83,9 +84,10 @@ Renderer 可通过前端回传：
 
 当前实现状态：
 
-- `action.event` 是后续代码需要对齐的正式格式。
-- `action.functionCall` 只作为未来契约保留，当前 Renderer 暂不执行，Agent 当前也不应主动生成。
-- 项目早期代码中存在 `{ "name": "...", "context": {} }` 扁平格式；这是待迁移的历史实现差异，不作为新文档口径。
+- `action.event` 是当前正式格式，Agent 应按该格式生成，Renderer 按该格式解析并派发。
+- Renderer 回传的 action payload 使用 `kind: "event"`，供后端 action handler 稳定分发。
+- `action.functionCall` 只作为未来契约保留，当前 Agent schema 不放行，Renderer 暂不执行。
+- 项目早期代码中存在 `{ "name": "...", "context": {} }` 扁平格式；Renderer 可做历史兼容，但该格式不作为新文档口径，也不应由 Agent 继续生成。
 
 Frontend 负责监听并转发 Renderer action/error，Backend 负责记录，Agent 不直接接收 Renderer 回传。
 

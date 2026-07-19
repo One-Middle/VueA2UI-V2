@@ -6,6 +6,7 @@
  */
 
 import type { InjectionKey } from "vue";
+import type { JsonObject } from "@a2ui-platform/shared";
 import type { ComponentModel } from "../core/component-model";
 import type { DataContext } from "../core/data-context";
 
@@ -20,7 +21,7 @@ export interface ComponentContext {
   /** 解析属性值（自动处理 { path } 动态引用） */
   resolveValue(raw: unknown): unknown;
   /** 派发 action（组件点击等） */
-  dispatchAction(name: string, context?: Record<string, unknown>): void;
+  dispatchAction(name: string, context: JsonObject): void;
   /** 为指定路径创建一个 setter 函数（用于双向绑定） */
   createSetter(path: string): (value: unknown) => void;
 }
@@ -33,5 +34,5 @@ export type ActionDispatcher = (
   surfaceId: string,
   sourceComponentId: string,
   name: string,
-  context: Record<string, unknown>
+  context: JsonObject
 ) => void;

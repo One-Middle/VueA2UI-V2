@@ -6,8 +6,10 @@
  * Vue 组件并渲染。通过 provide 向下传递 ComponentContext。
  */
 import { computed, inject, provide } from "vue";
+import type { JsonObject } from "@a2ui-platform/shared";
 import type { SurfaceGroupModel } from "../core/surface-model";
 import { DataContext } from "../core/data-context";
+import { createActionMessage } from "../core/action";
 import { catalogRegistry } from "../catalog-registry";
 import { type ComponentContext, componentContextKey } from "./context";
 
@@ -52,14 +54,13 @@ const componentContext = computed<ComponentContext | null>(() => {
     resolveValue(raw: unknown): unknown {
       return dataCtx.resolve(raw);
     },
-    dispatchAction(name: string, context?: Record<string, unknown>): void {
-      const detail = {
+    dispatchAction(name: string, context: JsonObject): void {
+      const detail = createActionMessage({
         name,
         surfaceId: props.surfaceId,
         sourceComponentId: props.componentId,
-        timestamp: new Date().toISOString(),
-        context: context ?? {},
-      };
+        context,
+      });
       window.dispatchEvent(new CustomEvent("a2ui:action", { detail }));
     },
     createSetter(path: string): (value: unknown) => void {
@@ -84,7 +85,7 @@ const contextProxy: ComponentContext = {
   resolveValue(raw: unknown): unknown {
     return requireComponentContext().resolveValue(raw);
   },
-  dispatchAction(name: string, context?: Record<string, unknown>): void {
+  dispatchAction(name: string, context: JsonObject): void {
     requireComponentContext().dispatchAction(name, context);
   },
   createSetter(path: string): (value: unknown) => void {
