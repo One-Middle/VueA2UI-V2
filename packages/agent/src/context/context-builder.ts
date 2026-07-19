@@ -1,4 +1,5 @@
 import type { AgentRunInput } from "@a2ui-platform/shared";
+import { A2UI_GENERATION_SKILL } from "../skills/a2ui-v0.9-generation.js";
 
 /** Agent Runtime 可用的 Skill 数据。 */
 export type AgentContextSkill = AgentRunInput["enabledSkills"][number];
@@ -37,12 +38,14 @@ export class AgentContextBuilder {
    * 根据 AgentRunInput 构建完整的 AgentContext。
    */
   buildContext(input: AgentRunInput): AgentContext {
+    const enabledSkills = this.mergeBuiltinSkills(input.enabledSkills);
+
     return {
       userMessage: input.userMessage,
       recentMessages: this.buildRecentMessages(input.recentMessages),
       uploadedFiles: this.buildUploadedFiles(input.uploadedFiles),
-      enabledSkills: this.buildEnabledSkills(input.enabledSkills),
-      enabledSkillList: input.enabledSkills,
+      enabledSkills: this.buildEnabledSkills(enabledSkills),
+      enabledSkillList: enabledSkills,
       currentSnapshotSummary: this.buildSnapshotSummary(input.currentSnapshot),
       catalogSummary: this.buildCatalogSummary(input.catalogId),
     };
@@ -121,6 +124,23 @@ export class AgentContextBuilder {
     }
 
     return parts.join("\n");
+  }
+
+  /**
+   * 合并运行时始终可用的基础 Skill，并避免与后端传入的同 id/name Skill 重复。
+   */
+  private mergeBuiltinSkills(skills: AgentContextSkill[]): AgentContextSkill[] {
+    const hasA2uiGenerationSkill = skills.some(
+      (skill) =>
+        skill.id === A2UI_GENERATION_SKILL.id ||
+        skill.name === A2UI_GENERATION_SKILL.name,
+    );
+
+    if (hasA2uiGenerationSkill) {
+      return skills;
+    }
+
+    return [A2UI_GENERATION_SKILL, ...skills];
   }
 
   /**

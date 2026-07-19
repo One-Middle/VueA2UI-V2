@@ -25,6 +25,13 @@ export interface BuiltinSkillMeta {
  */
 export const BUILTIN_SKILLS: BuiltinSkillMeta[] = [
   {
+    name: "A2UI v0.9 组件消息生成",
+    file: "a2ui-v0.9-generation.md",
+    description:
+      "用于生成、修改或修复合法 A2UI v0.9 server-to-client 组件消息；当用户要求创建或修改 UI 时必须使用。",
+    version: 1,
+  },
+  {
     name: "Hello World",
     file: "hello-world.md",
     description: "一个简单的示例 Skill，用于生成欢迎页或入门介绍页面。",

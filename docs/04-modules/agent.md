@@ -49,8 +49,12 @@ packages/agent/src/
   model/
     model-client.ts
   prompts/
-    a2ui-protocol-guide.ts
     prompt-composer.ts
+  skills/
+    a2ui-v0.9-generation.md
+    a2ui-v0.9-generation.ts
+    hello-world.md
+    registry.ts
   runtime/
     agent-runtime.ts
     create-agent-runtime.ts
@@ -76,8 +80,9 @@ packages/agent/src/
 | `src/logger.ts` | Agent 日志辅助。 |
 | `src/context/context-builder.ts` | 构建 Agent 上下文，汇总用户输入、历史消息、文件、skills、snapshot 和 Catalog 摘要。 |
 | `src/model/model-client.ts` | OpenAI-compatible API 客户端，负责模型请求与错误处理。 |
-| `src/prompts/prompt-composer.ts` | 拼装 system prompt、user prompt、组件详情 prompt 和 repair prompt。 |
-| `src/prompts/a2ui-protocol-guide.ts` | A2UI 协议教学内容，包括输出 envelope、消息顺序、组件规则、常见错误和示例。 |
+| `src/prompts/prompt-composer.ts` | 拼装 system prompt、user prompt 和 repair prompt；只注入 Agent 身份、工作流、输出通道、安全边界和按需披露内容。 |
+| `src/skills/a2ui-v0.9-generation.md` | A2UI v0.9 组件消息生成 Skill 内容，供内置 Skill 同步和前端展示。 |
+| `src/skills/a2ui-v0.9-generation.ts` | A2UI v0.9 组件消息生成 Skill 的运行时内建定义，保证 Agent 不依赖会话启用即可请求该基础能力。 |
 | `src/runtime/agent-runtime.ts` | Runtime 主状态机，实现 `IAgentRuntime` 接口，协调上下文、模型调用、解析、校验、组件信息披露和修复循环。 |
 | `src/runtime/create-agent-runtime.ts` | **工厂函数（唯一对外暴露的运行时 API）**，封装 ModelClient、PromptComposer、AgentContextBuilder 的创建与组装。 |
 | `src/runtime/output-parser.ts` | 解析模型输出中的 JSON envelope。 |
@@ -128,14 +133,15 @@ Agent 包通过 `index.ts` 暴露三层公共 API：
 ## 8. 核心流程
 
 1. `AgentRuntime` 接收后端传入的运行输入。
-2. `ContextBuilder` 构建上下文。
-3. `PromptComposer` 生成初始 prompt。
+2. `ContextBuilder` 构建上下文，并合并始终可用的 `builtin:a2ui-v0.9-generation` 基础 Skill。
+3. `PromptComposer` 生成初始 prompt，说明 Agent 身份、工作流和输出通道，不直接注入完整 A2UI 协议生成指南。
 4. `ModelClient` 调用模型。
-5. `OutputParser` 解析 `{ assistantMessage, a2uiMessages }`。
+5. 如果模型请求 Skill 内容，Runtime 通过 `getSkillContent` 披露完整 Markdown 内容并继续生成。
 6. 如果模型请求组件详情，Runtime 通过 `catalog-schema.ts` 获取详情并继续生成。
-7. 如果返回 A2UI messages，调用 `validateA2UI`。
-8. 校验失败时构建 repair prompt，最多重试 3 次。
-9. 成功返回合法 messages，失败返回结构化错误。
+7. `OutputParser` 解析最终 `{ assistantMessage, a2uiMessages }`。
+8. 如果返回 A2UI messages，调用 `validateA2UI`。
+9. 校验失败时构建 repair prompt，最多重试 3 次。
+10. 成功返回合法 messages，失败返回结构化错误。
 
 ## 9. Runtime 状态
 
@@ -151,7 +157,8 @@ Agent 包通过 `index.ts` 暴露三层公共 API：
 - 初始 Prompt 只包含已启用 Skill 的 `id`、`name` 和 `description` 摘要，不直接注入完整 `content`。
 - 当模型需要完整 Skill 规则时，输出 `skillInfoRequest`，由 Runtime 从本次 `AgentRunInput.enabledSkills` 中按 `id` 优先、`name` 其次精确匹配。
 - Runtime 通过 `getSkillContent` 工具调用记录披露结果，并把匹配到的 Markdown 内容注入下一轮 Prompt。
-- Runtime 不访问数据库、不读取本地文件、不执行 Skill 脚本；Skill 内容只来自后端传入的启用 Skill 列表。
+- A2UI 生成能力通过 `builtin:a2ui-v0.9-generation` 基础 Skill 提供；该 Skill 由 Runtime 始终内建注入，即使后端未为 session 启用任何 Skill 也可请求。
+- Runtime 不访问数据库、不读取本地文件、不执行 Skill 脚本；Skill 内容来自后端传入的启用 Skill 列表和 Runtime 内建基础 Skill。
 - Skill 内容披露和组件详情披露共用渐进式披露轮次，达到上限后强制输出最终 `{ assistantMessage, a2uiMessages }`。
 
 ## 11. 输出契约
@@ -166,6 +173,8 @@ Agent 包通过 `index.ts` 暴露三层公共 API：
 ```
 
 `a2uiMessages` 非空时必须经过 `validateA2UI`。
+
+最终 `assistantMessage` 应先简要复述 Agent 对用户需求的理解，再说明生成或修改结果，对应工作流中的“向用户确认自己的理解”。
 
 ## 12. 依赖契约
 

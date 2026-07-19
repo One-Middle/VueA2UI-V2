@@ -57,14 +57,19 @@ class FakeModelClient {
 }
 
 describe("Agent 渐进式组件披露", () => {
-  it("初始 Prompt 只包含组件摘要和请求格式，不包含旧的完整字段速查表", () => {
+  it("初始 Prompt 包含工作流和组件摘要，不直接注入旧协议指南", () => {
     const composer = new PromptComposer();
     const context = new AgentContextBuilder().buildContext(createInput());
 
     const { systemPrompt } = composer.composeInitial(context);
 
+    expect(systemPrompt).toContain(
+      "理解用户需求 -> 向用户确认自己的理解 -> 开始生成 -> 校验 -> 提交",
+    );
     expect(systemPrompt).toContain("componentInfoRequest");
     expect(systemPrompt).toContain("- Text:");
+    expect(systemPrompt).not.toContain("## A2UI v0.9 协议生成指南");
+    expect(systemPrompt).not.toContain("### 5. 消息类型");
     expect(systemPrompt).not.toContain('- Text: { "id": "..."');
     expect(systemPrompt).not.toContain('- Button: { "id": "..."');
   });
@@ -80,6 +85,19 @@ describe("Agent 渐进式组件披露", () => {
     expect(systemPrompt).toContain("### Column");
     expect(systemPrompt).toContain("children");
     expect(systemPrompt).not.toContain("### Button\n字段");
+  });
+
+  it("后端未传入 Skill 时，初始 Prompt 仍包含 A2UI 基础 Skill 摘要但不包含完整内容", () => {
+    const composer = new PromptComposer();
+    const context = new AgentContextBuilder().buildContext(createInput());
+
+    const { userPrompt } = composer.composeInitial(context);
+
+    expect(userPrompt).toContain("builtin:a2ui-v0.9-generation");
+    expect(userPrompt).toContain("A2UI v0.9 组件消息生成");
+    expect(userPrompt).toContain("当用户要求创建或修改 UI 时必须使用");
+    expect(userPrompt).not.toContain("## 4. 消息类型");
+    expect(userPrompt).not.toContain("生成新 UI 时必须先 createSurface");
   });
 
   it("初始 Prompt 只包含 Skill 摘要，不包含完整内容", () => {
@@ -100,6 +118,7 @@ describe("Agent 渐进式组件披露", () => {
     expect(userPrompt).toContain("skill-1");
     expect(userPrompt).toContain("课程表规范");
     expect(userPrompt).toContain("生成课程表时使用");
+    expect(userPrompt).toContain("builtin:a2ui-v0.9-generation");
     expect(userPrompt).not.toContain("必须使用三栏布局，这是完整 Skill 内容。");
   });
 
@@ -232,6 +251,75 @@ describe("Agent 渐进式组件披露", () => {
     expect(toolCalls.some((record) => record.toolName === "validateA2UI")).toBe(
       true,
     );
+  });
+
+  it("Runtime 可在无会话 Skill 时披露 A2UI 基础 Skill", async () => {
+    const finalOutput = {
+      assistantMessage: "我理解你需要一个课程表页面，已生成基础课程表 UI。",
+      a2uiMessages: [
+        {
+          version: "v0.9",
+          createSurface: {
+            surfaceId: "main",
+            catalogId:
+              "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json",
+          },
+        },
+        {
+          version: "v0.9",
+          updateComponents: {
+            surfaceId: "main",
+            components: [
+              {
+                id: "root",
+                component: "Column",
+                children: ["title"],
+              },
+              {
+                id: "title",
+                component: "Text",
+                text: "我的课程表",
+                usageHint: "h1",
+              },
+            ],
+          },
+        },
+      ],
+    };
+
+    const fakeModel = new FakeModelClient([
+      JSON.stringify({
+        assistantMessage: "需要查看 A2UI 生成 Skill 后再生成。",
+        skillInfoRequest: {
+          skills: ["builtin:a2ui-v0.9-generation"],
+          reason: "需要遵循 A2UI v0.9 生成规范",
+        },
+      }),
+      JSON.stringify(finalOutput),
+    ]);
+    const runtime = new AgentRuntime(
+      fakeModel as unknown as ModelClient,
+      new PromptComposer(),
+      new AgentContextBuilder(),
+    );
+    const toolCalls: ToolCallRecord[] = [];
+
+    const result = await runtime.run(createInput(), (record) => {
+      toolCalls.push(record);
+    });
+
+    expect(result.status).toBe("COMMITTED");
+    expect(fakeModel.prompts).toHaveLength(2);
+    expect(fakeModel.prompts[0]!.user).not.toContain("## 4. 消息类型");
+    expect(fakeModel.prompts[1]!.system).toContain("# A2UI v0.9 组件消息生成");
+    expect(fakeModel.prompts[1]!.system).toContain("## 4. 消息类型");
+    expect(
+      toolCalls.some(
+        (record) =>
+          record.toolName === "getSkillContent" &&
+          record.status === "succeeded",
+      ),
+    ).toBe(true);
   });
 
   it("Runtime 首轮请求 Skill 内容，补充后生成并记录 getSkillContent", async () => {

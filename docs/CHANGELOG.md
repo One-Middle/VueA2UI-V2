@@ -2,6 +2,12 @@
 
 ## 2026-07-19
 
+### Agent Runtime
+
+- 将 A2UI v0.9 生成指南从固定 system prompt 迁移为 `builtin:a2ui-v0.9-generation` 基础 Skill；Runtime 始终内建注入该 Skill，模型通过 `skillInfoRequest` 渐进披露完整生成规则。
+- `PromptComposer` 改为只注入 Agent 身份、能力边界、工作流、输出通道和安全禁令；工作流明确为“理解用户需求 -> 向用户确认自己的理解 -> 开始生成 -> 校验 -> 提交”。
+- 最终 `assistantMessage` 需先简要复述对用户需求的理解，再说明生成或修改结果；`validateA2UI` 仍是正式提交门禁。
+
 ### 文档治理
 
 - 将 `docs/` 调整为编号化分层：`00-meta`、`01-product`、`02-architecture`、`03-contracts`、`04-modules`、`05-operations`、`06-planning`、`90-notes`、`99-archive`。

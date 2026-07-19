@@ -147,6 +147,8 @@ Agent 只能输出：
 }
 ```
 
+Agent 的身份 Prompt 只注入工作流、输出通道和安全边界；A2UI 生成规则通过 `builtin:a2ui-v0.9-generation` 基础 Skill 渐进披露。该 Skill 始终由 Runtime 内建可用，但最终提交仍必须通过 `validateA2UI`。
+
 禁止：
 
 - 生成 HTML、JavaScript 或 CSS。
