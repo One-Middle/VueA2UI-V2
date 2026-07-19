@@ -14,7 +14,9 @@
     "test": "pnpm --filter @a2ui-platform/* -r test",
     "typecheck": "pnpm --filter @a2ui-platform/* -r typecheck",
     "lint": "pnpm --filter @a2ui-platform/* -r lint",
-    "format": "prettier --write ."
+    "repair:snapshots": "pnpm --filter @a2ui-platform/backend repair:snapshots",
+    "format": "prettier --write .",
+    "skill:sync": "pnpm --filter @a2ui-platform/backend skill:sync"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

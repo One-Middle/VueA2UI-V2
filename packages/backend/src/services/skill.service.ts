@@ -106,4 +106,50 @@ export const skillService = {
       })),
     };
   },
+
+  /**
+   * 同步内置 Skill：按 name + sourceType='builtin' 匹配已有记录后 upsert。
+   * 供 sync-builtin-skills 脚本调用。
+   */
+  async upsertBuiltin(params: {
+    name: string;
+    description?: string | null;
+    content: string;
+    version?: number;
+  }) {
+    const existing = await skillRepository.findByNameAndSourceType(
+      params.name,
+      "builtin",
+    );
+
+    if (existing) {
+      const updated = await skillRepository.update(existing.id, {
+        description: params.description ?? existing.description,
+        content: params.content,
+        version: existing.version + 1,
+        isActive: true,
+        deletedAt: null,
+      });
+      logger.info(
+        { skillId: updated.id, name: params.name },
+        "Builtin Skill 已更新",
+      );
+      return { skill: toSkillDto(updated)! };
+    }
+
+    const created = await skillRepository.create({
+      name: params.name,
+      description: params.description ?? null,
+      content: params.content,
+      sourceType: "builtin",
+      version: params.version ?? 1,
+      isActive: true,
+      metadata: {},
+    });
+    logger.info(
+      { skillId: created.id, name: params.name },
+      "Builtin Skill 已创建",
+    );
+    return { skill: toSkillDto(created)! };
+  },
 };

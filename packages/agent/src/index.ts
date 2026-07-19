@@ -4,6 +4,7 @@
  * 职责：
  * - 暴露 Agent Runtime 工厂函数（后端唯一需要的运行时 API）
  * - 暴露输出解析、校验与 Catalog 工具函数
+ * - 暴露内置 Skill 注册表
  *
  * 不暴露：AgentRuntime、ModelClient、PromptComposer、AgentContextBuilder
  * 等内部实现细节——外部只能通过 createAgentRuntime() 获取 IAgentRuntime 实例。
@@ -28,3 +29,6 @@ export {
   getComponentDef,
   getBasicCatalogDefinition,
 } from "./tools/catalog-schema.js";
+
+// ─── 内置 Skill 注册表 ───────────────────────────────────
+export { BUILTIN_SKILLS, type BuiltinSkillMeta } from "./skills/registry.js";

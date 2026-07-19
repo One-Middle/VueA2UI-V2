@@ -25,6 +25,16 @@ export const skillRepository = {
     });
   },
 
+  /**
+   * 按名称和来源类型查找 Skill（含软删除记录）。
+   * 用于内置 Skill 同步时匹配已有记录。
+   */
+  findByNameAndSourceType(name: string, sourceType: string) {
+    return prisma.skill.findFirst({
+      where: { name, sourceType },
+    });
+  },
+
   update(id: string, data: Prisma.SkillUpdateInput) {
     return prisma.skill.update({
       where: { id },
