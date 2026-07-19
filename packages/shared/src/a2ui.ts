@@ -1,3 +1,14 @@
+/**
+ * A2UI v0.9 协议共享类型。
+ *
+ * 职责：
+ * - 定义服务端到客户端 A2UI 消息
+ * - 定义 Renderer 回传 action/error 消息
+ * - 定义 Basic Catalog 相关共享类型
+ *
+ * 不负责：具体组件渲染、Agent 校验实现或后端持久化逻辑。
+ */
+
 export const A2UI_VERSION = "v0.9" as const;
 
 export type A2UIVersion = typeof A2UI_VERSION;
@@ -44,11 +55,43 @@ export type A2UIComponent = {
   [property: string]: JsonValue | undefined;
 };
 
-export interface A2UIActionPayload {
+/** 组件声明中的事件 action，用于描述用户交互触发的业务事件。 */
+export interface A2UIActionEventDeclaration {
+  /** 事件名称，如 submit、play、openDetail。 */
   name: string;
+  /** 事件上下文，可包含静态值或 `{ path }` 动态绑定。 */
+  context?: JsonObject;
+}
+
+/** 组件声明中的函数调用 action，当前仅作为未来能力保留。 */
+export interface A2UIActionFunctionCallDeclaration {
+  /** 受控函数名称，如 openUrl。 */
+  call: string;
+  /** 函数参数。 */
+  args?: JsonObject;
+}
+
+/** 组件声明中的 action 配置。当前 Renderer 只执行 event。 */
+export interface A2UIComponentActionDeclaration {
+  /** 用户交互事件。 */
+  event?: A2UIActionEventDeclaration;
+  /** 未来函数调用能力，当前 Agent 不应生成，Renderer 不执行。 */
+  functionCall?: A2UIActionFunctionCallDeclaration;
+}
+
+/** Renderer 回传给宿主前端和后端记录的 action 载荷。 */
+export interface A2UIActionPayload {
+  /** action 类型，供后端 handler 稳定分发。 */
+  kind: "event";
+  /** 事件名称。 */
+  name: string;
+  /** 触发事件的 surface ID。 */
   surfaceId: string;
+  /** 触发事件的组件 ID。 */
   sourceComponentId: string;
+  /** 触发时间，ISO 8601 字符串。 */
   timestamp: string;
+  /** 已解析后的事件上下文。 */
   context: JsonObject;
 }
 

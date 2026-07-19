@@ -557,7 +557,7 @@ const COMPONENT_DEFS: InternalComponentDef[] = [
         name: "action",
         type: "object",
         required: true,
-        description: "按钮动作，包含 name 和可选的 context 对象",
+        description: "按钮事件动作，格式为 { event: { name, context? } }",
       },
       {
         name: "fullWidth",

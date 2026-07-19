@@ -160,8 +160,9 @@ packages/renderer/src/
 Action 格式说明：
 
 - A2UI 契约目标以官网式 `Button.action.event` 为准，详见 [A2UI v0.9 契约](../03-contracts/a2ui-v0.9.md)。
-- `action.functionCall` 已纳入契约作为未来能力，但当前 Renderer 暂不执行。
-- Renderer 当前 action 字段消费状态以 [Renderer Basic Catalog 能力矩阵](./renderer-basic-catalog-capabilities.md) 为准；旧版扁平 `{ name, context }` 实现属于待迁移差异。
+- Renderer 回传 action 时生成标准 A2UI client message，并在 `action.kind` 中标记 `"event"`。
+- `action.functionCall` 作为未来能力保留在 shared 类型和文档中，但当前 Renderer 暂不执行，Agent schema 也不放行。
+- Renderer 当前优先消费 `action.event`，并仅为历史数据兼容旧版扁平 `{ name, context }`。
 
 ## 9. 依赖契约
 

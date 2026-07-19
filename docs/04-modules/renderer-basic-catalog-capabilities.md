@@ -18,7 +18,81 @@
 - 字段是否已被当前 Renderer 渲染：看本文档。
 - 字段由哪个文件实现：看 Renderer 模块说明和源码路径。
 
-## 3. 通用视觉属性
+## 3. 当前支持的 A2UI 信息与对应功能
+
+当前 `packages/renderer` 可以消费的 A2UI 信息分为消息层、Surface 层、组件层、数据层和交互回传层。
+
+### 3.1 服务端消息
+
+Renderer 只接受 `version === "v0.9"` 的服务端消息。已支持的消息如下：
+
+| A2UI 信息 | 当前功能 | 实现说明 |
+| --- | --- | --- |
+| `createSurface` | 创建或更新一个 `SurfaceModel`，记录 `surfaceId`、`catalogId`，并接收可选 `theme`、`sendDataModel`。 | `theme` 和 `sendDataModel` 当前只进入 surface 状态，尚未形成完整主题渲染或 dataModel 自动回传链路。 |
+| `updateDataModel` | 按 JSON Pointer 路径写入数据，支持替换根数据、写入对象路径和数组下标路径。 | `path` 为空、未提供或为 `/` 时替换整个 dataModel；深层路径会自动创建中间对象或数组。 |
+| `updateComponents` | 增量更新组件集合，新增、更新或删除 surface 内的组件，并触发 Vue 响应式渲染。 | 组件 `id` 不变且 `component` 类型不变时更新属性；类型变化时重建组件模型。 |
+| `deleteSurface` | 删除指定 surface，清理组件集合和 dataModel 订阅。 | 删除后对应 `A2uiSurface` 会显示 surface 缺失状态。 |
+
+消息处理结果会返回本次接受的消息数和涉及的 `surfaceIds`。目标 surface 不存在的 `updateComponents`、`updateDataModel` 会被忽略并记录 warning。
+
+### 3.2 Surface 与组件树
+
+Renderer 当前按以下规则渲染 A2UI surface：
+
+- 每个 surface 由 `A2uiSurface.vue` 承载，必须存在 `id: "root"` 的根组件才会进入正常渲染。
+- 单个组件由 `A2uiComponent.vue` 动态渲染，根据 `component` 字段从 `catalogRegistry` 查找 Vue 组件。
+- 未找到组件实例时显示“组件未找到”，组件类型未注册时显示“未注册的组件类型”。
+- 已注册 Basic Catalog 的 18 个组件：`Text`、`Image`、`Icon`、`Video`、`AudioPlayer`、`Divider`、`Row`、`Column`、`List`、`Card`、`Tabs`、`Modal`、`Button`、`TextField`、`CheckBox`、`ChoicePicker`、`Slider`、`DateTimeInput`。
+- 容器组件主要通过 `child` 或 `children` 引用其他组件 ID，不支持在 props 内直接内联嵌套组件对象。
+
+### 3.3 数据模型与动态取值
+
+Renderer 当前支持基于 JSON Pointer 的数据模型能力：
+
+| A2UI 信息 | 当前功能 | 典型用途 |
+| --- | --- | --- |
+| `updateDataModel.path` + `value` | 写入或替换数据模型中的指定路径。 | 初始化表单值、列表数据、状态值。 |
+| `{ "path": "/some/value" }` 动态引用 | 组件属性中只有 `path` 一个字段的对象会被解析为 dataModel 取值。 | `Text.text`、`Image.url`、`Button.action.context`、表单 `value/text` 等动态绑定。 |
+| 相对路径上下文 | `DataContext` 支持绝对路径和相对路径拼接。 | 为后续动态列表模板扩展保留基础能力。 |
+| 表单类组件写回 | 部分输入组件在绑定值为 `{ path }` 时，会把用户输入写回 dataModel。 | `TextField.text`、`CheckBox.value`、`ChoicePicker.value`、`Slider.value`、`DateTimeInput.value`。 |
+
+注意：当前 `List` 能根据 `{ path, componentId }` 读取数组并重复渲染模板组件，但尚未为每一项创建独立 item 作用域，因此模板内直接读取当前项字段的能力仍不完整。
+
+### 3.4 可实现的 UI 功能
+
+基于当前 Basic Catalog 组件和数据能力，Renderer 已能实现以下 UI：
+
+| 功能类型 | 可实现能力 | 主要组件 |
+| --- | --- | --- |
+| 文本展示 | 标题、正文、说明文字、单行或多行截断、动态文本绑定。 | `Text` |
+| 图片和媒体展示 | 图片 URL、替代文本、裁剪方式、宽高比例、浏览器原生懒加载；基础视频和音频播放控件。 | `Image`、`Video`、`AudioPlayer` |
+| 图标展示 | 常用图标名到 Unicode/emoji fallback 的展示，未知图标名直接显示名称文本。 | `Icon` |
+| 基础布局 | 水平/垂直 flex 布局、间距、换行、对齐、分布、卡片包裹、静态列表、基础标签页、基础模态框。 | `Row`、`Column`、`Card`、`List`、`Tabs`、`Modal`、`Divider` |
+| 表单输入 | 文本输入、长文本、数字输入、密码输入、复选框、下拉选择、滑块、日期/时间/日期时间输入，并可写回 dataModel。 | `TextField`、`CheckBox`、`ChoicePicker`、`Slider`、`DateTimeInput` |
+| 用户操作 | 按钮点击后派发 `a2ui:action` 浏览器事件，携带 `name`、`surfaceId`、`sourceComponentId`、`timestamp`、`context`。 | `Button` |
+| 视觉样式 | 受控 `style` 白名单、`variant`、`size`、`tone`、`preset` 修饰类，形成按钮、卡片、文本、布局等基础视觉变化。 | 已接入 `visual-props.ts` 的组件 |
+
+### 3.5 客户端回传能力
+
+当前已实现的客户端到宿主环境回传能力：
+
+- `Button` 点击会调用 `dispatchAction`，在 `window` 上派发 `CustomEvent("a2ui:action")`。
+- 回传 detail 结构包含 `name`、`surfaceId`、`sourceComponentId`、`timestamp` 和 `context`。
+- `context` 内的 `{ path }` 动态引用会在点击时解析成当前 dataModel 值。
+- 当前按钮 action 解析仍兼容历史扁平格式 `{ name, context }`；契约目标格式 `action.event` 尚未在 Renderer 中完全对齐。
+- `action.functionCall` 当前不执行。
+
+### 3.6 当前不支持或仅保留状态的信息
+
+以下 A2UI 信息即使能通过上游校验，也不代表当前 Renderer 已完整消费：
+
+- `createSurface.theme`：仅保存到 `SurfaceModel.theme`，尚未驱动全局主题变量。
+- `createSurface.sendDataModel`：仅保存布尔状态，尚未自动在 action 中附带完整 dataModel 快照。
+- 任意 `className`、`css`、`innerHTML`、脚本、事件处理器字段：Renderer 不消费。
+- 未注册组件类型：不会执行动态代码，只显示 fallback。
+- `action.event` 目标结构、`action.functionCall`、复杂 Modal 触发策略、完整表单校验展示、真实图标库、媒体 poster/autoplay/loop/muted 等字段仍待补齐。
+
+## 4. 通用视觉属性
 
 Renderer 已提供通用视觉属性解析工具：`packages/renderer/src/components/basic/visual-props.ts`。
 
@@ -47,7 +121,7 @@ Renderer 已提供通用视觉属性解析工具：`packages/renderer/src/compon
 - `style` 只做白名单字段转换，不透传任意 CSS 块。
 - `variant`、`size`、`tone`、`preset` 只生成 Renderer 自有修饰类，具体视觉由 `packages/renderer/src/styles.css` 决定。
 
-## 4. 组件能力总览
+## 5. 组件能力总览
 
 | 组件 | 当前状态 | 已消费字段 | 主要缺口 |
 | --- | --- | --- | --- |
@@ -76,7 +150,7 @@ Renderer 已提供通用视觉属性解析工具：`packages/renderer/src/compon
 - 部分完整：已消费主要协议字段和部分视觉字段，但仍有明确缺口。
 - 完整：当前暂无组件达到完整状态；完整状态要求 schema 中声明的字段都有明确渲染或明确忽略策略。
 
-## 5. 已接入受控视觉属性的组件
+## 6. 已接入受控视觉属性的组件
 
 以下组件已经接入 `visual-props.ts`：
 
@@ -91,7 +165,7 @@ Renderer 已提供通用视觉属性解析工具：`packages/renderer/src/compon
 
 这些组件会消费通用视觉字段，并由 `styles.css` 提供基础样式、修饰类和部分预设表现。
 
-## 6. 当前音乐卡片场景支持情况
+## 7. 当前音乐卡片场景支持情况
 
 针对“类似 QQ 音乐播放风格、带播放控制的音乐卡片”这类组件树，当前 Renderer 已支持：
 
@@ -109,7 +183,7 @@ Renderer 已提供通用视觉属性解析工具：`packages/renderer/src/compon
 - 播放器状态驱动的图标自动切换，例如 `isPlaying` 自动切换 `play_arrow` / `pause`。
 - 专门的音乐播放器复合组件；当前仍由 Basic Catalog 原子组件组合表达。
 
-## 7. 测试与验收
+## 8. 测试与验收
 
 当前已覆盖：
 
@@ -123,7 +197,7 @@ Renderer 已提供通用视觉属性解析工具：`packages/renderer/src/compon
 - 增加音乐卡片回归样例，验证图标、图片比例、按钮变体和 Slider 数值隐藏。
 - 增加视觉截图验收，防止 CSS 变体回退为默认浏览器控件。
 
-## 8. 后续升级顺序
+## 9. 后续升级顺序
 
 建议按以下优先级继续补齐：
 

@@ -30,6 +30,10 @@ function mountSurface(components: A2UIComponent[]): HTMLElement {
   surface.updateDataModel("/", {
     progress: 32,
     coverUrl: "https://example.com/cover.jpg",
+    currentTrack: {
+      id: "song-1",
+      title: "播放",
+    },
   });
   surface.updateComponents(components);
 
@@ -106,6 +110,7 @@ describe("Basic Catalog 视觉属性", () => {
     expect(actions[0]).toMatchObject({
       version: "v0.9",
       action: {
+        kind: "event",
         name: "play",
         surfaceId: "main",
         sourceComponentId: "root",
@@ -114,6 +119,129 @@ describe("Basic Catalog 视觉属性", () => {
         },
       },
     });
+  });
+
+  it("解析 action.event context 中的动态绑定", async () => {
+    const actions: unknown[] = [];
+    const handler = (event: Event) => {
+      actions.push((event as CustomEvent<unknown>).detail);
+    };
+    window.addEventListener("a2ui:action", handler);
+
+    const container = mountSurface([
+      {
+        id: "root",
+        component: "Button",
+        child: "label",
+        action: {
+          event: {
+            name: "playTrack",
+            context: {
+              track: { path: "/currentTrack" },
+            },
+          },
+        },
+      },
+      {
+        id: "label",
+        component: "Text",
+        text: { path: "/currentTrack/title" },
+      },
+    ]);
+
+    await nextTick();
+    container.querySelector("button")?.dispatchEvent(new MouseEvent("click"));
+    window.removeEventListener("a2ui:action", handler);
+
+    expect(actions[0]).toMatchObject({
+      action: {
+        kind: "event",
+        name: "playTrack",
+        context: {
+          track: {
+            id: "song-1",
+            title: "播放",
+          },
+        },
+      },
+    });
+  });
+
+  it("兼容历史扁平 action 并派发标准消息", async () => {
+    const actions: unknown[] = [];
+    const handler = (event: Event) => {
+      actions.push((event as CustomEvent<unknown>).detail);
+    };
+    window.addEventListener("a2ui:action", handler);
+
+    const container = mountSurface([
+      {
+        id: "root",
+        component: "Button",
+        child: "label",
+        action: {
+          name: "legacyPlay",
+          context: {
+            trackId: "song-1",
+          },
+        },
+      },
+      {
+        id: "label",
+        component: "Text",
+        text: "播放",
+      },
+    ]);
+
+    await nextTick();
+    container.querySelector("button")?.dispatchEvent(new MouseEvent("click"));
+    window.removeEventListener("a2ui:action", handler);
+
+    expect(actions[0]).toMatchObject({
+      version: "v0.9",
+      action: {
+        kind: "event",
+        name: "legacyPlay",
+        context: {
+          trackId: "song-1",
+        },
+      },
+    });
+  });
+
+  it("当前不执行 action.functionCall", async () => {
+    const actions: unknown[] = [];
+    const handler = (event: Event) => {
+      actions.push((event as CustomEvent<unknown>).detail);
+    };
+    window.addEventListener("a2ui:action", handler);
+
+    const container = mountSurface([
+      {
+        id: "root",
+        component: "Button",
+        child: "label",
+        action: {
+          functionCall: {
+            call: "openUrl",
+            args: {
+              url: "https://a2ui.org",
+            },
+          },
+        },
+      },
+      {
+        id: "label",
+        component: "Text",
+        text: "打开",
+      },
+    ]);
+
+    await nextTick();
+    container.querySelector("button")?.dispatchEvent(new MouseEvent("click"));
+    window.removeEventListener("a2ui:action", handler);
+
+    expect(actions).toHaveLength(0);
   });
 
   it("透传 Card、Row 和 Image 的受控样式字段", async () => {

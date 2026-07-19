@@ -32,6 +32,7 @@
 
 ### Renderer
 
+- Button action 正式迁移到 `action.event`：Renderer 优先解析官网式事件声明，派发 `{ version: "v0.9", action: { kind: "event", ... } }` A2UI client message，并仅保留旧版 `{ name, context }` 历史兼容。
 - 新增 Basic Catalog 受控视觉属性解析工具，Renderer 开始消费既有协议中的 `style`、`variant`、`size`、`tone`、`preset` 字段。
 - `Card`、`Button`、`Icon`、`Image`、`Row`、`Column`、`Slider`、`Text` 接入受控样式和视觉修饰类，补齐音乐卡片等场景所需的基础渲染能力。
 - 修复 `Icon` 只读取旧字段 `icon` 的问题，现在优先读取协议推荐的 `name` 并兼容 `icon`。
@@ -42,12 +43,14 @@
 
 ### Agent Runtime
 
+- Agent Basic Catalog schema 和协议提示改为要求 `Button.action.event`，不再放行或鼓励旧版扁平 `{ name, context }`，并明确当前不生成 `action.functionCall`。
 - 将 Skill 注入升级为渐进式披露：初始 Prompt 只暴露 Skill 摘要，模型可通过 `skillInfoRequest` 主动请求完整 Skill 内容。
 - 新增 `getSkillContent` runtime tool call，按已启用 Skill 的 `id` 或 `name` 精确匹配并披露 Markdown 内容，不访问数据库、不读取本地路径、不执行脚本。
 - 统一 Skill 内容披露与组件详情披露流程，修复模式会继续携带已披露 Skill 内容和组件详情。
 
 ### Backend / Frontend
 
+- Frontend Preview 宿主补齐 `a2ui:action` / `a2ui:error` 监听，按当前会话转发 Renderer 回传消息到 Backend 记录接口。
 - `AgentRunInput.enabledSkills` 增加 `description` 字段，后端触发 Agent Run 时同步传入 Skill 描述。
 - `ToolCallRecord` 增加 `phase` 字段，SSE `agent_run_attempt` 会携带 `getSkillContent` 工具调用供前端展示。
 - 前端工作台新增运行期 tool call 状态，对话页可显示 Skill 调用提示，Runtime 面板可查看实时或历史工具调用记录。

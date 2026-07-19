@@ -148,12 +148,20 @@
     },
     "action": {
       "type": "object",
-      "required": ["name"],
+      "required": ["event"],
       "properties": {
-        "name": { "type": "string" },
-        "context": {
-          "description": "动作上下文数据",
-          "type": "object"
+        "event": {
+          "description": "用户交互事件",
+          "type": "object",
+          "required": ["name"],
+          "properties": {
+            "name": { "type": "string" },
+            "context": {
+              "description": "动作上下文数据，可包含静态值或 { path } 动态绑定",
+              "type": "object"
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false

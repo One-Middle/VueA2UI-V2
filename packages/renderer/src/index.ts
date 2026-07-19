@@ -8,6 +8,18 @@ export { MessageProcessor } from "./core/message-processor";
 export type { ProcessMessagesResult } from "./core/message-processor";
 export { DataContext } from "./core/data-context";
 export {
+  createActionMessage,
+  resolveActionContext,
+  resolveComponentAction,
+} from "./core/action";
+export type {
+  ActionValueResolver,
+  CreateActionMessageInput,
+  RendererComponentAction,
+  RendererEventAction,
+  RendererFunctionCallAction,
+} from "./core/action";
+export {
   ComponentContextImpl,
 } from "./core/component-context";
 export type {
