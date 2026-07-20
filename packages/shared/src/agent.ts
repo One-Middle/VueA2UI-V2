@@ -10,6 +10,7 @@
  */
 
 import type { A2UIServerMessage, JsonObject, SurfaceSnapshotData } from "./a2ui";
+import type { SkillReference } from "./api";
 import type { AgentRunPhase } from "./sse";
 
 /** A2UI 校验过程中发现的单个问题。 */
@@ -55,7 +56,13 @@ export interface AgentRunInput {
   /** 用户上传的文件列表（含文件内容） */
   uploadedFiles: Array<{ id: string; originalName: string; content: string }>;
   /** 已启用的 Skill 列表 */
-  enabledSkills: Array<{ id: string; name: string; description?: string | null; content: string }>;
+  enabledSkills: Array<{
+    id: string;
+    name: string;
+    description?: string | null;
+    content: string;
+    references?: SkillReference[];
+  }>;
   /** 当前 Surface 快照数据，用于增量更新 */
   currentSnapshot: SurfaceSnapshotData | null;
   /** 使用的 Catalog ID */

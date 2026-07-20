@@ -16,6 +16,7 @@ export { createAgentRuntime } from "./runtime/create-agent-runtime.js";
 // ─── 输出解析工具 ────────────────────────────────────────
 export { parseModelOutput } from "./runtime/output-parser.js";
 export { parseComponentInfoRequest } from "./runtime/component-info-request-parser.js";
+export { parseSkillReferenceRequest } from "./runtime/skill-reference-request-parser.js";
 
 // ─── 校验与 Catalog 工具 ─────────────────────────────────
 export { validateA2UI } from "./tools/validate-a2ui.js";

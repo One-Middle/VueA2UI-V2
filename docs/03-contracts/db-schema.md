@@ -11,7 +11,7 @@
 - `sessions`：一次 UI 创作上下文。
 - `messages`：用户和 assistant 的自然语言消息。
 - `uploaded_files`：用户上传的 `.txt` 文件。
-- `skills`：可注入 Agent 上下文的文本说明。
+- `skills`：可注入 Agent 上下文的文本说明；`metadata.references` 保存该 Skill 的参考资料列表，结构为 `id`、`title`、`content` 和可选 `description`。
 - `session_skills`：会话与 skill 的启用关系。
 - `agent_runs`：一次模型生成或修复过程。
 - `tool_calls`：校验、组件详情披露等工具调用记录。

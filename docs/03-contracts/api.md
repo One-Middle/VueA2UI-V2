@@ -60,6 +60,8 @@
 - `POST /api/sessions/:sessionId/skills/:skillId/enable`
 - `POST /api/sessions/:sessionId/skills/:skillId/disable`
 
+`SkillDto` 包含 `references: SkillReference[]`。`SkillReference` 字段为 `id`、`title`、`content` 和可选 `description`。`POST /api/skills` 与 `PATCH /api/skills/:skillId` 可传入 `references`，用于为 Skill 维护按需披露的参考资料正文。
+
 ### A2UI
 
 - `GET /api/sessions/:sessionId/a2ui-events`

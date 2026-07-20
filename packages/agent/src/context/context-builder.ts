@@ -120,6 +120,14 @@ export class AgentContextBuilder {
       parts.push(`- id: ${s.id}`);
       parts.push(`  name: ${s.name}`);
       parts.push(`  description: ${s.description?.trim() || "（无描述）"}`);
+      if (s.references && s.references.length > 0) {
+        parts.push("  references:");
+        for (const ref of s.references) {
+          parts.push(`    - id: ${ref.id}`);
+          parts.push(`      title: ${ref.title}`);
+          parts.push(`      description: ${ref.description?.trim() || "（无描述）"}`);
+        }
+      }
       parts.push("");
     }
 

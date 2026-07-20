@@ -2,6 +2,13 @@ import { z } from "zod";
 import type { Request, Response, NextFunction } from "express";
 import { validationFailed } from "./errors.js";
 
+const skillReferenceSchema = z.object({
+  id: z.string().min(1).max(100),
+  title: z.string().min(1).max(200),
+  content: z.string().min(1).max(50000),
+  description: z.string().max(1000).nullable().optional(),
+});
+
 /**
  * Session 创建校验。
  */
@@ -40,6 +47,7 @@ export const createSkillSchema = z.object({
   name: z.string().min(1).max(200),
   description: z.string().max(1000).nullable().optional(),
   content: z.string().min(1).max(50000),
+  references: z.array(skillReferenceSchema).max(20).optional(),
 });
 
 /**
@@ -49,6 +57,7 @@ export const updateSkillSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   description: z.string().max(1000).nullable().optional(),
   content: z.string().min(1).max(50000).optional(),
+  references: z.array(skillReferenceSchema).max(20).optional(),
   isActive: z.boolean().optional(),
 });
 

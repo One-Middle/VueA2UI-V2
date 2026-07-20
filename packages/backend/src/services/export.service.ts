@@ -45,6 +45,7 @@ export const exportService = {
           name: skill.name,
           description: skill.description,
           content: skill.content,
+          references: extractSkillReferences(skill.metadata),
           sourceType: skill.sourceType,
           version: skill.version,
           isActive: skill.isActive,
@@ -211,3 +212,40 @@ export const exportService = {
     return JSON.stringify(currentSnapshot.snapshot, null, 2);
   },
 };
+
+function extractSkillReferences(metadata: unknown): ExportSessionDto["skills"][number]["references"] {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return [];
+  }
+  const references = (metadata as { references?: unknown }).references;
+  if (!Array.isArray(references)) {
+    return [];
+  }
+  return references
+    .filter((item) => {
+      if (!item || typeof item !== "object" || Array.isArray(item)) return false;
+      const ref = item as Record<string, unknown>;
+      return (
+        typeof ref.id === "string" &&
+        ref.id.trim().length > 0 &&
+        typeof ref.title === "string" &&
+        ref.title.trim().length > 0 &&
+        typeof ref.content === "string" &&
+        ref.content.trim().length > 0
+      );
+    })
+    .map((item) => {
+      const ref = item as {
+        id: string;
+        title: string;
+        content: string;
+        description?: string | null;
+      };
+      return {
+        id: ref.id.trim(),
+        title: ref.title.trim(),
+        content: ref.content,
+        description: ref.description ?? null,
+      };
+    });
+}

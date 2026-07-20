@@ -27,6 +27,7 @@ import { ModelClient, type ModelResponse, type TokenUsage } from "../model/model
 import { parseModelOutput } from "./output-parser.js";
 import { parseComponentInfoRequest } from "./component-info-request-parser.js";
 import { parseSkillInfoRequest } from "./skill-info-request-parser.js";
+import { parseSkillReferenceRequest } from "./skill-reference-request-parser.js";
 import { validateA2UI } from "../tools/validate-a2ui.js";
 import {
   formatCatalogComponentDetails,
@@ -75,8 +76,10 @@ export class AgentRuntime implements IAgentRuntime {
     let totalTokens: JsonObject | undefined;
     let componentDetails = "";
     let skillDetails = "";
+    let skillReferenceDetails = "";
     const disclosedComponents = new Set<string>();
     const disclosedSkills = new Set<string>();
+    const disclosedSkillReferences = new Set<string>();
 
     /** 累加 Token 用量到 totalTokens。 */
     const addUsage = (usage?: TokenUsage): void => {
@@ -107,7 +110,7 @@ export class AgentRuntime implements IAgentRuntime {
               a2uiMessages: lastA2uiMessages,
             }),
             lastValidation?.errors ?? [],
-            { componentDetails, skillDetails },
+            { componentDetails, skillDetails, skillReferenceDetails },
           );
 
           logger.info(
@@ -127,14 +130,17 @@ export class AgentRuntime implements IAgentRuntime {
               attempt,
               disclosedComponents,
               disclosedSkills,
+              disclosedSkillReferences,
               componentDetails,
               skillDetails,
+              skillReferenceDetails,
               addUsage,
               onToolCall,
             );
           modelResponse = disclosureResult.modelResponse;
           componentDetails = disclosureResult.componentDetails;
           skillDetails = disclosureResult.skillDetails;
+          skillReferenceDetails = disclosureResult.skillReferenceDetails;
         }
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err);
@@ -285,17 +291,21 @@ export class AgentRuntime implements IAgentRuntime {
     attempt: number,
     disclosedComponents: Set<string>,
     disclosedSkills: Set<string>,
+    disclosedSkillReferences: Set<string>,
     initialComponentDetails: string,
     initialSkillDetails: string,
+    initialSkillReferenceDetails: string,
     addUsage: (usage?: TokenUsage) => void,
     onToolCall?: (record: ToolCallRecord) => void,
   ): Promise<{
     modelResponse: ModelResponse;
     componentDetails: string;
     skillDetails: string;
+    skillReferenceDetails: string;
   }> {
     let componentDetails = initialComponentDetails;
     let skillDetails = initialSkillDetails;
+    let skillReferenceDetails = initialSkillReferenceDetails;
     let lastResponse: ModelResponse | undefined;
 
     for (let round = 1; round <= MAX_DISCLOSURE_ROUNDS + 1; round++) {
@@ -305,6 +315,7 @@ export class AgentRuntime implements IAgentRuntime {
         {
           componentDetails,
           skillDetails,
+          skillReferenceDetails,
           forceFinalOutput,
         },
       );
@@ -326,8 +337,13 @@ export class AgentRuntime implements IAgentRuntime {
       }
 
       const skillRequestResult = parseSkillInfoRequest(lastResponse.content);
+      const skillReferenceRequestResult = parseSkillReferenceRequest(lastResponse.content);
       const componentRequestResult = parseComponentInfoRequest(lastResponse.content);
-      if (!skillRequestResult.ok && !componentRequestResult.ok) {
+      if (
+        !skillRequestResult.ok &&
+        !skillReferenceRequestResult.ok &&
+        !componentRequestResult.ok
+      ) {
         break;
       }
 
@@ -349,6 +365,28 @@ export class AgentRuntime implements IAgentRuntime {
         onToolCall?.(result.toolCall(attempt));
         logger.info(
           `Skill 内容披露 → requested=${result.requestedSkills.length}, disclosed=${result.disclosedSkills.length}, skipped=${result.skippedSkills.length}, already=${result.alreadyDisclosedSkills.length}`,
+        );
+      }
+
+      if (skillReferenceRequestResult.ok) {
+        const result = this.discloseSkillReferences(
+          context,
+          skillReferenceRequestResult.request.skill,
+          skillReferenceRequestResult.request.references,
+          disclosedSkillReferences,
+          skillReferenceRequestResult.request.reason,
+        );
+        if (result.feedback.length > 0) {
+          skillReferenceDetails = [skillReferenceDetails, ...result.feedback]
+            .filter((part) => part.trim().length > 0)
+            .join("\n\n");
+        }
+        for (const referenceKey of result.disclosedReferenceKeys) {
+          disclosedSkillReferences.add(referenceKey);
+        }
+        onToolCall?.(result.toolCall(attempt));
+        logger.info(
+          `Skill Reference 内容披露 → requested=${result.requestedReferences.length}, disclosed=${result.disclosedReferences.length}, skipped=${result.skippedReferences.length}, already=${result.alreadyDisclosedReferences.length}`,
         );
       }
 
@@ -376,7 +414,12 @@ export class AgentRuntime implements IAgentRuntime {
       throw new Error("模型未返回任何内容");
     }
 
-    return { modelResponse: lastResponse, componentDetails, skillDetails };
+    return {
+      modelResponse: lastResponse,
+      componentDetails,
+      skillDetails,
+      skillReferenceDetails,
+    };
   }
 
   /** 按需披露 Skill 完整内容。 */
@@ -474,6 +517,150 @@ export class AgentRuntime implements IAgentRuntime {
         durationMs: Date.now() - disclosureStartTime,
         ...(disclosedNow.length === 0
           ? { errorMessage: "没有新增可披露 Skill 内容" }
+          : {}),
+      }),
+    };
+  }
+
+  /** 按需披露 Skill Reference 完整内容。 */
+  private discloseSkillReferences(
+    context: AgentContext,
+    skillIdOrName: string,
+    references: string[],
+    disclosedSkillReferences: Set<string>,
+    reason?: string,
+  ): {
+    requestedSkill: string;
+    requestedReferences: string[];
+    disclosedReferences: Array<{ skillId: string; skillName: string; id: string; title: string }>;
+    disclosedReferenceKeys: string[];
+    alreadyDisclosedReferences: string[];
+    skippedReferences: string[];
+    feedback: string[];
+    toolCall: (attempt: number) => ToolCallRecord;
+  } {
+    const disclosureStartTime = Date.now();
+    const requestedReferences = Array.from(new Set(references));
+    const matchedSkill =
+      context.enabledSkillList.find((skill) => skill.id === skillIdOrName) ??
+      context.enabledSkillList.find((skill) => skill.name === skillIdOrName);
+
+    const disclosedNow: Array<{
+      skillId: string;
+      skillName: string;
+      id: string;
+      title: string;
+      content: string;
+    }> = [];
+    const alreadyDisclosedReferences: string[] = [];
+    const skippedReferences: string[] = [];
+
+    if (!matchedSkill) {
+      skippedReferences.push(...requestedReferences);
+    } else {
+      const availableReferences = matchedSkill.references ?? [];
+      const shouldDiscloseAll = requestedReferences.includes("*");
+      const candidates = shouldDiscloseAll
+        ? availableReferences
+        : requestedReferences
+            .map(
+              (requested) =>
+                availableReferences.find((ref) => ref.id === requested) ??
+                availableReferences.find((ref) => ref.title === requested),
+            )
+            .filter((ref): ref is NonNullable<typeof ref> => !!ref);
+
+      if (!shouldDiscloseAll) {
+        for (const requested of requestedReferences) {
+          const matched =
+            availableReferences.find((ref) => ref.id === requested) ??
+            availableReferences.find((ref) => ref.title === requested);
+          if (!matched) {
+            skippedReferences.push(requested);
+          }
+        }
+      }
+
+      for (const reference of candidates) {
+        const referenceKey = `${matchedSkill.id}:${reference.id}`;
+        if (disclosedSkillReferences.has(referenceKey)) {
+          alreadyDisclosedReferences.push(reference.title);
+          continue;
+        }
+        disclosedNow.push({
+          skillId: matchedSkill.id,
+          skillName: matchedSkill.name,
+          id: reference.id,
+          title: reference.title,
+          content: reference.content,
+        });
+      }
+    }
+
+    const feedback: string[] = [];
+    for (const reference of disclosedNow) {
+      feedback.push(
+        [
+          `### Skill Reference: ${reference.skillName} / ${reference.title}`,
+          `skillId: ${reference.skillId}`,
+          `referenceId: ${reference.id}`,
+          "",
+          reference.content,
+        ].join("\n"),
+      );
+    }
+    if (skippedReferences.length > 0) {
+      feedback.push(
+        [
+          "### Skill Reference 内容请求反馈",
+          `以下 Skill Reference 未启用或不存在，不能使用：${skippedReferences.join("、")}`,
+        ].join("\n"),
+      );
+    }
+    if (alreadyDisclosedReferences.length > 0) {
+      feedback.push(
+        [
+          "### 已披露 Skill Reference 提醒",
+          `以下 Skill Reference 内容已经提供过，不会重复注入：${alreadyDisclosedReferences.join("、")}`,
+        ].join("\n"),
+      );
+    }
+
+    const disclosedReferenceSummaries = disclosedNow.map((reference) => ({
+      skillId: reference.skillId,
+      skillName: reference.skillName,
+      id: reference.id,
+      title: reference.title,
+    }));
+
+    return {
+      requestedSkill: skillIdOrName,
+      requestedReferences,
+      disclosedReferences: disclosedReferenceSummaries,
+      disclosedReferenceKeys: disclosedNow.map(
+        (reference) => `${reference.skillId}:${reference.id}`,
+      ),
+      alreadyDisclosedReferences,
+      skippedReferences,
+      feedback,
+      toolCall: (attemptIndex: number): ToolCallRecord => ({
+        toolName: "getSkillReferenceContent",
+        status: disclosedNow.length > 0 ? "succeeded" : "failed",
+        attemptIndex,
+        phase: "GENERATE_DRAFT",
+        inputSummary: {
+          skill: skillIdOrName,
+          requestedReferences,
+          alreadyDisclosedReferences,
+          skippedReferences,
+          ...(reason ? { reason } : {}),
+        },
+        output: {
+          disclosedReferences: disclosedReferenceSummaries,
+        },
+        durationMs: Date.now() - disclosureStartTime,
+        ...(disclosedNow.length === 0
+          ? { errorMessage: "没有新增可披露 Skill Reference 内容" }
           : {}),
       }),
     };

@@ -1,4 +1,10 @@
-import type { SkillDto, CreateSkillRequest, UpdateSkillRequest } from "@a2ui-platform/shared";
+import type {
+  JsonObject,
+  SkillDto,
+  SkillReference,
+  CreateSkillRequest,
+  UpdateSkillRequest,
+} from "@a2ui-platform/shared";
 import { logger } from "../logger.js";
 import { skillRepository } from "../repositories/skill.repository.js";
 import { sessionSkillRepository } from "../repositories/session-skill.repository.js";
@@ -12,11 +18,66 @@ function toSkillDto(s: Awaited<ReturnType<typeof skillRepository.findById>>): Sk
     name: s.name,
     description: s.description,
     content: s.content,
+    references: normalizeSkillReferences(s.metadata),
     sourceType: s.sourceType,
     version: s.version,
     isActive: s.isActive,
     createdAt: s.createdAt.toISOString(),
     updatedAt: s.updatedAt.toISOString(),
+  };
+}
+
+function normalizeSkillReferences(metadata: unknown): SkillReference[] {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return [];
+  }
+  const references = (metadata as { references?: unknown }).references;
+  if (!Array.isArray(references)) {
+    return [];
+  }
+  return references
+    .filter((item): item is SkillReference => {
+      if (!item || typeof item !== "object" || Array.isArray(item)) return false;
+      const ref = item as Record<string, unknown>;
+      return (
+        typeof ref.id === "string" &&
+        ref.id.trim().length > 0 &&
+        typeof ref.title === "string" &&
+        ref.title.trim().length > 0 &&
+        typeof ref.content === "string" &&
+        ref.content.trim().length > 0
+      );
+    })
+    .map((ref) => ({
+      id: ref.id.trim(),
+      title: ref.title.trim(),
+      content: ref.content,
+      description: ref.description ?? null,
+    }));
+}
+
+function buildSkillMetadata(references?: SkillReference[]): JsonObject {
+  return {
+    references: (references ?? []).map((ref) => ({
+      id: ref.id,
+      title: ref.title,
+      content: ref.content,
+      description: ref.description ?? null,
+    })),
+  };
+}
+
+function mergeSkillReferencesMetadata(
+  metadata: unknown,
+  references: SkillReference[],
+): JsonObject {
+  const base =
+    metadata && typeof metadata === "object" && !Array.isArray(metadata)
+      ? (metadata as JsonObject)
+      : {};
+  return {
+    ...base,
+    ...buildSkillMetadata(references),
   };
 }
 
@@ -32,7 +93,7 @@ export const skillService = {
       sourceType: "manual",
       version: 1,
       isActive: true,
-      metadata: {},
+      metadata: buildSkillMetadata(req.references),
     });
 
     logger.info({ skillId: skill.id }, "Skill 已创建");
@@ -61,6 +122,12 @@ export const skillService = {
     if (data.name !== undefined) updateData.name = data.name;
     if (data.description !== undefined) updateData.description = data.description;
     if (data.content !== undefined) updateData.content = data.content;
+    if (data.references !== undefined) {
+      updateData.metadata = mergeSkillReferencesMetadata(
+        existing.metadata,
+        data.references,
+      );
+    }
     if (data.isActive !== undefined) updateData.isActive = data.isActive;
 
     const updated = await skillRepository.update(skillId, updateData);
@@ -144,7 +211,7 @@ export const skillService = {
       sourceType: "builtin",
       version: params.version ?? 1,
       isActive: true,
-      metadata: {},
+      metadata: buildSkillMetadata(),
     });
     logger.info(
       { skillId: created.id, name: params.name },

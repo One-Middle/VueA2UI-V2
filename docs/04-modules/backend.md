@@ -122,7 +122,7 @@ packages/backend/
 | `MessageService` | `src/services/message.service.ts` | 保存用户消息并触发 Agent run。 | 用户对话进入后端业务流程的主入口。 |
 | `SnapshotService` | `src/services/snapshot.service.ts` | 从 committed A2UI events 回放并物化 current snapshot。 | 决定历史会话和实时预览能否恢复一致 UI 状态。 |
 | `StreamService` | `src/services/stream.service.ts` | 管理 SSE 客户端并广播 run、message、event、snapshot。 | 负责后端向前端推送实时状态。 |
-| `skillService` | `src/services/skill.service.ts` | 管理 Skill CRUD、会话启用关系和内置 Skill upsert。 | 支撑 Agent Runtime 的可选能力注入。 |
+| `skillService` | `src/services/skill.service.ts` | 管理 Skill CRUD、Reference metadata、会话启用关系和内置 Skill upsert。 | 支撑 Agent Runtime 的可选能力注入与参考资料按需披露。 |
 | Prisma Client | `src/db.ts` | 数据库访问入口。 | 所有 repository 和事务边界的基础设施。 |
 
 ## 7. 路由职责

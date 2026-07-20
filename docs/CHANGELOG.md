@@ -4,6 +4,7 @@
 
 ### Agent Runtime
 
+- Skill 支持 `references` 参考资料列表；Runtime 初始 Prompt 只展示 Reference 摘要，模型可通过 `skillReferenceRequest` 按需请求正文，并记录 `getSkillReferenceContent` 工具调用。
 - 将 A2UI v0.9 生成指南从固定 system prompt 迁移为 `builtin:a2ui-v0.9-generation` 基础 Skill；Runtime 始终内建注入该 Skill，模型通过 `skillInfoRequest` 渐进披露完整生成规则。
 - `PromptComposer` 改为只注入 Agent 身份、能力边界、工作流、输出通道和安全禁令；工作流明确为“理解用户需求 -> 向用户确认自己的理解 -> 开始生成 -> 校验 -> 提交”。
 - 最终 `assistantMessage` 需先简要复述对用户需求的理解，再说明生成或修改结果；`validateA2UI` 仍是正式提交门禁。
@@ -60,6 +61,7 @@
 
 ### Backend / Frontend
 
+- Skill CRUD 支持 `references` 字段，后端将其保存到 `skills.metadata.references` 并在 Agent Run、会话导出和前端 Skill 面板中透传。
 - Frontend Preview 宿主补齐 `a2ui:action` / `a2ui:error` 监听，按当前会话转发 Renderer 回传消息到 Backend 记录接口。
 - `AgentRunInput.enabledSkills` 增加 `description` 字段，后端触发 Agent Run 时同步传入 Skill 描述。
 - `ToolCallRecord` 增加 `phase` 字段，SSE `agent_run_attempt` 会携带 `getSkillContent` 工具调用供前端展示。

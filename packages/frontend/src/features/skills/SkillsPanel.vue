@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { SkillDto } from "@a2ui-platform/shared";
+import type { SkillDto, SkillReference } from "@a2ui-platform/shared";
 import {
   NButton,
   NCard,
@@ -25,7 +25,13 @@ const workspace = useWorkspaceStore();
 const modalVisible = ref(false);
 const modalMode = ref<ModalMode>("create");
 const editingSkill = ref<SkillDto | null>(null);
-const form = ref({ name: "", description: "", content: "", isActive: true });
+const form = ref({
+  name: "",
+  description: "",
+  content: "",
+  referencesJson: "[]",
+  isActive: true,
+});
 
 // ─── 计算属性 ──────────────────────────────────────────
 
@@ -61,6 +67,7 @@ const openView = (skill: SkillDto) => {
     name: skill.name,
     description: skill.description ?? "",
     content: skill.content,
+    referencesJson: formatReferences(skill.references),
     isActive: skill.isActive,
   };
   modalMode.value = "view";
@@ -74,6 +81,7 @@ const openEdit = (skill: SkillDto) => {
     name: skill.name,
     description: skill.description ?? "",
     content: skill.content,
+    referencesJson: formatReferences(skill.references),
     isActive: skill.isActive,
   };
   modalMode.value = "edit";
@@ -83,7 +91,13 @@ const openEdit = (skill: SkillDto) => {
 /** 打开新建弹窗 */
 const openCreate = () => {
   editingSkill.value = null;
-  form.value = { name: "", description: "", content: "", isActive: true };
+  form.value = {
+    name: "",
+    description: "",
+    content: "",
+    referencesJson: "[]",
+    isActive: true,
+  };
   modalMode.value = "create";
   modalVisible.value = true;
 };
@@ -98,12 +112,14 @@ const closeModal = () => {
 /** 新建 / 编辑 提交 */
 const handleSubmit = async () => {
   if (!form.value.name || !form.value.content) return;
+  const references = parseReferences(form.value.referencesJson);
 
   if (modalMode.value === "edit" && editingSkill.value) {
     await workspace.updateSkill(editingSkill.value.id, {
       name: form.value.name,
       description: form.value.description,
       content: form.value.content,
+      references,
       isActive: form.value.isActive,
     });
   } else if (modalMode.value === "create") {
@@ -111,10 +127,43 @@ const handleSubmit = async () => {
       form.value.name,
       form.value.description,
       form.value.content,
+      references,
     );
   }
 
   closeModal();
+};
+
+/** 格式化 Skill Reference JSON。 */
+const formatReferences = (references: SkillReference[] = []) =>
+  JSON.stringify(references, null, 2);
+
+/** 解析 Skill Reference JSON。 */
+const parseReferences = (raw: string): SkillReference[] => {
+  const parsed = JSON.parse(raw || "[]") as unknown;
+  if (!Array.isArray(parsed)) {
+    throw new Error("References 必须是数组");
+  }
+  return parsed.map((item) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      throw new Error("Reference 必须是对象");
+    }
+    const ref = item as Record<string, unknown>;
+    if (
+      typeof ref.id !== "string" ||
+      typeof ref.title !== "string" ||
+      typeof ref.content !== "string"
+    ) {
+      throw new Error("Reference 必须包含 id、title 和 content");
+    }
+    return {
+      id: ref.id,
+      title: ref.title,
+      content: ref.content,
+      description:
+        typeof ref.description === "string" ? ref.description : null,
+    };
+  });
 };
 
 /** 会话级启用/禁用切换 */
@@ -246,6 +295,18 @@ const sourceTypeTagType = (type: string): "info" | "warning" | "default" => {
               文件中。请通过编辑对应 .md 文件后运行
               <code>pnpm skill:sync</code> 更新内容。
             </p>
+          </div>
+
+          <!-- References -->
+          <div class="form-field">
+            <label>References（JSON）</label>
+            <n-input
+              v-model:value="form.referencesJson"
+              type="textarea"
+              placeholder='[{"id":"ref-1","title":"参考资料","content":"资料正文"}]'
+              :rows="modalMode === 'view' ? 10 : 8"
+              :readonly="isReadonly"
+            />
           </div>
 
           <!-- 可用状态（仅编辑模式显示） -->

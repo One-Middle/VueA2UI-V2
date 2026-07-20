@@ -11,6 +11,18 @@
 
 import type { A2UIClientMessage, A2UIServerMessage, JsonObject, SurfaceSnapshotData } from "./a2ui";
 
+/** Skill 附带的参考资料。 */
+export interface SkillReference {
+  /** Reference 在所属 Skill 内的唯一标识。 */
+  id: string;
+  /** Reference 标题，用于摘要展示和模型请求。 */
+  title: string;
+  /** Reference 正文内容。 */
+  content: string;
+  /** Reference 描述或使用提示。 */
+  description?: string | null;
+}
+
 /** 会话状态 */
 export type SessionStatus = "active" | "archived" | "deleted";
 /** 消息角色 */
@@ -149,6 +161,8 @@ export interface SkillDto {
   description: string | null;
   /** Skill 内容（Markdown） */
   content: string;
+  /** Skill 附带的参考资料列表。 */
+  references: SkillReference[];
   /** Skill 来源类型（system / user） */
   sourceType: string;
   /** 版本号 */
@@ -369,6 +383,8 @@ export interface CreateSkillRequest {
   description?: string;
   /** Skill 内容（Markdown） */
   content: string;
+  /** Skill 附带的参考资料列表。 */
+  references?: SkillReference[];
 }
 
 /** 更新 Skill 请求。 */
@@ -379,6 +395,8 @@ export interface UpdateSkillRequest {
   description?: string;
   /** 新的 Skill 内容 */
   content?: string;
+  /** 新的 Skill 参考资料列表。 */
+  references?: SkillReference[];
   /** 是否启用 */
   isActive?: boolean;
 }

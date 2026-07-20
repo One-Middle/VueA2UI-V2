@@ -22,7 +22,8 @@
 
 ## 3.1 Agent Runtime 共享字段
 
-- `AgentRunInput.enabledSkills` 包含 `id`、`name`、`description` 和 `content`；Runtime 初始 Prompt 只暴露摘要，完整 `content` 仅在 `skillInfoRequest` 命中后披露。
+- `AgentRunInput.enabledSkills` 包含 `id`、`name`、`description`、`content` 和可选 `references`；Runtime 初始 Prompt 只暴露 Skill 摘要和 Reference 摘要，完整 `content` 仅在 `skillInfoRequest` 命中后披露，完整 Reference 内容仅在 `skillReferenceRequest` 命中后披露。
+- `SkillReference` 包含 `id`、`title`、`content` 和可选 `description`，表示隶属于单个 Skill 的参考资料正文。
 - `ToolCallRecord.phase` 用于标记工具调用所属阶段，后端 SSE 会将该阶段透传给前端。
 - `IAgentRuntime` 接口定义了 Agent Runtime 的唯一调用契约 `run(input, onToolCall?) → AgentRunResult`，后端只依赖此接口，不感知具体实现。
 - `AgentRuntimeFactoryConfig` 定义工厂函数所需的最小配置（模型 API 连接参数），与具体模型客户端实现无关。

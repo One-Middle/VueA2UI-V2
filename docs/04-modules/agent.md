@@ -154,12 +154,14 @@ Agent 包通过 `index.ts` 暴露三层公共 API：
 
 ## 10. Skill 渐进式披露
 
-- 初始 Prompt 只包含已启用 Skill 的 `id`、`name` 和 `description` 摘要，不直接注入完整 `content`。
+- 初始 Prompt 只包含已启用 Skill 的 `id`、`name`、`description` 摘要，以及各 Skill 下 Reference 的 `id`、`title`、`description` 摘要，不直接注入完整 `content` 或 Reference 正文。
 - 当模型需要完整 Skill 规则时，输出 `skillInfoRequest`，由 Runtime 从本次 `AgentRunInput.enabledSkills` 中按 `id` 优先、`name` 其次精确匹配。
 - Runtime 通过 `getSkillContent` 工具调用记录披露结果，并把匹配到的 Markdown 内容注入下一轮 Prompt。
+- 当模型需要 Skill Reference 正文时，输出 `skillReferenceRequest`，由 Runtime 先按 Skill `id`/`name` 匹配，再按 Reference `id`/`title` 匹配；`references: ["*"]` 表示披露该 Skill 下全部 Reference。
+- Runtime 通过 `getSkillReferenceContent` 工具调用记录披露结果，并把匹配到的 Reference 正文注入下一轮 Prompt。
 - A2UI 生成能力通过 `builtin:a2ui-v0.9-generation` 基础 Skill 提供；该 Skill 由 Runtime 始终内建注入，即使后端未为 session 启用任何 Skill 也可请求。
-- Runtime 不访问数据库、不读取本地文件、不执行 Skill 脚本；Skill 内容来自后端传入的启用 Skill 列表和 Runtime 内建基础 Skill。
-- Skill 内容披露和组件详情披露共用渐进式披露轮次，达到上限后强制输出最终 `{ assistantMessage, a2uiMessages }`。
+- Runtime 不访问数据库、不读取本地文件、不执行 Skill 脚本；Skill 内容和 Reference 内容来自后端传入的启用 Skill 列表和 Runtime 内建基础 Skill。
+- Skill 内容披露、Skill Reference 披露和组件详情披露共用渐进式披露轮次，达到上限后强制输出最终 `{ assistantMessage, a2uiMessages }`。
 
 ## 11. 输出契约
 

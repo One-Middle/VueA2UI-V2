@@ -18,6 +18,7 @@ import type {
   MessageDto,
   UploadedFileDto,
   SkillDto,
+  SkillReference,
   SurfaceSnapshotDto,
   ToolCallDto,
   A2UIServerMessage,
@@ -335,9 +336,14 @@ export const useWorkspaceStore = defineStore("workspace", {
     },
 
     /** 创建新 Skill。 */
-    async createSkill(name: string, description: string, content: string) {
+    async createSkill(
+      name: string,
+      description: string,
+      content: string,
+      references: SkillReference[] = [],
+    ) {
       try {
-        const result = await api.createSkill({ name, description, content });
+        const result = await api.createSkill({ name, description, content, references });
         this.skills.push(result.skill);
         return result.skill;
       } catch {
@@ -346,7 +352,16 @@ export const useWorkspaceStore = defineStore("workspace", {
     },
 
     /** 更新已有 Skill 的字段。 */
-    async updateSkill(skillId: string, data: { name?: string; description?: string; content?: string; isActive?: boolean }) {
+    async updateSkill(
+      skillId: string,
+      data: {
+        name?: string;
+        description?: string;
+        content?: string;
+        references?: SkillReference[];
+        isActive?: boolean;
+      },
+    ) {
       try {
         const result = await api.updateSkill(skillId, data);
         const idx = this.skills.findIndex((s) => s.id === skillId);

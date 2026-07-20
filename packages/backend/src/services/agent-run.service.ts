@@ -163,6 +163,7 @@ export const agentRunService = {
               name: sessionSkill.skill.name,
               description: sessionSkill.skill.description,
               content: sessionSkill.skill.content,
+              references: extractSkillReferences(sessionSkill.skill.metadata),
             })),
           currentSnapshot: currentSnapshot ? (currentSnapshot.snapshot as AgentRunInput["currentSnapshot"]) : null,
           catalogId: config.catalog.id,
@@ -508,6 +509,43 @@ export const agentRunService = {
     };
   },
 };
+
+function extractSkillReferences(metadata: unknown): AgentRunInput["enabledSkills"][number]["references"] {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return [];
+  }
+  const references = (metadata as { references?: unknown }).references;
+  if (!Array.isArray(references)) {
+    return [];
+  }
+  return references
+    .filter((item) => {
+      if (!item || typeof item !== "object" || Array.isArray(item)) return false;
+      const ref = item as Record<string, unknown>;
+      return (
+        typeof ref.id === "string" &&
+        ref.id.trim().length > 0 &&
+        typeof ref.title === "string" &&
+        ref.title.trim().length > 0 &&
+        typeof ref.content === "string" &&
+        ref.content.trim().length > 0
+      );
+    })
+    .map((item) => {
+      const ref = item as {
+        id: string;
+        title: string;
+        content: string;
+        description?: string | null;
+      };
+      return {
+        id: ref.id.trim(),
+        title: ref.title.trim(),
+        content: ref.content,
+        description: ref.description ?? null,
+      };
+    });
+}
 
 function extractSurfaceIds(messages: A2UIServerMessage[]): string[] {
   const surfaceIds = new Set<string>();

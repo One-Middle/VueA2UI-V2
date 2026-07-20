@@ -4,6 +4,7 @@ import { AgentContextBuilder } from "../context/context-builder.js";
 import { PromptComposer } from "../prompts/prompt-composer.js";
 import { parseComponentInfoRequest } from "./component-info-request-parser.js";
 import { parseSkillInfoRequest } from "./skill-info-request-parser.js";
+import { parseSkillReferenceRequest } from "./skill-reference-request-parser.js";
 import { AgentRuntime } from "./agent-runtime.js";
 import type { ModelClient, ModelResponse } from "../model/model-client.js";
 
@@ -155,6 +156,26 @@ describe("Agent 渐进式组件披露", () => {
     if (result.ok) {
       expect(result.request.skills).toEqual(["skill-1", "课程表规范"]);
       expect(result.request.reason).toBe("需要遵循课程表规则");
+    }
+  });
+
+  it("可解析合法 skillReferenceRequest", () => {
+    const result = parseSkillReferenceRequest(
+      JSON.stringify({
+        assistantMessage: "需要查看 reference 后再生成。",
+        skillReferenceRequest: {
+          skill: "skill-1",
+          references: ["ref-1", "视觉规范"],
+          reason: "需要遵循参考资料",
+        },
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.request.skill).toBe("skill-1");
+      expect(result.request.references).toEqual(["ref-1", "视觉规范"]);
+      expect(result.request.reason).toBe("需要遵循参考资料");
     }
   });
 
@@ -395,6 +416,94 @@ describe("Agent 渐进式组件披露", () => {
       toolCalls.some(
         (record) =>
           record.toolName === "getSkillContent" &&
+          record.phase === "GENERATE_DRAFT",
+      ),
+    ).toBe(true);
+  });
+
+  it("Runtime 首轮请求 Skill Reference 内容，补充后生成并记录 getSkillReferenceContent", async () => {
+    const finalOutput = {
+      assistantMessage: "已按 reference 生成页面。",
+      a2uiMessages: [
+        {
+          version: "v0.9",
+          createSurface: {
+            surfaceId: "main",
+            catalogId:
+              "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json",
+          },
+        },
+        {
+          version: "v0.9",
+          updateComponents: {
+            surfaceId: "main",
+            components: [
+              {
+                id: "root",
+                component: "Column",
+                children: ["title"],
+              },
+              {
+                id: "title",
+                component: "Text",
+                text: "Reference Driven UI",
+                usageHint: "h1",
+              },
+            ],
+          },
+        },
+      ],
+    };
+
+    const fakeModel = new FakeModelClient([
+      JSON.stringify({
+        assistantMessage: "需要查看 Skill Reference 后再生成。",
+        skillReferenceRequest: {
+          skill: "skill-1",
+          references: ["ref-1"],
+          reason: "需要参考资料正文",
+        },
+      }),
+      JSON.stringify(finalOutput),
+    ]);
+    const runtime = new AgentRuntime(
+      fakeModel as unknown as ModelClient,
+      new PromptComposer(),
+      new AgentContextBuilder(),
+    );
+    const toolCalls: ToolCallRecord[] = [];
+
+    const result = await runtime.run(
+      createInput([
+        {
+          id: "skill-1",
+          name: "Reference Skill",
+          description: "Skill with references",
+          content: "Skill content only.",
+          references: [
+            {
+              id: "ref-1",
+              title: "视觉规范",
+              content: "Reference full content: use compact spacing.",
+            },
+          ],
+        },
+      ]),
+      (record) => {
+        toolCalls.push(record);
+      },
+    );
+
+    expect(result.status).toBe("COMMITTED");
+    expect(fakeModel.prompts).toHaveLength(2);
+    expect(fakeModel.prompts[0]!.user).toContain("ref-1");
+    expect(fakeModel.prompts[0]!.user).toContain("视觉规范");
+    expect(fakeModel.prompts[0]!.user).not.toContain("Reference full content");
+    expect(fakeModel.prompts[1]!.system).toContain("Reference full content");
+    expect(
+      toolCalls.some(
+        (record) =>
+          record.toolName === "getSkillReferenceContent" &&
           record.phase === "GENERATE_DRAFT",
       ),
     ).toBe(true);

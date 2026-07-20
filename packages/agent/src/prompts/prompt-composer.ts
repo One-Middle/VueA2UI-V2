@@ -5,6 +5,7 @@ import { formatCatalogComponentSummaries } from "../tools/catalog-schema.js";
 export interface PromptDisclosureOptions {
   componentDetails?: string;
   skillDetails?: string;
+  skillReferenceDetails?: string;
   forceFinalOutput?: boolean;
 }
 
@@ -90,7 +91,18 @@ export class PromptComposer {
       "}",
       "skillInfoRequest.skills 只能填写已启用 Skill 摘要中的 id 或 name，优先使用 id。",
       "",
-      "### 2. 请求组件字段详情",
+      "### 2. 请求 Skill Reference 完整内容",
+      "{",
+      '  "assistantMessage": "需要查看相关参考资料后再生成。",',
+      '  "skillReferenceRequest": {',
+      '    "skill": "skill-id-or-name",',
+      '    "references": ["reference-id-or-title"],',
+      '    "reason": "需要遵循该参考资料"',
+      "  }",
+      "}",
+      'skillReferenceRequest.skill 只能填写已启用 Skill 摘要中的 id 或 name；references 只能填写该 Skill 摘要中的 reference id 或 title，也可以填写 "*" 请求该 Skill 下全部 references。',
+      "",
+      "### 3. 请求组件字段详情",
       "{",
       '  "assistantMessage": "需要查看组件详情后再生成。",',
       '  "componentInfoRequest": {',
@@ -100,7 +112,7 @@ export class PromptComposer {
       "}",
       "componentInfoRequest.components 只能填写下方 Basic Catalog 中存在的组件名称。",
       "",
-      "### 3. 最终响应",
+      "### 4. 最终响应",
       "{",
       '  "assistantMessage": "先简要复述理解，再说明生成或修改了什么",',
       '  "a2uiMessages": []',
@@ -118,6 +130,14 @@ export class PromptComposer {
             options.skillDetails.trim(),
           ]
         : []),
+      ...(options.skillReferenceDetails?.trim()
+        ? [
+            "",
+            "## 已披露 Skill Reference 内容",
+            "你必须遵循以下已披露 Skill Reference 内容。未披露 reference 如需完整内容，应继续请求 skillReferenceRequest。",
+            options.skillReferenceDetails.trim(),
+          ]
+        : []),
       ...(options.componentDetails?.trim()
         ? [
             "",
@@ -130,7 +150,7 @@ export class PromptComposer {
         ? [
             "",
             "## 强制最终输出",
-            "渐进式披露轮次已达到上限。现在必须基于已披露的信息输出最终 { assistantMessage, a2uiMessages } JSON，不要再输出 componentInfoRequest 或 skillInfoRequest。",
+            "渐进式披露轮次已达到上限。现在必须基于已披露的信息输出最终 { assistantMessage, a2uiMessages } JSON，不要再输出 componentInfoRequest、skillInfoRequest 或 skillReferenceRequest。",
           ]
         : []),
       "",
@@ -171,7 +191,7 @@ export class PromptComposer {
     parts.push("");
 
     parts.push(
-      "请根据以上用户需求和上下文信息生成 A2UI。若需要 Skill 完整内容，请先输出 skillInfoRequest；若需要组件字段详情，请先输出 componentInfoRequest；若已有足够信息，请输出最终 { assistantMessage, a2uiMessages } JSON。",
+      "请根据以上用户需求和上下文信息生成 A2UI。若需要 Skill 完整内容，请先输出 skillInfoRequest；若需要 Skill Reference 完整内容，请先输出 skillReferenceRequest；若需要组件字段详情，请先输出 componentInfoRequest；若已有足够信息，请输出最终 { assistantMessage, a2uiMessages } JSON。",
     );
 
     return parts.join("\n");
