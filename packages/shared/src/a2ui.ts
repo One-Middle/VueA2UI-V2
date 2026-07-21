@@ -63,6 +63,22 @@ export interface A2UIActionEventDeclaration {
   context?: JsonObject;
 }
 
+/** 组件属性中的只读脚本声明，用于根据 dataModel 计算属性值。 */
+export interface A2UIPropertyScriptDeclaration {
+  /** 同步 JS 函数体，必须显式 return 一个 JSON-compatible 值。 */
+  code: string;
+  /** 脚本依赖的 dataModel JSON Pointer 路径，用于 Renderer 建立最小订阅。 */
+  deps: string[];
+  /** 脚本执行失败或返回值非法时使用的兜底值。 */
+  fallback?: JsonValue;
+}
+
+/** 可出现在组件属性中的脚本动态值包装。 */
+export interface A2UIPropertyScriptValue {
+  /** 只读属性脚本声明。 */
+  script: A2UIPropertyScriptDeclaration;
+}
+
 /** 组件声明中的函数调用 action，当前仅作为未来能力保留。 */
 export interface A2UIActionFunctionCallDeclaration {
   /** 受控函数名称，如 openUrl。 */
@@ -71,10 +87,22 @@ export interface A2UIActionFunctionCallDeclaration {
   args?: JsonObject;
 }
 
-/** 组件声明中的 action 配置。当前 Renderer 只执行 event。 */
+/** 组件声明中的脚本 action，用于在用户交互时执行受限本地逻辑。 */
+export interface A2UIActionScriptDeclaration {
+  /** 同步 JS 函数体，允许读取和写入 dataModel，并调用宿主注入的 actions 能力。 */
+  code: string;
+  /** 可选依赖说明，供 Agent 和调试工具理解脚本读取的数据路径。 */
+  deps?: string[];
+  /** 脚本上下文，可包含静态值或 `{ path }` 动态绑定。 */
+  context?: JsonObject;
+}
+
+/** 组件声明中的 action 配置。 */
 export interface A2UIComponentActionDeclaration {
   /** 用户交互事件。 */
   event?: A2UIActionEventDeclaration;
+  /** 用户交互触发的受限脚本。 */
+  script?: A2UIActionScriptDeclaration;
   /** 未来函数调用能力，当前 Agent 不应生成，Renderer 不执行。 */
   functionCall?: A2UIActionFunctionCallDeclaration;
 }

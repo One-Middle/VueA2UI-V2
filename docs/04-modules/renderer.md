@@ -153,16 +153,24 @@ packages/renderer/src/
 用户交互：
 
 1. Basic 组件触发 action 或数据写回。
-2. `ComponentContext` 解析动态上下文。
-3. Renderer 派发 action/error 给宿主前端。
+2. `ComponentContext` 解析动态上下文、属性脚本和 action 上下文。
+3. Renderer 派发 action/error 给宿主前端，或执行受限 `action.script` 后再通过注入的 `actions.emit` 派发事件。
 4. 前端调用后端 Renderer 回传 API。
 
 Action 格式说明：
 
 - A2UI 契约目标以官网式 `Button.action.event` 为准，详见 [A2UI v0.9 契约](../03-contracts/a2ui-v0.9.md)。
 - Renderer 回传 action 时生成标准 A2UI client message，并在 `action.kind` 中标记 `"event"`。
+- Renderer 支持受限 `action.script`，脚本可读写当前 surface 的 `dataModel`，并通过 `actions.emit` 复用标准 action 派发链路。
 - `action.functionCall` 作为未来能力保留在 shared 类型和文档中，但当前 Renderer 暂不执行，Agent schema 也不放行。
-- Renderer 当前只派发 `action.event`；旧版扁平 `{ name, context }` 不再兼容。
+- Renderer 当前只派发 `action.event` 或由 `action.script` 显式 emit 的事件；旧版扁平 `{ name, context }` 不再兼容。
+
+属性脚本说明：
+
+- Renderer 支持 `{ script: { code, deps, fallback } }` 属性脚本，用于只读计算属性值。
+- 属性脚本通过 SES `Compartment` 同步执行，只注入 `dataModel.get`。
+- `deps` 必填，Renderer 会注册最小订阅并在依赖路径变化后触发组件属性重新计算。
+- 第一版只支持 `style.<白名单字段>.script`，不支持 `style.script` 返回完整样式对象。
 
 ## 9. 依赖契约
 

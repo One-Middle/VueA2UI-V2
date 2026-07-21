@@ -6,7 +6,7 @@
 
 | 计划 | 状态 | 入口 | 影响范围 |
 | --- | --- | --- | --- |
-暂无。
+| Renderer JSRuntime 能力建设 | 计划中 | [plan.md](./2026-07-renderer-js-runtime/plan.md) | shared、agent、renderer、A2UI 契约、Renderer 能力矩阵 |
 
 ## 2. 待启动
 

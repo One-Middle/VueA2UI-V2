@@ -82,14 +82,71 @@ Renderer 可通过前端回传：
 }
 ```
 
+`action.script` 用于用户交互触发的受限本地脚本。脚本由 Renderer JSRuntime 在 SES `Compartment` 中同步执行，可读取和写入当前 surface 的 `dataModel`，并通过宿主显式注入的 `actions` 能力分组派发事件：
+
+```json
+{
+  "action": {
+    "script": {
+      "code": "const count = Number(dataModel.get('/count') ?? 0); dataModel.set('/count', count + 1); actions.emit('changed', { count: count + 1 });",
+      "deps": ["/count"],
+      "context": {}
+    }
+  }
+}
+```
+
 当前实现状态：
 
 - `action.event` 是当前正式格式，Agent 应按该格式生成，Renderer 按该格式解析并派发。
 - Renderer 回传的 action payload 使用 `kind: "event"`，供后端 action handler 稳定分发。
+- `action.script` 是受限本地脚本 action，Renderer 可执行；脚本不直接调用后端，若需形成正式回传事件，应通过 `actions.emit` 复用标准 `a2ui:action` 派发链路。
 - `action.functionCall` 只作为未来契约保留，当前 Agent schema 不放行，Renderer 暂不执行。
 - 项目早期代码中存在 `{ "name": "...", "context": {} }` 扁平格式；当前 Renderer 不再兼容该格式，Agent 不应生成。
 
 Frontend 负责监听并转发 Renderer action/error，Backend 负责记录，Agent 不直接接收 Renderer 回传。
+
+### 3.2 属性脚本契约
+
+组件属性可使用只读属性脚本从 `dataModel` 计算值。属性脚本必须声明 `deps`，Renderer 通过这些路径建立最小订阅，并在数据变化后重新执行脚本：
+
+```json
+{
+  "text": {
+    "script": {
+      "code": "return `当前分数：${dataModel.get('/score') ?? 0}`;",
+      "deps": ["/score"],
+      "fallback": "当前分数：0"
+    }
+  }
+}
+```
+
+属性脚本约束：
+
+- `code` 必须是同步 JS 函数体，并显式 `return` 一个 JSON-compatible 值。
+- `deps` 必填，最多 32 个 JSON Pointer 路径。
+- `fallback` 可选，用于脚本异常或返回值非法时兜底。
+- 属性脚本只注入 `dataModel.get(path)`，不注入 `dataModel.set`、`actions`、DOM、网络、浏览器存储或计时器能力。
+- Renderer 第一版使用主线程 SES，不能阻止死循环；脚本应保持为可信简单逻辑。
+
+样式脚本第一版只允许出现在受控样式白名单字段上，例如 `style.color.script`：
+
+```json
+{
+  "style": {
+    "color": {
+      "script": {
+        "code": "return Number(dataModel.get('/score') ?? 0) >= 60 ? '#16a34a' : '#dc2626';",
+        "deps": ["/score"],
+        "fallback": "#dc2626"
+      }
+    }
+  }
+}
+```
+
+`style.script` 返回整个样式对象、任意 CSS、`className`、`innerHTML` 和事件处理器仍不属于正式能力。
 
 ## 4. 组件树规则
 

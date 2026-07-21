@@ -1,5 +1,21 @@
 # 更新日志
 
+## 2026-07-21
+
+### Renderer
+
+- 新增 Renderer JSRuntime MVP：基于 SES `Compartment` 执行受限同步脚本。
+- 新增 `action.script`，Button 可在点击时执行脚本，读写当前 surface 的 `dataModel`，并通过 `actions.emit` 派发标准 `a2ui:action`。
+- 新增属性脚本 `{ script: { code, deps, fallback } }`，支持只读 `dataModel.get` 计算属性值，并通过必填 `deps` 建立最小订阅。
+- `visual-props.ts` 支持 `style.<白名单字段>.script`，动态样式仍受 Renderer 白名单约束。
+- 补充 Renderer 回归测试，覆盖属性脚本文本、动态样式、`action.script` 和脚本错误 fallback。
+
+### Agent / Shared / 文档
+
+- Shared A2UI 类型新增属性脚本和 `action.script` 声明。
+- Basic Catalog schema 放行属性脚本、样式字段脚本和 `action.script`。
+- 新增 `docs/06-planning/2026-07-renderer-js-runtime/` 平台改造计划，并同步 A2UI 契约和 Renderer 模块文档。
+
 ## 2026-07-19
 
 ### Agent Runtime

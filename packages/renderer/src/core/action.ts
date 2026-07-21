@@ -3,13 +3,15 @@
  *
  * 职责：
  * - 解析当前正式的 action.event 声明
+ * - 解析 action.script 声明并交给组件上下文执行
  * - 预留 functionCall 识别接口但不执行
  * - 生成标准 A2UI client-to-server action 消息
  *
- * 不负责：调用后端 API、执行 functionCall 或决定业务处理策略。
+ * 不负责：调用后端 API、直接执行脚本或决定业务处理策略。
  */
 
 import type { A2UIClientMessage, JsonObject, JsonValue } from "@a2ui-platform/shared";
+import type { ActionScriptDeclaration } from "./js-runtime";
 
 /** Renderer 当前可派发的 event action。 */
 export interface RendererEventAction {
@@ -31,9 +33,18 @@ export interface RendererFunctionCallAction {
   args: Record<string, unknown>;
 }
 
+/** Renderer 可执行的脚本 action 声明。 */
+export interface RendererScriptAction {
+  /** action 类型。 */
+  kind: "script";
+  /** 受限同步脚本声明。 */
+  script: ActionScriptDeclaration;
+}
+
 /** Renderer 支持识别的 action 声明。 */
 export type RendererComponentAction =
   | RendererEventAction
+  | RendererScriptAction
   | RendererFunctionCallAction;
 
 /** 动态值解析函数。 */
@@ -67,6 +78,23 @@ export function resolveComponentAction(
   if (event) {
     const name = typeof event.name === "string" ? event.name.trim() : "";
     return name ? { kind: "event", name, context: toRecord(event.context) } : null;
+  }
+
+  const script = isPlainObject(action.script) ? action.script : null;
+  if (script) {
+    const code = typeof script.code === "string" ? script.code : "";
+    return code
+      ? {
+          kind: "script",
+          script: {
+            code,
+            deps: Array.isArray(script.deps)
+              ? script.deps.filter((dep): dep is string => typeof dep === "string")
+              : undefined,
+            context: toRecord(script.context),
+          },
+        }
+      : null;
   }
 
   const functionCall = isPlainObject(action.functionCall) ? action.functionCall : null;

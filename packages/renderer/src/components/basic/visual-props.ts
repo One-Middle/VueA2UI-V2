@@ -46,12 +46,18 @@ const SHADOW_MAP: Record<string, string> = {
 
 /** 解析组件 style 字段。 */
 export function resolveVisualStyle(ctx: ComponentContext): CSSProperties {
-  const raw = ctx.resolveValue(ctx.componentModel.getProperty("style"));
+  const raw = ctx.componentModel.getProperty("style");
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
     return {};
   }
 
-  const source = raw as Record<string, unknown>;
+  const source: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    const resolved = ctx.resolveValue(value);
+    if (resolved !== undefined) {
+      source[key] = resolved;
+    }
+  }
   const style: CSSProperties = {};
 
   for (const key of DIRECT_STYLE_KEYS) {
