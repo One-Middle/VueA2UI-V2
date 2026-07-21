@@ -53,6 +53,7 @@ Renderer 当前支持基于 JSON Pointer 的数据模型能力：
 | --- | --- | --- |
 | `updateDataModel.path` + `value` | 写入或替换数据模型中的指定路径。 | 初始化表单值、列表数据、状态值。 |
 | `{ "path": "/some/value" }` 动态引用 | 组件属性中只有 `path` 一个字段的对象会被解析为 dataModel 取值，根替换和深层路径更新都会触发 Vue 响应式刷新。 | `Text.text`、`Image.url`、`Button.action.context`、表单 `value/text` 等动态绑定。 |
+| `{ "script": { "code", "deps", "fallback" } }` 属性脚本 | 组件属性可通过 SES 受限脚本只读访问 `dataModel.get` 并返回 JSON-compatible 值；`deps` 变化会触发重新执行。 | `Text.text`、已接入通用视觉属性的 `style.<白名单字段>`。 |
 | 相对路径上下文 | `DataContext` 支持绝对路径和相对路径拼接，递归渲染时会向子组件传递当前 dataModel 作用域。 | 动态列表模板、嵌套容器内的相对路径绑定。 |
 | 表单类组件写回 | 部分输入组件在绑定值为 `{ path }` 时，会把用户输入写回 dataModel。 | `TextField.text`、`CheckBox.value`、`ChoicePicker.value`、`Slider.value`、`DateTimeInput.value`。 |
 
@@ -69,7 +70,7 @@ Renderer 当前支持基于 JSON Pointer 的数据模型能力：
 | 图标展示 | 常用图标名到 Unicode/emoji fallback 的展示，未知图标名直接显示名称文本。 | `Icon` |
 | 基础布局 | 水平/垂直 flex 布局、间距、换行、对齐、分布、卡片包裹、静态列表、基础标签页、基础模态框。 | `Row`、`Column`、`Card`、`List`、`Tabs`、`Modal`、`Divider` |
 | 表单输入 | 文本输入、长文本、数字输入、密码输入、复选框、下拉选择、滑块、日期/时间/日期时间输入，并可写回 dataModel。 | `TextField`、`CheckBox`、`ChoicePicker`、`Slider`、`DateTimeInput` |
-| 用户操作 | 按钮点击后派发 `a2ui:action` 浏览器事件，事件 detail 为标准 A2UI client message，包含 `version` 和 `action`。 | `Button` |
+| 用户操作 | 按钮点击后派发 `a2ui:action` 浏览器事件，事件 detail 为标准 A2UI client message，包含 `version` 和 `action`；`action.script` 可通过注入的 `actions.emit` 复用该链路。 | `Button` |
 | 视觉样式 | 受控 `style` 白名单、`variant`、`size`、`tone`、`preset` 修饰类，形成按钮、卡片、文本、布局等基础视觉变化。 | 已接入 `visual-props.ts` 的组件 |
 
 ### 3.5 支持的 action 类型与实现原理
@@ -79,17 +80,18 @@ Renderer 当前支持基于 JSON Pointer 的数据模型能力：
 | action 声明类型 | 示例 | 当前行为 |
 | --- | --- | --- |
 | 正式事件 action：`action.event` | `{ "action": { "event": { "name": "submit", "context": { "form": { "path": "/form" } } } } }` | 支持。点击按钮时解析为 `kind: "event"`，读取 `event.name`，解析 `event.context` 后派发标准 A2UI action 消息。 |
+| 受限脚本 action：`action.script` | `{ "action": { "script": { "code": "const count = Number(dataModel.get('/count') ?? 0); dataModel.set('/count', count + 1); actions.emit('changed', { count: count + 1 });", "deps": ["/count"] } } }` | 支持。点击按钮时在 SES `Compartment` 中同步执行脚本，可读写当前 surface 的 `dataModel`，并通过 `actions.emit` 派发标准 A2UI action 消息。 |
 | 未来函数调用 action：`action.functionCall` | `{ "action": { "functionCall": { "call": "openUrl", "args": { "url": "https://a2ui.org" } } } }` | 只识别，不执行。`Button` 点击时会忽略 `kind: "functionCall"`，不会派发 `a2ui:action`，也不会调用浏览器或后端能力。 |
 | 空 action、非对象 action、缺少有效名称的 action | `{ "action": {} }` | 不派发。 |
 
 实现链路：
 
 1. `ButtonComponent.vue` 从组件模型读取 `action` 属性，并调用 `resolveComponentAction(rawAction, ctx.resolveValue)`。
-2. `resolveComponentAction` 会先解析 action 本身的 `{ path }` 动态引用，再按顺序识别 `action.event` 和 `action.functionCall`。
+2. `resolveComponentAction` 会先解析 action 本身的 `{ path }` 动态引用，再按顺序识别 `action.event`、`action.script` 和 `action.functionCall`。
 3. 点击按钮时，如果按钮处于 `disabled` 或 `loading` 状态，直接中止，不派发 action。
-4. 只有解析结果为 `kind: "event"` 时才继续派发；`functionCall` 当前被明确跳过。
+4. 解析结果为 `kind: "event"` 时直接派发；解析结果为 `kind: "script"` 时执行受限脚本；`functionCall` 当前被明确跳过。
 5. `resolveActionContext` 会逐项解析 `context` 中的 `{ path }` 动态引用，得到点击时刻的 dataModel 值；解析结果为 `undefined` 的字段会被丢弃。
-6. `A2uiComponent.vue` 通过 `createActionMessage` 组装标准回传消息，并在 `window` 上派发 `CustomEvent("a2ui:action")`。
+6. `A2uiComponent.vue` 通过 `createActionMessage` 组装标准回传消息，并在 `window` 上派发 `CustomEvent("a2ui:action")`。`action.script` 中的 `actions.emit` 也复用该派发能力。
 
 派发出的事件 detail 结构为：
 
@@ -107,18 +109,42 @@ Renderer 当前支持基于 JSON Pointer 的数据模型能力：
 }
 ```
 
-宿主前端负责监听 `a2ui:action` 并决定后续业务处理；Renderer 不直接调用后端 API，不执行 `functionCall`，也不在组件内部决定业务分支。
+宿主前端负责监听 `a2ui:action` 并决定后续业务处理；Renderer 不直接调用后端 API，不执行 `functionCall`，也不在组件内部决定业务分支。`action.script` 仅能使用 Renderer 显式注入的 `dataModel` 和 `actions` 能力。
 
-### 3.6 当前不支持或仅保留状态的信息
+### 3.6 属性脚本与样式脚本
+
+Renderer 支持只读属性脚本：
+
+```json
+{
+  "text": {
+    "script": {
+      "code": "return `当前分数：${dataModel.get('/score') ?? 0}`;",
+      "deps": ["/score"],
+      "fallback": "当前分数：0"
+    }
+  }
+}
+```
+
+当前规则：
+
+- 属性脚本使用 SES `Compartment` 同步执行。
+- 属性脚本只注入 `dataModel.get`，不注入 `dataModel.set`、`actions`、DOM、网络或浏览器存储能力。
+- `deps` 必填，Renderer 会通过 `DataModel.subscribe` 建立最小订阅，依赖变化后触发组件属性重新计算。
+- 属性脚本必须显式 `return` JSON-compatible 值；异常时使用 `fallback` 并派发 `a2ui:error`。
+- 样式脚本第一版只支持 `style.<白名单字段>.script`，解析结果仍经过 `visual-props.ts` 白名单。
+
+### 3.7 当前不支持或仅保留状态的信息
 
 以下 A2UI 信息即使能通过上游校验，也不代表当前 Renderer 已完整消费：
 
 - `createSurface.theme`：仅保存到 `SurfaceModel.theme`，尚未驱动全局主题变量。
 - `createSurface.sendDataModel`：仅保存布尔状态，尚未自动在 action 中附带完整 dataModel 快照。
-- 任意 `className`、`css`、`innerHTML`、脚本、事件处理器字段：Renderer 不消费。
+- 任意 `className`、`css`、`innerHTML`、非受控脚本、事件处理器字段：Renderer 不消费。
 - 未注册组件类型：不会执行动态代码，只显示 fallback。
 - 历史扁平 action：`{ "action": { "name": "submit", "context": {} } }` 不再兼容，按钮点击时不会派发。
-- `action.functionCall` 执行能力、复杂 Modal 触发策略、完整表单校验展示、真实图标库、媒体 poster/autoplay/loop/muted 等字段仍待补齐。
+- `action.functionCall` 执行能力、`style.script` 整体对象、Worker 超时隔离、复杂 Modal 触发策略、完整表单校验展示、真实图标库、媒体 poster/autoplay/loop/muted 等字段仍待补齐。
 
 ## 4. 通用视觉属性
 
@@ -145,7 +171,7 @@ Renderer 已提供通用视觉属性解析工具：`packages/renderer/src/compon
 
 安全约束：
 
-- Renderer 不消费 `className`、`css`、`innerHTML`、脚本或事件处理器字段。
+- Renderer 不消费 `className`、`css`、`innerHTML`、非受控脚本或事件处理器字段。
 - `style` 只做白名单字段转换，不透传任意 CSS 块。
 - `variant`、`size`、`tone`、`preset` 只生成 Renderer 自有修饰类，具体视觉由 `packages/renderer/src/styles.css` 决定。
 
@@ -165,7 +191,7 @@ Renderer 已提供通用视觉属性解析工具：`packages/renderer/src/compon
 | `Card` | 部分完整 | `child`、兼容 `children`、`title`、通用视觉字段 | `variant/preset` 只有部分默认样式。 |
 | `Tabs` | 基础 | `tabItems`、兼容 `tabs`、本地选中态 | `align`、`fullWidth`、`variant`、`size`、`tone`、通用视觉字段尚未接入。 |
 | `Modal` | 基础 | `child`、本地关闭态 | `visible` 绑定、`trigger`、`size`、`placement`、关闭策略、遮罩强度、标题/底部区尚未接入。 |
-| `Button` | 部分完整 | `child`、`action.event`、识别但不执行 `action.functionCall`、`fullWidth`、`disabled`、`loading`、通用视觉字段 | 历史扁平 `action` 不再兼容；`action.functionCall` 暂不执行；`iconPosition` 尚未实现；loading 只有禁用语义，未显示加载指示器。 |
+| `Button` | 部分完整 | `child`、`action.event`、`action.script`、识别但不执行 `action.functionCall`、`fullWidth`、`disabled`、`loading`、通用视觉字段 | 历史扁平 `action` 不再兼容；`action.functionCall` 暂不执行；`iconPosition` 尚未实现；loading 只有禁用语义，未显示加载指示器。 |
 | `TextField` | 基础 | `label`、`text`、`usageHint` | `placeholder`、`disabled`、`required`、`helpText`、`errorText`、通用视觉字段尚未接入。 |
 | `CheckBox` | 基础 | `label`、`value` | `description`、`labelPosition`、`disabled`、`helpText`、`errorText`、通用视觉字段尚未接入。 |
 | `ChoicePicker` | 基础 | `options`、`value` | `label`、`placeholder`、`disabled`、`helpText`、`errorText`、通用视觉字段尚未接入。 |
@@ -224,6 +250,9 @@ Renderer 已提供通用视觉属性解析工具：`packages/renderer/src/compon
 
 - 按正式 `action.event` 派发标准 A2UI action 消息。
 - 解析 `action.event.context` 中的 `{ path }` 动态绑定。
+- 执行 `action.script`，验证 dataModel 写入和 `actions.emit` 派发。
+- 执行 `Text.text.script`，验证 `deps` 变化后的重新计算。
+- 执行 `style.<白名单字段>.script`，验证动态样式仍受白名单约束。
 - 确认历史扁平 action 当前不会派发。
 - 确认 `action.functionCall` 当前不会执行、不会派发。
 

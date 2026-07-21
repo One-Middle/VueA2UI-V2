@@ -44,6 +44,26 @@ function mountSurface(components: A2UIComponent[]): HTMLElement {
   return container;
 }
 
+function createMountedSurface(components: A2UIComponent[]): {
+  container: HTMLElement;
+  surfaceGroup: SurfaceGroupModel;
+} {
+  registerBasicCatalog();
+  const surfaceGroup = new SurfaceGroupModel();
+  const surface = surfaceGroup.getOrCreate("main", "basic");
+  surface.updateDataModel("/", {
+    count: 1,
+    score: 40,
+  });
+  surface.updateComponents(components);
+
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+  app = createApp(A2uiSurface, { surfaceId: "main", surfaceGroup });
+  app.mount(container);
+  return { container, surfaceGroup };
+}
+
 describe("Basic Catalog 视觉属性", () => {
   it("渲染 Icon.name 并兼容按钮视觉修饰类", async () => {
     const container = mountSurface([
@@ -233,6 +253,141 @@ describe("Basic Catalog 视觉属性", () => {
     window.removeEventListener("a2ui:action", handler);
 
     expect(actions).toHaveLength(0);
+  });
+
+  it("执行 action.script 并通过 actions.emit 派发标准 action", async () => {
+    const actions: unknown[] = [];
+    const handler = (event: Event) => {
+      actions.push((event as CustomEvent<unknown>).detail);
+    };
+    window.addEventListener("a2ui:action", handler);
+
+    const { container, surfaceGroup } = createMountedSurface([
+      {
+        id: "root",
+        component: "Button",
+        child: "label",
+        action: {
+          script: {
+            code: "const count = Number(dataModel.get('/count') ?? 0); dataModel.set('/count', count + 1); actions.emit('changed', { count: count + 1 });",
+            deps: ["/count"],
+          },
+        },
+      },
+      {
+        id: "label",
+        component: "Text",
+        text: "增加",
+      },
+    ]);
+
+    await nextTick();
+    container.querySelector("button")?.dispatchEvent(new MouseEvent("click"));
+    window.removeEventListener("a2ui:action", handler);
+
+    expect(surfaceGroup.get("main")?.dataModel.get("/count")).toBe(2);
+    expect(actions[0]).toMatchObject({
+      action: {
+        kind: "event",
+        name: "changed",
+        context: {
+          count: 2,
+        },
+      },
+    });
+  });
+
+  it("执行 Text.text 属性脚本并使用 deps 响应 dataModel 更新", async () => {
+    const { container, surfaceGroup } = createMountedSurface([
+      {
+        id: "root",
+        component: "Text",
+        text: {
+          script: {
+            code: "return `计数：${dataModel.get('/count') ?? 0}`;",
+            deps: ["/count"],
+            fallback: "计数：0",
+          },
+        },
+      },
+    ]);
+
+    await nextTick();
+    expect(container.querySelector(".a2ui-text-body")?.textContent).toBe("计数：1");
+
+    surfaceGroup.get("main")?.dataModel.set("/count", 3);
+    await nextTick();
+    expect(container.querySelector(".a2ui-text-body")?.textContent).toBe("计数：3");
+  });
+
+  it("执行 style 白名单字段脚本并保持动态样式响应式", async () => {
+    const { container, surfaceGroup } = createMountedSurface([
+      {
+        id: "root",
+        component: "Text",
+        text: "成绩",
+        style: {
+          color: {
+            script: {
+              code: "return Number(dataModel.get('/score') ?? 0) >= 60 ? '#16a34a' : '#dc2626';",
+              deps: ["/score"],
+              fallback: "#dc2626",
+            },
+          },
+          fontWeight: {
+            script: {
+              code: "return Number(dataModel.get('/score') ?? 0) >= 90 ? 700 : 400;",
+              deps: ["/score"],
+              fallback: 400,
+            },
+          },
+        },
+      },
+    ]);
+
+    await nextTick();
+    const text = container.querySelector(".a2ui-text-body") as HTMLElement | null;
+    expect(text?.style.color).toBe("rgb(220, 38, 38)");
+    expect(text?.style.fontWeight).toBe("400");
+
+    surfaceGroup.get("main")?.dataModel.set("/score", 95);
+    await nextTick();
+    expect(text?.style.color).toBe("rgb(22, 163, 74)");
+    expect(text?.style.fontWeight).toBe("700");
+  });
+
+  it("属性脚本异常时使用 fallback 并派发 renderer error", async () => {
+    const errors: unknown[] = [];
+    const handler = (event: Event) => {
+      errors.push((event as CustomEvent<unknown>).detail);
+    };
+    window.addEventListener("a2ui:error", handler);
+
+    const { container } = createMountedSurface([
+      {
+        id: "root",
+        component: "Text",
+        text: {
+          script: {
+            code: "throw new Error('boom');",
+            deps: ["/count"],
+            fallback: "兜底文本",
+          },
+        },
+      },
+    ]);
+
+    await nextTick();
+    window.removeEventListener("a2ui:error", handler);
+
+    expect(container.querySelector(".a2ui-text-body")?.textContent).toBe("兜底文本");
+    expect(errors[0]).toMatchObject({
+      version: "v0.9",
+      error: {
+        code: "SCRIPT_EXECUTION_ERROR",
+        surfaceId: "main",
+      },
+    });
   });
 
   it("透传 Card、Row 和 Image 的受控样式字段", async () => {

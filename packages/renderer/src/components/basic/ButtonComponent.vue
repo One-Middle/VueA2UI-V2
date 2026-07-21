@@ -54,11 +54,18 @@ function handleClick(): void {
     return;
   }
   const action = componentAction.value;
-  if (!action || action.kind !== "event") {
+  if (!action) {
     return;
   }
-  const context = resolveActionContext(action.context, ctx.resolveValue);
-  ctx.dispatchAction(action.name, context);
+  if (action.kind === "event") {
+    const context = resolveActionContext(action.context, ctx.resolveValue);
+    ctx.dispatchAction(action.name, context);
+    return;
+  }
+  if (action.kind === "script") {
+    const context = resolveActionContext(action.script.context ?? {}, ctx.resolveValue);
+    ctx.runActionScript(action, context);
+  }
 }
 </script>
 

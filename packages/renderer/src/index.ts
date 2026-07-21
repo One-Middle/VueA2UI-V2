@@ -18,7 +18,22 @@ export type {
   RendererComponentAction,
   RendererEventAction,
   RendererFunctionCallAction,
+  RendererScriptAction,
 } from "./core/action";
+export {
+  initializeJsRuntime,
+  isActionScriptDeclaration,
+  isPropertyScriptValue,
+  runActionScript,
+  runPropertyScript,
+} from "./core/js-runtime";
+export type {
+  ActionScriptActions,
+  ActionScriptDeclaration,
+  PropertyScriptDeclaration,
+  RunActionScriptInput,
+  RunPropertyScriptInput,
+} from "./core/js-runtime";
 export {
   ComponentContextImpl,
 } from "./core/component-context";

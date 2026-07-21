@@ -9,6 +9,7 @@ import type { InjectionKey } from "vue";
 import type { JsonObject } from "@a2ui-platform/shared";
 import type { ComponentModel } from "../core/component-model";
 import type { DataContext } from "../core/data-context";
+import type { RendererScriptAction } from "../core/action";
 
 /** 组件上下文中暴露的接口 */
 export interface ComponentContext {
@@ -20,8 +21,14 @@ export interface ComponentContext {
   readonly surfaceId: string;
   /** 解析属性值（自动处理 { path } 动态引用） */
   resolveValue(raw: unknown): unknown;
+  /** 注册属性脚本依赖路径，用于 dataModel 变化时触发组件刷新。 */
+  registerScriptDeps(deps: string[]): void;
+  /** 派发 Renderer 错误消息。 */
+  dispatchError(error: { code: string; message: string; path?: string }): void;
   /** 派发 action（组件点击等） */
   dispatchAction(name: string, context: JsonObject): void;
+  /** 执行受限 action.script。 */
+  runActionScript(action: RendererScriptAction, context: JsonObject): void;
   /** 为指定路径创建一个 setter 函数（用于双向绑定） */
   createSetter(path: string): (value: unknown) => void;
 }
