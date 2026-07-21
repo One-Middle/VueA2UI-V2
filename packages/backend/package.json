@@ -14,7 +14,8 @@
     "prisma:push": "node --env-file=../../.env ./node_modules/prisma/build/index.js db push",
     "prisma:migrate": "node --env-file=../../.env ./node_modules/prisma/build/index.js migrate dev",
     "repair:snapshots": "node --env-file=../../.env --import tsx src/scripts/repair-current-snapshots.ts",
-    "skill:sync": "node --env-file=../../.env --import tsx src/scripts/sync-builtin-skills.ts"
+    "skill:sync": "node --env-file=../../.env --import tsx src/scripts/sync-builtin-skills.ts",
+    "skill:docs": "node --env-file=../../.env --import tsx src/scripts/sync-skill-docs.ts"
   },
   "dependencies": {
     "@a2ui-platform/agent": "workspace:*",

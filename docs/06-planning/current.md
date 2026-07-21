@@ -20,6 +20,7 @@
 
 | 计划 | 完成日期 | 结果 | 影响范围 |
 | --- | --- | --- | --- |
+| Renderer dataModel 响应式优化 | 2026-07-21 | [result.md](./2026-07-renderer-datamodel-reactivity/result.md) | renderer、`docs/04-modules/`、`docs/CHANGELOG.md` |
 | 文档治理体系改造 | 2026-07-19 | [result.md](./2026-07-docs-governance-rework/result.md) | `docs/`、AGENTS 文档入口规则 |
 
 ## 4. 维护规则

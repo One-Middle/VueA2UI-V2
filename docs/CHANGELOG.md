@@ -72,6 +72,7 @@
 
 ### Backend / Frontend
 
+- 后端新增 `skill:docs` 脚本，可将数据库中的 Skill 和 Reference 内容同步到 `packages/backend/skill-docs/`，作为开发期可读文档镜像。
 - Skill CRUD 支持 `references` 字段，后端将其保存到 `skills.metadata.references` 并在 Agent Run、会话导出和前端 Skill 面板中透传。
 - Frontend Preview 宿主补齐 `a2ui:action` / `a2ui:error` 监听，按当前会话转发 Renderer 回传消息到 Backend 记录接口。
 - `AgentRunInput.enabledSkills` 增加 `description` 字段，后端触发 Agent Run 时同步传入 Skill 描述。

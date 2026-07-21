@@ -51,7 +51,10 @@ pnpm dev:frontend
 pnpm dev:backend
 pnpm --filter @a2ui-platform/renderer test
 pnpm --filter @a2ui-platform/agent typecheck
+pnpm --filter @a2ui-platform/backend skill:docs
 ```
+
+`pnpm --filter @a2ui-platform/backend skill:docs` 会从数据库读取当前 Skill，并同步到 `packages/backend/skill-docs/`。该目录是开发期可读镜像，数据库仍是事实来源，不支持从文档反向导入。
 
 当前环境可能尚未安装 pnpm 或依赖；如果命令不可用，应说明原因，不要假装已验证。
 

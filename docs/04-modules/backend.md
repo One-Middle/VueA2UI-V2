@@ -89,6 +89,8 @@ packages/backend/
       tool-call.repository.ts
     scripts/
       repair-current-snapshots.ts
+      sync-builtin-skills.ts
+      sync-skill-docs.ts
     utils/
       errors.ts
       pagination.ts
@@ -112,6 +114,8 @@ packages/backend/
 | `src/utils/pagination.ts` | 分页参数和分页响应辅助。 |
 | `src/utils/validation.ts` | Zod 校验辅助。 |
 | `src/scripts/repair-current-snapshots.ts` | 从 committed A2UI events 修复 current snapshot 的维护脚本。 |
+| `src/scripts/sync-builtin-skills.ts` | 将 Agent 包内置 Skill Markdown 同步到数据库。 |
+| `src/scripts/sync-skill-docs.ts` | 将数据库 Skill 和 Reference 内容同步到 `packages/backend/skill-docs/` 文档镜像目录，仅供开发查看。 |
 
 ## 6. 关键类 / 核心对象 / 关键文件
 
@@ -150,7 +154,7 @@ packages/backend/
 | `stream.service.ts` | SSE 客户端管理和事件广播。 |
 | `session.service.ts` | 会话查询、创建、更新和详情聚合。 |
 | `file.service.ts` | 上传文件校验、保存、读取和删除。 |
-| `skill.service.ts` | Skill 管理和会话启用关系。 |
+| `skill.service.ts` | Skill 管理、Reference metadata 和会话启用关系。 |
 | `renderer-event.service.ts` | Renderer action/error 持久化。 |
 | `export.service.ts` | 会话、JSONL 和 snapshot 导出。 |
 
