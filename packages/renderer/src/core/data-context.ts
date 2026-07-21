@@ -37,10 +37,15 @@ export class DataContext {
    */
   constructor(dataModel: DataModel, basePath?: string) {
     this.dataModel = dataModel;
-    this._basePath = basePath && basePath !== "/" ? basePath : "";
+    this._basePath = this._normalizeBasePath(basePath);
   }
 
   // ─── 公开 API ─────────────────────────────────────────────
+
+  /** 当前数据作用域基准路径。根作用域统一返回 "/"。 */
+  get basePath(): string {
+    return this._basePath || "/";
+  }
 
   /**
    * 解析表达式值。
@@ -60,8 +65,7 @@ export class DataContext {
    * @param relativePath 相对路径（如 "item"、"children/0"）
    */
   createChildContext(relativePath: string): DataContext {
-    const childBase = this._joinPath(this._basePath, relativePath);
-    return new DataContext(this.dataModel, childBase);
+    return new DataContext(this.dataModel, this.resolvePath(relativePath));
   }
 
   /** 订阅 dataModel 中相对路径的变更 */
@@ -81,6 +85,9 @@ export class DataContext {
    * 否则在 basePath 基础上拼接。
    */
   resolvePath(path: string): string {
+    if (path === "" || path === ".") {
+      return this.basePath;
+    }
     if (path.startsWith("/")) {
       return path;
     }
@@ -91,7 +98,18 @@ export class DataContext {
 
   /** 拼接两个路径片段 */
   private _joinPath(base: string, relative: string): string {
-    if (!base) return "/" + relative;
-    return base + "/" + relative;
+    const cleanRelative = relative.replace(/^\/+/, "").replace(/\/+$/, "");
+    if (!cleanRelative) return base || "/";
+    if (!base) return "/" + cleanRelative;
+    return base + "/" + cleanRelative;
+  }
+
+  /** 将外部传入的 basePath 规整成内部无尾斜杠形式。 */
+  private _normalizeBasePath(basePath?: string): string {
+    if (!basePath || basePath === "/") {
+      return "";
+    }
+    const prefixed = basePath.startsWith("/") ? basePath : "/" + basePath;
+    return prefixed.replace(/\/+$/, "");
   }
 }

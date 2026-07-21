@@ -32,6 +32,7 @@ function close(): void {
         v-if="childComponentId"
         :surface-id="surfaceId"
         :component-id="childComponentId"
+        :base-path="ctx.dataContext.basePath"
       />
     </div>
   </div>

@@ -39,6 +39,7 @@ const cardStyle = computed(() => resolveVisualStyle(ctx));
       v-if="childComponentId"
       :surface-id="surfaceId"
       :component-id="childComponentId"
+      :base-path="ctx.dataContext.basePath"
     />
     <template v-else>
       <A2uiComponent
@@ -46,6 +47,7 @@ const cardStyle = computed(() => resolveVisualStyle(ctx));
         :key="childId"
         :surface-id="surfaceId"
         :component-id="childId"
+        :base-path="ctx.dataContext.basePath"
       />
     </template>
   </div>

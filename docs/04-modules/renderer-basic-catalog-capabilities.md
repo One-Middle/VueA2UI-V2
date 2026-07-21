@@ -52,11 +52,11 @@ Renderer 当前支持基于 JSON Pointer 的数据模型能力：
 | A2UI 信息 | 当前功能 | 典型用途 |
 | --- | --- | --- |
 | `updateDataModel.path` + `value` | 写入或替换数据模型中的指定路径。 | 初始化表单值、列表数据、状态值。 |
-| `{ "path": "/some/value" }` 动态引用 | 组件属性中只有 `path` 一个字段的对象会被解析为 dataModel 取值。 | `Text.text`、`Image.url`、`Button.action.context`、表单 `value/text` 等动态绑定。 |
-| 相对路径上下文 | `DataContext` 支持绝对路径和相对路径拼接。 | 为后续动态列表模板扩展保留基础能力。 |
+| `{ "path": "/some/value" }` 动态引用 | 组件属性中只有 `path` 一个字段的对象会被解析为 dataModel 取值，根替换和深层路径更新都会触发 Vue 响应式刷新。 | `Text.text`、`Image.url`、`Button.action.context`、表单 `value/text` 等动态绑定。 |
+| 相对路径上下文 | `DataContext` 支持绝对路径和相对路径拼接，递归渲染时会向子组件传递当前 dataModel 作用域。 | 动态列表模板、嵌套容器内的相对路径绑定。 |
 | 表单类组件写回 | 部分输入组件在绑定值为 `{ path }` 时，会把用户输入写回 dataModel。 | `TextField.text`、`CheckBox.value`、`ChoicePicker.value`、`Slider.value`、`DateTimeInput.value`。 |
 
-注意：当前 `List` 能根据 `{ path, componentId }` 读取数组并重复渲染模板组件，但尚未为每一项创建独立 item 作用域，因此模板内直接读取当前项字段的能力仍不完整。
+注意：当前 `List` 能根据 `{ path, componentId }` 读取数组并重复渲染模板组件，并会为每一项创建独立 item 作用域，因此模板组件内可以使用相对 `{ path: "title" }` 读取当前项字段。
 
 ### 3.4 可实现的 UI 功能
 
@@ -161,7 +161,7 @@ Renderer 已提供通用视觉属性解析工具：`packages/renderer/src/compon
 | `Divider` | 基础 | 无额外字段 | `orientation`、`thickness`、`color`、`spacing`、`label`、通用视觉字段尚未接入。 |
 | `Row` | 部分完整 | `children`、`distribution`、`alignment`、`gap`、`wrap`、通用视觉字段 | 未实现 grid/form 等复杂预设的专门布局。 |
 | `Column` | 部分完整 | `children`、`distribution`、`alignment`、`gap`、`wrap`、通用视觉字段 | 未实现 grid/form 等复杂预设的专门布局。 |
-| `List` | 基础 | 静态 `children`、动态 `{ path, componentId }` | `direction`、`marker`、`gap`、`divided`、`wrap`、通用视觉字段尚未接入。 |
+| `List` | 基础 | 静态 `children`、动态 `{ path, componentId }`、动态 item 相对路径作用域 | `direction`、`marker`、`gap`、`divided`、`wrap`、通用视觉字段尚未接入。 |
 | `Card` | 部分完整 | `child`、兼容 `children`、`title`、通用视觉字段 | `variant/preset` 只有部分默认样式。 |
 | `Tabs` | 基础 | `tabItems`、兼容 `tabs`、本地选中态 | `align`、`fullWidth`、`variant`、`size`、`tone`、通用视觉字段尚未接入。 |
 | `Modal` | 基础 | `child`、本地关闭态 | `visible` 绑定、`trigger`、`size`、`placement`、关闭策略、遮罩强度、标题/底部区尚未接入。 |
@@ -216,6 +216,8 @@ Renderer 已提供通用视觉属性解析工具：`packages/renderer/src/compon
 当前已覆盖：
 
 - `packages/renderer/src/core/surface-model.test.ts`
+- `packages/renderer/src/core/data-model.test.ts`
+- `packages/renderer/src/vue/datamodel-reactivity.test.ts`
 - `packages/renderer/src/components/basic/visual-props.test.ts`
 
 其中 `visual-props.test.ts` 已覆盖：

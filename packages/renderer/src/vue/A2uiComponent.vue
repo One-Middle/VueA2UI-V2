@@ -18,6 +18,8 @@ const props = defineProps<{
   surfaceId: string;
   /** 当前组件 ID */
   componentId: string;
+  /** 当前组件读取相对 dataModel 路径时使用的数据作用域 */
+  basePath?: string;
 }>();
 
 /** 从上层注入 SurfaceGroupModel */
@@ -45,7 +47,7 @@ const componentContext = computed<ComponentContext | null>(() => {
   const dm = dataModel.value;
   if (!cm || !dm) return null;
 
-  const dataCtx = new DataContext(dm);
+  const dataCtx = new DataContext(dm, props.basePath);
 
   return {
     componentModel: cm,

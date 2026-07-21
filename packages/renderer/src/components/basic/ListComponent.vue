@@ -20,8 +20,19 @@ const items = computed(() => {
   return Array.isArray(data) ? data : [];
 });
 
+/** 动态列表每一项的独立数据作用域 */
+const itemBasePaths = computed(() => {
+  if (!dynamicChild.value) return [];
+  const listBasePath = ctx.dataContext.resolvePath(dynamicChild.value.path);
+  return items.value.map((_, index) => appendPathSegment(listBasePath, String(index)));
+});
+
 /** 静态 children（字符串列表） */
 const staticChildren = computed(() => ctx.componentModel.getStaticChildren());
+
+function appendPathSegment(basePath: string, segment: string): string {
+  return basePath === "/" ? `/${segment}` : `${basePath}/${segment}`;
+}
 </script>
 
 <template>
@@ -31,17 +42,19 @@ const staticChildren = computed(() => ctx.componentModel.getStaticChildren());
       <A2uiComponent
         :surface-id="surfaceId"
         :component-id="childId"
+        :base-path="ctx.dataContext.basePath"
       />
     </li>
 
     <!-- 动态子组件：根据数据数组渲染 -->
     <li
-      v-for="(item, index) in items"
+      v-for="(itemBasePath, index) in itemBasePaths"
       :key="`${dynamicChild?.componentId}-${index}`"
     >
       <A2uiComponent
         :surface-id="surfaceId"
         :component-id="dynamicChild!.componentId"
+        :base-path="itemBasePath"
       />
     </li>
   </ul>

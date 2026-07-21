@@ -53,6 +53,7 @@ const activeChildId = computed(() => {
         v-if="activeChildId"
         :surface-id="surfaceId"
         :component-id="activeChildId"
+        :base-path="ctx.dataContext.basePath"
       />
     </div>
   </div>

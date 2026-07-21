@@ -9,7 +9,7 @@
  *   - "~1" 表示 "/"
  */
 
-import { shallowReactive } from "vue";
+import { reactive } from "vue";
 import { logger } from "../logger.js";
 import type { JsonValue } from "@a2ui-platform/shared";
 
@@ -48,7 +48,8 @@ export class DataModel {
   private _destroyed = false;
 
   constructor(initialData?: JsonValue) {
-    this._data = shallowReactive({ root: initialData ?? null }) as { root: unknown };
+    const state: { root: unknown } = { root: initialData ?? null };
+    this._data = reactive(state) as { root: unknown };
   }
 
   // ─── 公开 API ─────────────────────────────────────────────
@@ -68,14 +69,11 @@ export class DataModel {
     const segments = parsePath(path);
     if (segments.length === 0) {
       this._data.root = value;
-      this._notify([]);
+      this._notifyAffected([]);
       return;
     }
     this._setBySegments(segments, value);
-    // 通知路径本身及所有祖先路径的订阅者
-    for (let i = segments.length; i >= 0; i--) {
-      this._notify(segments.slice(0, i));
-    }
+    this._notifyAffected(segments);
   }
 
   /** 删除指定路径的值。 */
@@ -84,13 +82,11 @@ export class DataModel {
     const segments = parsePath(path);
     if (segments.length === 0) {
       this._data.root = null;
-      this._notify([]);
+      this._notifyAffected([]);
       return;
     }
     this._deleteBySegments(segments);
-    for (let i = segments.length; i >= 0; i--) {
-      this._notify(segments.slice(0, i));
-    }
+    this._notifyAffected(segments);
   }
 
   /**
@@ -145,15 +141,18 @@ export class DataModel {
 
   /** 按路径片段设置值，自动创建中间节点 */
   private _setBySegments(segments: string[], value: JsonValue): void {
+    if (this._data.root === null || this._data.root === undefined || typeof this._data.root !== "object") {
+      this._data.root = this._shouldUseArray(segments[0]!) ? [] : {};
+    }
+
     let current: unknown = this._data.root;
     for (let i = 0; i < segments.length - 1; i++) {
       const seg = segments[i]!;
       const nextSeg = segments[i + 1]!;
-      const isNextArray = /^\d+$/.test(nextSeg);
+      const isNextArray = this._shouldUseArray(nextSeg);
 
       let next: unknown;
       if (current === null || current === undefined || typeof current !== "object") {
-        // 创建中间节点
         const newNode: unknown = isNextArray ? [] : {};
         if (Array.isArray(current)) {
           const idx = parseInt(seg, 10);
@@ -186,7 +185,9 @@ export class DataModel {
     const lastSeg = segments[segments.length - 1]!;
     if (Array.isArray(current)) {
       const idx = parseInt(lastSeg, 10);
-      (current as unknown[])[idx] = value;
+      if (!Number.isNaN(idx)) {
+        (current as unknown[])[idx] = value;
+      }
     } else if (typeof current === "object" && current !== null) {
       (current as Record<string, unknown>)[lastSeg] = value;
     }
@@ -230,5 +231,34 @@ export class DataModel {
         }
       });
     }
+  }
+
+  /**
+   * 通知本次变更影响的订阅者。
+   *
+   * 根节点变更会影响所有路径；深层路径变更会影响该路径及所有祖先路径。
+   */
+  private _notifyAffected(segments: string[]): void {
+    if (segments.length === 0) {
+      for (const subs of this._subscribers.values()) {
+        subs.forEach((cb) => {
+          try {
+            cb();
+          } catch (e) {
+            logger.error("订阅回调异常:", e);
+          }
+        });
+      }
+      return;
+    }
+
+    for (let i = segments.length; i >= 0; i--) {
+      this._notify(segments.slice(0, i));
+    }
+  }
+
+  /** 数字路径片段在自动创建中间节点时按数组处理。 */
+  private _shouldUseArray(segment: string): boolean {
+    return /^\d+$/.test(segment);
   }
 }

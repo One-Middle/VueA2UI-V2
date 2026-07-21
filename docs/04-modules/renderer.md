@@ -49,6 +49,7 @@ packages/renderer/src/
     component-model.ts
     data-context.ts
     data-model.ts
+    data-model.test.ts
     message-processor.ts
     surface-model.ts
     surface-model.test.ts
@@ -56,6 +57,7 @@ packages/renderer/src/
     A2uiComponent.vue
     A2uiSurface.vue
     context.ts
+    datamodel-reactivity.test.ts
   components/
     index.ts
     basic/
@@ -95,11 +97,13 @@ packages/renderer/src/
 | `src/core/surface-model.test.ts` | surface model 测试。 |
 | `src/core/component-model.ts` | 组件模型，保存组件类型、props、children 引用等。 |
 | `src/core/data-model.ts` | JSON Pointer 数据读写与订阅。 |
+| `src/core/data-model.test.ts` | dataModel 深层响应式、路径创建和订阅通知测试。 |
 | `src/core/data-context.ts` | 组件渲染时的数据读取、写入和表达式解析上下文。 |
 | `src/core/component-context.ts` | 组件渲染上下文，封装 action/error 派发能力。 |
 | `src/vue/context.ts` | Vue provide/inject 上下文定义。 |
 | `src/vue/A2uiSurface.vue` | 单个 surface 的 Vue 渲染入口。 |
 | `src/vue/A2uiComponent.vue` | 递归渲染组件模型，并处理 unknown component fallback。 |
+| `src/vue/datamodel-reactivity.test.ts` | dataModel 更新驱动 DOM 刷新的回归测试。 |
 | `src/components/index.ts` | Basic 组件统一导出。 |
 | `src/components/basic/*.vue` | 各 Basic Catalog 组件实现。 |
 | `src/components/basic/visual-props.ts` | Basic 组件通用受控视觉属性解析。 |
@@ -148,7 +152,13 @@ packages/renderer/src/
 2. 前端传入已校验 A2UI 消息批次。
 3. `MessageProcessor` 根据消息类型更新 surface、components 或 data model。
 4. `A2uiSurface` 读取当前 surface。
-5. `A2uiComponent` 从 root 开始递归渲染组件。
+5. `A2uiComponent` 从 root 开始递归渲染组件，并向子组件传递当前 dataModel 作用域。
+
+dataModel 响应式：
+
+- `DataModel` 使用 Vue `reactive` 保存根数据，`updateDataModel("/")` 和深层 JSON Pointer 写入都会触发绑定组件重新计算。
+- `DataContext` 负责解析绝对路径和相对路径；动态 `List` 会为每个 item 创建独立作用域，模板组件可用相对路径读取当前项字段。
+- `DataModel.subscribe()` 保留为路径级监听扩展能力，根节点替换会通知所有已注册路径。
 
 用户交互：
 
@@ -176,6 +186,7 @@ Action 格式说明：
 - `pnpm --filter @a2ui-platform/renderer typecheck`
 - `pnpm --filter @a2ui-platform/renderer test`
 - 合法消息可稳定渲染。
+- `updateDataModel` 根替换、深层路径更新和动态 List item 作用域应有回归测试覆盖。
 - unknown component、missing child、绑定错误有可见 fallback 或 error。
 - Renderer 状态不进入 Pinia。
 

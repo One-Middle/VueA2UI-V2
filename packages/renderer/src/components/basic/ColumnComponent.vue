@@ -74,6 +74,7 @@ const columnClasses = computed(() => [
       :key="childId"
       :surface-id="surfaceId"
       :component-id="childId"
+      :base-path="ctx.dataContext.basePath"
     />
   </div>
 </template>

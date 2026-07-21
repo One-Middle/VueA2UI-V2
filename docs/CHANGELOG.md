@@ -1,5 +1,16 @@
 # 更新日志
 
+## 2026-07-20
+
+### Renderer
+
+- 优化 `DataModel` 响应式实现，深层 JSON Pointer 写入、根数据替换和自动创建对象/数组路径均可稳定驱动 Vue 组件刷新。
+- `DataContext` 增加 dataModel 作用域传递能力，递归渲染组件会保留当前相对路径上下文。
+- 动态 `List` 为每个 item 建立独立数据作用域，模板组件可使用相对 `{ path: "title" }` 读取当前项字段。
+- 根节点替换会通知所有已注册 `DataModel.subscribe()` 路径订阅，保留路径级监听扩展能力。
+- 新增 Renderer dataModel 响应式回归测试，覆盖深层更新、根替换、自动建路径、订阅通知、动态列表 item 作用域和 DOM 刷新。
+- 更新 Renderer 模块说明和 Basic Catalog 能力矩阵，明确 `updateDataModel` 与动态 List 的当前实际能力。
+
 ## 2026-07-19
 
 ### Agent Runtime
