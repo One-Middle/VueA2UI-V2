@@ -28,8 +28,8 @@
 | 数据库表、字段、事务边界 | `03-contracts/db-schema.md` |
 | A2UI 协议、Basic Catalog 合法字段 | `03-contracts/a2ui-v0.9.md` |
 | shared 类型契约 | `03-contracts/shared-types.md` |
-| 模块内部职责、关键类、核心链路 | `04-modules/<module>.md` |
-| Renderer 当前 Basic Catalog 渲染能力 | `04-modules/renderer-basic-catalog-capabilities.md` |
+| 模块内部职责、关键类、核心链路 | `04-modules/<module>/README.md` |
+| Renderer 当前 Basic Catalog 渲染能力 | `04-modules/renderer/basic-catalog-capabilities.md` |
 | 开发命令、环境变量、工程约定 | `05-operations/development.md` |
 | 平台改造计划和执行记录 | `06-planning/<YYYY-MM-topic>/` |
 | 当前活跃计划索引 | `06-planning/current.md` |

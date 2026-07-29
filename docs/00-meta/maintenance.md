@@ -15,10 +15,10 @@
 | --- | --- |
 | 产品能力变化 | `01-product/prd.md`、`02-architecture/system-design.md`、相关 `04-modules/`、`CHANGELOG.md` |
 | API 或 SSE 变化 | `03-contracts/api.md`、相关前后端模块说明 |
-| DB schema 或事务边界变化 | `03-contracts/db-schema.md`、`04-modules/backend.md` |
-| A2UI 协议或 Basic Catalog 合法字段变化 | `03-contracts/a2ui-v0.9.md`、`04-modules/renderer.md`、`04-modules/agent.md` |
+| DB schema 或事务边界变化 | `03-contracts/db-schema.md`、`04-modules/backend/README.md` |
+| A2UI 协议或 Basic Catalog 合法字段变化 | `03-contracts/a2ui-v0.9.md`、`04-modules/renderer/README.md`、`04-modules/agent/README.md` |
 | shared 类型变化 | `03-contracts/shared-types.md`、受影响模块说明 |
-| 模块内部逻辑变化 | `04-modules/<module>.md` |
+| 模块内部逻辑变化 | `04-modules/<module>/README.md` |
 | 开发命令或工程结构变化 | `05-operations/development.md` |
 | 平台改造启动、推进或完成 | `06-planning/<计划目录>/`、`06-planning/current.md` |
 | 临时调研、代码导读或 AI 总结 | `90-notes/` |

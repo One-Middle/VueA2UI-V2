@@ -12,7 +12,7 @@
 ## 2. 开发某个模块
 
 1. [系统设计](../02-architecture/system-design.md)
-2. 对应模块文档：`../04-modules/<module>.md`
+2. 对应模块文档：`../04-modules/<module>/README.md`
 3. 相关契约：`../03-contracts/`
 4. 当前活跃计划：[../06-planning/current.md](../06-planning/current.md)
 
@@ -25,7 +25,7 @@
 
 ## 4. 排查端到端问题
 
-1. [集成说明](../04-modules/integration.md)
+1. [集成说明](../04-modules/integration/README.md)
 2. [API 契约](../03-contracts/api.md)
 3. [A2UI 契约](../03-contracts/a2ui-v0.9.md)
 4. 相关模块说明

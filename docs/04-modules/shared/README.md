@@ -64,9 +64,9 @@ packages/shared/src/
 
 ## 7. 依赖契约
 
-- Shared 类型：[../03-contracts/shared-types.md](../03-contracts/shared-types.md)
-- API：[../03-contracts/api.md](../03-contracts/api.md)
-- A2UI：[../03-contracts/a2ui-v0.9.md](../03-contracts/a2ui-v0.9.md)
+- Shared 类型：[../../03-contracts/shared-types.md](../../03-contracts/shared-types.md)
+- API：[../../03-contracts/api.md](../../03-contracts/api.md)
+- A2UI：[../../03-contracts/a2ui-v0.9.md](../../03-contracts/a2ui-v0.9.md)
 
 ## 8. 测试与验收
 
@@ -85,4 +85,4 @@ packages/shared/src/
 
 更细的历史类型规格维护在 `docs/99-archive/shared/`：
 
-- [Shared 类型旧规格](../99-archive/shared/types-spec.md)
+- [Shared 类型旧规格](../../99-archive/shared/types-spec.md)

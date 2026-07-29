@@ -171,10 +171,10 @@ Agent 成功提交：
 
 ## 10. 依赖契约
 
-- API：[../03-contracts/api.md](../03-contracts/api.md)
-- DB：[../03-contracts/db-schema.md](../03-contracts/db-schema.md)
-- A2UI：[../03-contracts/a2ui-v0.9.md](../03-contracts/a2ui-v0.9.md)
-- Agent：[./agent.md](./agent.md)
+- API：[../../03-contracts/api.md](../../03-contracts/api.md)
+- DB：[../../03-contracts/db-schema.md](../../03-contracts/db-schema.md)
+- A2UI：[../../03-contracts/a2ui-v0.9.md](../../03-contracts/a2ui-v0.9.md)
+- Agent：[../agent/README.md](../agent/README.md)
 
 ## 11. 测试与验收
 
@@ -189,11 +189,11 @@ Agent 成功提交：
 
 - 修改 API 路由时，同步更新 `docs/03-contracts/api.md`。
 - 修改 Prisma schema 或事务边界时，同步更新 `docs/03-contracts/db-schema.md`。
-- 修改 Agent 编排时，同步更新 `docs/04-modules/agent.md` 和 `docs/04-modules/integration.md`。
+- 修改 Agent 编排时，同步更新 `docs/04-modules/agent/README.md` 和 `docs/04-modules/integration/README.md`。
 
 ## 13. 详细档案索引
 
 更细的历史设计和实现细节维护在 `docs/99-archive/backend/`：
 
-- [Backend 实施说明](../99-archive/backend/implementation.md)
-- [Backend 实现细节](../99-archive/backend/implementation-details.md)
+- [Backend 实施说明](../../99-archive/backend/implementation.md)
+- [Backend 实现细节](../../99-archive/backend/implementation-details.md)

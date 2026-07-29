@@ -183,7 +183,7 @@ Frontend 负责监听并转发 Renderer action/error，Backend 负责记录，Ag
 
 - 本节说明 Basic Catalog 的协议层组件集合和字段校验来源。
 - 字段通过校验只表示该字段是合法 A2UI 输入，不等于当前 Renderer 已完整消费该字段。
-- Renderer 对各字段的实际渲染支持程度见 [Renderer Basic Catalog 能力矩阵](../04-modules/renderer-basic-catalog-capabilities.md)。
+- Renderer 对各字段的实际渲染支持程度见 [Renderer Basic Catalog 能力矩阵](../04-modules/renderer/basic-catalog-capabilities.md)。
 
 组件字段和校验约束由以下文件共同维护：
 

@@ -180,9 +180,9 @@ Agent 包通过 `index.ts` 暴露三层公共 API：
 
 ## 12. 依赖契约
 
-- A2UI：[../03-contracts/a2ui-v0.9.md](../03-contracts/a2ui-v0.9.md)
-- Shared 类型：[../03-contracts/shared-types.md](../03-contracts/shared-types.md)
-- Backend 提交：[./backend.md](./backend.md)
+- A2UI：[../../03-contracts/a2ui-v0.9.md](../../03-contracts/a2ui-v0.9.md)
+- Shared 类型：[../../03-contracts/shared-types.md](../../03-contracts/shared-types.md)
+- Backend 提交：[../backend/README.md](../backend/README.md)
 
 ## 13. 测试与验收
 
@@ -204,7 +204,7 @@ Agent 包通过 `index.ts` 暴露三层公共 API：
 
 更细的历史设计和实现细节维护在 `docs/99-archive/agent/`：
 
-- [上下文编排与组成](../99-archive/agent/context-orchestration.md)
-- [Agent LLM A2UI 生成指南](../99-archive/agent/agent-llm-a2ui-guide.md)
-- [Runtime 实施说明](../99-archive/agent/runtime-implementation.md)
-- [Runtime 实现细节](../99-archive/agent/runtime-implementation-details.md)
+- [上下文编排与组成](../../99-archive/agent/context-orchestration.md)
+- [Agent LLM A2UI 生成指南](../../99-archive/agent/agent-llm-a2ui-guide.md)
+- [Runtime 实施说明](../../99-archive/agent/runtime-implementation.md)
+- [Runtime 实现细节](../../99-archive/agent/runtime-implementation-details.md)

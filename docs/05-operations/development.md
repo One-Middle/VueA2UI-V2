@@ -63,7 +63,7 @@ pnpm --filter @a2ui-platform/backend skill:docs
 - 先共享类型，后模块实现；跨模块契约优先放入 `packages/shared`。
 - 后端只提交通过 `validateA2UI` 的 A2UI 消息。
 - Renderer 不接收未通过后端校验的消息作为正式状态。
-- 修改模块功能逻辑时，同步更新 `docs/04-modules/*.md`。
+- 修改模块功能逻辑时，同步更新 `docs/04-modules/<module>/README.md`。
 - 修改 API、DB、A2UI、shared 类型时，同步更新 `docs/03-contracts/`。
 - 设计功能逻辑变更时，同步更新 `docs/CHANGELOG.md`。
 
@@ -80,8 +80,8 @@ pnpm --filter @a2ui-platform/backend skill:docs
 
 ## 6. 模块入口
 
-- Frontend：[../04-modules/frontend.md](../04-modules/frontend.md)
-- Renderer：[../04-modules/renderer.md](../04-modules/renderer.md)
-- Backend：[../04-modules/backend.md](../04-modules/backend.md)
-- Agent：[../04-modules/agent.md](../04-modules/agent.md)
-- Shared：[../04-modules/shared.md](../04-modules/shared.md)
+- Frontend：[../04-modules/frontend/README.md](../04-modules/frontend/README.md)
+- Renderer：[../04-modules/renderer/README.md](../04-modules/renderer/README.md)
+- Backend：[../04-modules/backend/README.md](../04-modules/backend/README.md)
+- Agent：[../04-modules/agent/README.md](../04-modules/agent/README.md)
+- Shared：[../04-modules/shared/README.md](../04-modules/shared/README.md)

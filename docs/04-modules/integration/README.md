@@ -60,13 +60,13 @@ Frontend MessageInput
 
 ## 5. 联调入口
 
-- Frontend：[./frontend.md](./frontend.md)
-- Renderer：[./renderer.md](./renderer.md)
-- Backend：[./backend.md](./backend.md)
-- Agent：[./agent.md](./agent.md)
-- API：[../03-contracts/api.md](../03-contracts/api.md)
-- A2UI：[../03-contracts/a2ui-v0.9.md](../03-contracts/a2ui-v0.9.md)
-- DB：[../03-contracts/db-schema.md](../03-contracts/db-schema.md)
+- Frontend：[../frontend/README.md](../frontend/README.md)
+- Renderer：[../renderer/README.md](../renderer/README.md)
+- Backend：[../backend/README.md](../backend/README.md)
+- Agent：[../agent/README.md](../agent/README.md)
+- API：[../../03-contracts/api.md](../../03-contracts/api.md)
+- A2UI：[../../03-contracts/a2ui-v0.9.md](../../03-contracts/a2ui-v0.9.md)
+- DB：[../../03-contracts/db-schema.md](../../03-contracts/db-schema.md)
 
 ## 6. 验收场景
 
@@ -82,4 +82,4 @@ Frontend MessageInput
 
 更细的历史集成说明维护在 `docs/99-archive/integration/`：
 
-- [集成实现细节](../99-archive/integration/implementation-details.md)
+- [集成实现细节](../../99-archive/integration/implementation-details.md)

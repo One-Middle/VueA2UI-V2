@@ -34,4 +34,4 @@
 - 新增类型时，为 export 类型和接口补充中文 JSDoc。
 - 修改 API DTO 时，同步 `docs/03-contracts/api.md`。
 - 修改 A2UI 类型时，同步 `docs/03-contracts/a2ui-v0.9.md`。
-- 修改 Agent result 或 validation 类型时，同步 `docs/04-modules/agent.md` 与相关后端提交逻辑。
+- 修改 Agent result 或 validation 类型时，同步 `docs/04-modules/agent/README.md` 与相关后端提交逻辑。

@@ -169,7 +169,7 @@ dataModel 响应式：
 
 Action 格式说明：
 
-- A2UI 契约目标以官网式 `Button.action.event` 为准，详见 [A2UI v0.9 契约](../03-contracts/a2ui-v0.9.md)。
+- A2UI 契约目标以官网式 `Button.action.event` 为准，详见 [A2UI v0.9 契约](../../03-contracts/a2ui-v0.9.md)。
 - Renderer 回传 action 时生成标准 A2UI client message，并在 `action.kind` 中标记 `"event"`。
 - Renderer 支持受限 `action.script`，脚本可读写当前 surface 的 `dataModel`，并通过 `actions.emit` 复用标准 action 派发链路。
 - `action.functionCall` 作为未来能力保留在 shared 类型和文档中，但当前 Renderer 暂不执行，Agent schema 也不放行。
@@ -184,10 +184,10 @@ Action 格式说明：
 
 ## 9. 依赖契约
 
-- A2UI：[../03-contracts/a2ui-v0.9.md](../03-contracts/a2ui-v0.9.md)
-- Shared 类型：[../03-contracts/shared-types.md](../03-contracts/shared-types.md)
-- 集成说明：[./integration.md](./integration.md)
-- Renderer Basic Catalog 能力矩阵：[./renderer-basic-catalog-capabilities.md](./renderer-basic-catalog-capabilities.md)
+- A2UI：[../../03-contracts/a2ui-v0.9.md](../../03-contracts/a2ui-v0.9.md)
+- Shared 类型：[../../03-contracts/shared-types.md](../../03-contracts/shared-types.md)
+- 集成说明：[../integration/README.md](../integration/README.md)
+- Renderer Basic Catalog 能力矩阵：[./basic-catalog-capabilities.md](./basic-catalog-capabilities.md)
 
 ## 10. 测试与验收
 
@@ -205,7 +205,7 @@ Action 格式说明：
 
 ## 12. Basic Catalog 能力说明
 
-Renderer 对 Basic Catalog 字段的实际消费状态维护在 [Renderer Basic Catalog 能力矩阵](./renderer-basic-catalog-capabilities.md)。
+Renderer 对 Basic Catalog 字段的实际消费状态维护在 [Renderer Basic Catalog 能力矩阵](./basic-catalog-capabilities.md)。
 
 本文档只维护模块定位、工程结构、核心流程和维护规则，不重复列出每个组件的字段能力，避免与能力矩阵产生冲突。
 
@@ -213,8 +213,8 @@ Renderer 对 Basic Catalog 字段的实际消费状态维护在 [Renderer Basic 
 
 更细的历史设计和协议说明维护在 `docs/99-archive/renderer/`：
 
-- [Renderer 实施说明](../99-archive/renderer/implementation.md)
-- [Renderer 实现细节](../99-archive/renderer/implementation-details.md)
-- [A2UI Renderer v0.9 指南](../99-archive/renderer/a2ui-renderer-v0_9-guide.md)
-- [A2UI 协议认识](../99-archive/renderer/a2ui-protocol-notes.md)
-- [Basic Catalog 组件优化](../99-archive/renderer/basic-catalog-component-optimization.md)
+- [Renderer 实施说明](../../99-archive/renderer/implementation.md)
+- [Renderer 实现细节](../../99-archive/renderer/implementation-details.md)
+- [A2UI Renderer v0.9 指南](../../99-archive/renderer/a2ui-renderer-v0_9-guide.md)
+- [A2UI 协议认识](../../99-archive/renderer/a2ui-protocol-notes.md)
+- [Basic Catalog 组件优化](../../99-archive/renderer/basic-catalog-component-optimization.md)

@@ -134,10 +134,10 @@ packages/frontend/src/
 
 ## 8. 依赖契约
 
-- API：[../03-contracts/api.md](../03-contracts/api.md)
-- A2UI：[../03-contracts/a2ui-v0.9.md](../03-contracts/a2ui-v0.9.md)
-- Shared 类型：[../03-contracts/shared-types.md](../03-contracts/shared-types.md)
-- 系统边界：[../02-architecture/system-design.md](../02-architecture/system-design.md)
+- API：[../../03-contracts/api.md](../../03-contracts/api.md)
+- A2UI：[../../03-contracts/a2ui-v0.9.md](../../03-contracts/a2ui-v0.9.md)
+- Shared 类型：[../../03-contracts/shared-types.md](../../03-contracts/shared-types.md)
+- 系统边界：[../../02-architecture/system-design.md](../../02-architecture/system-design.md)
 
 ## 9. 测试与验收
 
@@ -151,11 +151,11 @@ packages/frontend/src/
 
 - 修改页面结构、工作台状态或 SSE 消费逻辑时，同步更新本文档。
 - 修改 HTTP/SSE 调用时，同步更新 `docs/03-contracts/api.md`。
-- 修改 Renderer 输入模型时，同步更新 `docs/04-modules/renderer.md`。
+- 修改 Renderer 输入模型时，同步更新 `docs/04-modules/renderer/README.md`。
 
 ## 11. 详细档案索引
 
 更细的历史设计和实现细节维护在 `docs/99-archive/frontend/`：
 
-- [Frontend 实施说明](../99-archive/frontend/implementation.md)
-- [Frontend 实现细节](../99-archive/frontend/implementation-details.md)
+- [Frontend 实施说明](../../99-archive/frontend/implementation.md)
+- [Frontend 实现细节](../../99-archive/frontend/implementation-details.md)
