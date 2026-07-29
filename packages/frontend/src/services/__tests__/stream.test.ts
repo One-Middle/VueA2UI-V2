@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { connectStream } from "./stream";
+import { connectStream } from "../stream";
 
 describe("connectStream", () => {
   it("parses an SSE frame split across reader chunks", async () => {

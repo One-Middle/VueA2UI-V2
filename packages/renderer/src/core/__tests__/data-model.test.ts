@@ -10,8 +10,8 @@
 
 import { computed, nextTick } from "vue";
 import { describe, expect, it } from "vitest";
-import { DataContext } from "./data-context";
-import { DataModel } from "./data-model";
+import { DataContext } from "../data-context";
+import { DataModel } from "../data-model";
 
 describe("DataModel", () => {
   it("深层路径更新会触发 Vue computed 重新计算", async () => {

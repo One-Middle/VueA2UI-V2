@@ -11,9 +11,9 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { createApp, nextTick, type App } from "vue";
 import type { A2UIComponent } from "@a2ui-platform/shared";
-import { registerBasicCatalog } from "../index";
-import { SurfaceGroupModel } from "../../core/surface-model";
-import A2uiSurface from "../../vue/A2uiSurface.vue";
+import { registerBasicCatalog } from "../../index";
+import { SurfaceGroupModel } from "../../../core/surface-model";
+import A2uiSurface from "../../../vue/A2uiSurface.vue";
 
 let app: App<Element> | undefined;
 

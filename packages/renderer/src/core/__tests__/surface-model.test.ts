@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { DataContext } from "./data-context";
-import { SurfaceModel } from "./surface-model";
+import { DataContext } from "../data-context";
+import { SurfaceModel } from "../surface-model";
 
 describe("SurfaceModel", () => {
   it("updates root dataModel without replacing the instance", () => {

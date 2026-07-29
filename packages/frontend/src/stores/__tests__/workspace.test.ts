@@ -1,10 +1,10 @@
 import type { MessageDto, SessionDetailResponse, SessionDto, SurfaceSnapshotDto } from "@a2ui-platform/shared";
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import * as api from "../services/api";
-import { connectStream, type StreamHandlers } from "../services/stream";
-import { useRendererStore } from "./renderer";
-import { useWorkspaceStore } from "./workspace";
+import * as api from "../../services/api";
+import { connectStream, type StreamHandlers } from "../../services/stream";
+import { useRendererStore } from "../renderer";
+import { useWorkspaceStore } from "../workspace";
 
 vi.mock("../services/api", () => ({
   getSession: vi.fn(),

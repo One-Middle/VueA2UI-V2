@@ -9,7 +9,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { AgentRunInput, IAgentRuntime } from "@a2ui-platform/shared";
-import { createAgentRuntime } from "./create-agent-runtime.js";
+import { createAgentRuntime } from "../create-agent-runtime.js";
 
 describe("createAgentRuntime", () => {
   const baseConfig = {

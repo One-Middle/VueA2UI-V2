@@ -1,7 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { a2uiEventRepository } from "../repositories/a2ui-event.repository.js";
-import { snapshotService } from "./snapshot.service.js";
+import { a2uiEventRepository } from "../../repositories/a2ui-event.repository.js";
+import { snapshotService } from "../snapshot.service.js";
 
 vi.mock("../repositories/a2ui-event.repository.js", () => ({
   a2uiEventRepository: { findBySessionId: vi.fn() },

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { A2UIServerMessage } from "@a2ui-platform/shared";
-import { validateA2UI } from "./validate-a2ui.js";
+import { validateA2UI } from "../validate-a2ui.js";
 
 const catalogId = "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json";
 

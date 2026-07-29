@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { AgentRunInput, ToolCallRecord } from "@a2ui-platform/shared";
-import { AgentContextBuilder } from "../context/context-builder.js";
-import { PromptComposer } from "../prompts/prompt-composer.js";
-import { parseComponentInfoRequest } from "./component-info-request-parser.js";
-import { parseSkillInfoRequest } from "./skill-info-request-parser.js";
-import { parseSkillReferenceRequest } from "./skill-reference-request-parser.js";
-import { AgentRuntime } from "./agent-runtime.js";
-import type { ModelClient, ModelResponse } from "../model/model-client.js";
+import { AgentContextBuilder } from "../../context/context-builder.js";
+import { PromptComposer } from "../../prompts/prompt-composer.js";
+import { parseComponentInfoRequest } from "../component-info-request-parser.js";
+import { parseSkillInfoRequest } from "../skill-info-request-parser.js";
+import { parseSkillReferenceRequest } from "../skill-reference-request-parser.js";
+import { AgentRuntime } from "../agent-runtime.js";
+import type { ModelClient, ModelResponse } from "../../model/model-client.js";
 
 function createInput(
   enabledSkills: AgentRunInput["enabledSkills"] = [],
