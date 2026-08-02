@@ -7,9 +7,10 @@ import { parseSkillInfoRequest } from "../skill-info-request-parser.js";
 import { parseSkillReferenceRequest } from "../skill-reference-request-parser.js";
 import { AgentRuntime } from "../agent-runtime.js";
 import type { ModelClient, ModelResponse } from "../../model/model-client.js";
+import { getPlatformAutoEnabledSkills } from "../../skills/platform-skills.js";
 
 function createInput(
-  enabledSkills: AgentRunInput["enabledSkills"] = [],
+  enabledSkills: AgentRunInput["enabledSkills"] = getPlatformAutoEnabledSkills(),
 ): AgentRunInput {
   return {
     sessionId: "session-1",
@@ -88,7 +89,7 @@ describe("Agent 渐进式组件披露", () => {
     expect(systemPrompt).not.toContain("### Button\n字段");
   });
 
-  it("后端未传入 Skill 时，初始 Prompt 仍包含 A2UI 基础 Skill 摘要但不包含完整内容", () => {
+  it("Resolver 传入平台 Skill 时，初始 Prompt 包含 A2UI 摘要但不包含完整内容", () => {
     const composer = new PromptComposer();
     const context = new AgentContextBuilder().buildContext(createInput());
 
@@ -99,6 +100,16 @@ describe("Agent 渐进式组件披露", () => {
     expect(userPrompt).toContain("当用户要求创建或修改 UI 时必须使用");
     expect(userPrompt).not.toContain("## 4. 消息类型");
     expect(userPrompt).not.toContain("生成新 UI 时必须先 createSurface");
+  });
+
+  it("Runtime 不会自行注入平台 Skill", () => {
+    const composer = new PromptComposer();
+    const context = new AgentContextBuilder().buildContext(createInput([]));
+
+    const { userPrompt } = composer.composeInitial(context);
+
+    expect(userPrompt).toContain("（无启用的 Skills）");
+    expect(userPrompt).not.toContain("builtin:a2ui-v0.9-generation");
   });
 
   it("初始 Prompt 只包含 Skill 摘要，不包含完整内容", () => {
@@ -119,7 +130,6 @@ describe("Agent 渐进式组件披露", () => {
     expect(userPrompt).toContain("skill-1");
     expect(userPrompt).toContain("课程表规范");
     expect(userPrompt).toContain("生成课程表时使用");
-    expect(userPrompt).toContain("builtin:a2ui-v0.9-generation");
     expect(userPrompt).not.toContain("必须使用三栏布局，这是完整 Skill 内容。");
   });
 

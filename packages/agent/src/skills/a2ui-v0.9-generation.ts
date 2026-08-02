@@ -5,9 +5,16 @@
  * - 为 Agent Runtime 提供始终可用的 A2UI 生成能力 Skill
  * - 避免运行期读取本地 Markdown 文件
  *
+ * 注意：
+ * - 当前开发阶段，后端 Skill Resolver 统一决定本次 Agent run 启用哪些 Skill。
+ * - platform-skills.ts 只向后端 Resolver 提供平台 Skill 定义。
+ * - 本文件保存 A2UI 平台内置 Skill 的运行时内容。
+ * - a2ui-v0.9-generation.md 仅作为人类可读文档，不作为运行时或同步源。
+ *
  * 不负责：内置 Skill 数据库同步（见 registry.ts 和 backend sync 脚本）。
  */
 
+import type { SkillReference } from "@a2ui-platform/shared";
 import type { AgentContextSkill } from "../context/context-builder.js";
 
 /** A2UI v0.9 基础生成 Skill 的固定 ID。 */
@@ -245,10 +252,91 @@ export const A2UI_GENERATION_SKILL_CONTENT = [
   "- 禁止把 JSRuntime 当作浏览器脚本环境使用，不要访问 DOM、window、document、fetch、网络或外部 API。",
 ].join("\n");
 
+/** A2UI v0.9 基础生成 Skill 的参考资料。 */
+export const A2UI_GENERATION_SKILL_REFERENCES: SkillReference[] = [
+  {
+    id: "basic-catalog-quality-patterns",
+    title: "Basic Catalog 高质量组合模式",
+    description:
+      "用于避免生成过于简陋的 Card/Row/Text 平铺结构，说明常见 UI 的组件组织方式。",
+    content: [
+      "# Basic Catalog 高质量组合模式",
+      "",
+      "生成 UI 时先做信息架构，再选择组件。不要把所有信息直接铺成若干 Row 和 Text。",
+      "",
+      "## 推荐结构",
+      "",
+      "- 卡片类 UI：Card 作为外层容器，内部使用 Column 拆出媒体区、标题区、内容区和操作区。",
+      "- 列表类 UI：重复数据优先进入 dataModel 数组，再使用 List 模板渲染，不要生成 row1、row2、row3。",
+      "- 看板类 UI：使用 Column 组织页面，Row 承载多个指标 Card，重要数字使用 metric/brand，说明文字使用 caption/neutral。",
+      "- 表单类 UI：字段按 Column 分组，按钮区单独放在底部 Row，错误和帮助信息放在字段附近。",
+      "",
+      "## 视觉字段",
+      "",
+      "常见 UI 必须主动使用受控视觉字段：gap、padding、borderRadius、variant、tone、size、preset、shadow。复杂视觉效果优先使用 variant/tone/preset，不要臆造 className、css、html 或浏览器事件字段。",
+    ].join("\n"),
+  },
+  {
+    id: "jsruntime-usage-patterns",
+    title: "JSRuntime 使用模式",
+    description:
+      "说明什么时候应该使用受限 JSRuntime，以及属性脚本和按钮脚本的边界。",
+    content: [
+      "# JSRuntime 使用模式",
+      "",
+      "JSRuntime 用于声明式绑定难以表达的少量同步逻辑，不是浏览器 JavaScript 环境。",
+      "",
+      "## 应该使用的场景",
+      "",
+      "- 从 dataModel 派生文案，例如播放/暂停、已完成/待处理。",
+      "- 从 dataModel 派生 Icon.name、Text.text、style.color 等允许脚本的属性。",
+      "- 点击按钮后先更新本地 dataModel，再通过 actions.emit 通知宿主。",
+      "",
+      "## 不应该使用的场景",
+      "",
+      "- 静态文案或简单 { path } 数据绑定可以表达时，不要使用脚本。",
+      "- 不要访问 DOM、window、document、fetch、localStorage、网络、定时器、import、async/await、eval 或 Function。",
+      "- 不要生成 HTML 字符串、<script>、javascript: URL 或 onClick/onChange 等事件处理器字段。",
+      "",
+      "## 示例",
+      "",
+      "属性脚本：",
+      "",
+      '{ "script": { "code": "return dataModel.get(\'/player/isPlaying\') ? \'pause\' : \'play_arrow\';", "deps": ["/player/isPlaying"], "fallback": "play_arrow" } }',
+      "",
+      "按钮脚本：",
+      "",
+      '{ "script": { "code": "const next = !Boolean(dataModel.get(\'/player/isPlaying\')); dataModel.set(\'/player/isPlaying\', next); actions.emit(\'playToggled\', { isPlaying: next });", "deps": ["/player/isPlaying"] } }',
+    ].join("\n"),
+  },
+  {
+    id: "a2ui-message-checklist",
+    title: "A2UI 消息生成检查清单",
+    description:
+      "输出 A2UI 消息前的结构、绑定、交互和安全检查项。",
+    content: [
+      "# A2UI 消息生成检查清单",
+      "",
+      "输出前逐项确认：",
+      "",
+      "- 新 UI 是否包含 createSurface、必要的 updateDataModel 和 updateComponents。",
+      "- surfaceId 是否固定为 main。",
+      "- 是否存在 id 为 root 的组件。",
+      "- child、children、tabItems.child 是否只引用真实存在的组件 id。",
+      "- 重复内容是否优先使用 dataModel 数组和 List 模板。",
+      "- Button.action 是否使用 action.event 或 action.script，而不是旧版 { name }。",
+      "- 是否避免了 Catalog 外组件，例如 div、table、input、select、Schedule、Calendar。",
+      "- 是否避免了 className、css、innerHTML、onClick、onInput、onChange。",
+      "- 是否在常见 UI 中使用 gap、padding、borderRadius、variant、tone、size、preset 等受控视觉字段。",
+    ].join("\n"),
+  },
+];
+
 /** A2UI v0.9 基础生成 Skill 的运行时对象。 */
 export const A2UI_GENERATION_SKILL: AgentContextSkill = {
   id: A2UI_GENERATION_SKILL_ID,
   name: A2UI_GENERATION_SKILL_NAME,
   description: A2UI_GENERATION_SKILL_DESCRIPTION,
   content: A2UI_GENERATION_SKILL_CONTENT,
+  references: A2UI_GENERATION_SKILL_REFERENCES,
 };

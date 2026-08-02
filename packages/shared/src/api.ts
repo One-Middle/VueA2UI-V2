@@ -427,6 +427,8 @@ export interface RuntimeConfigDto {
   catalogVersion: string;
   /** Renderer 版本 */
   rendererVersion: string;
+  /** platform Skill 来源：code 表示代码种子，db 表示数据库。 */
+  platformSkillSource: "code" | "db";
 }
 
 /** 更新 Runtime 配置请求。 */

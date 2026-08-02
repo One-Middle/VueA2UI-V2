@@ -33,3 +33,7 @@ export {
 
 // ─── 内置 Skill 注册表 ───────────────────────────────────
 export { BUILTIN_SKILLS, type BuiltinSkillMeta } from "./skills/registry.js";
+export {
+  getPlatformAutoEnabledSkills,
+  type PlatformSkill,
+} from "./skills/platform-skills.js";

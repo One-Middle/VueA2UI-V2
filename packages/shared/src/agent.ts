@@ -61,6 +61,8 @@ export interface AgentRunInput {
     name: string;
     description?: string | null;
     content: string;
+    sourceType?: string | null;
+    metadata?: JsonObject | null;
     references?: SkillReference[];
   }>;
   /** 当前 Surface 快照数据，用于增量更新 */

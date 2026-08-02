@@ -19,12 +19,12 @@ import { a2uiEventRepository } from "../repositories/a2ui-event.repository.js";
 import { agentRunRepository } from "../repositories/agent-run.repository.js";
 import { fileRepository } from "../repositories/file.repository.js";
 import { messageRepository } from "../repositories/message.repository.js";
-import { sessionSkillRepository } from "../repositories/session-skill.repository.js";
 import { surfaceSnapshotRepository } from "../repositories/surface-snapshot.repository.js";
 import { toolCallRepository } from "../repositories/tool-call.repository.js";
 import { notFound } from "../utils/errors.js";
 import { config } from "../config.js";
 import { snapshotService } from "./snapshot.service.js";
+import { skillResolverService } from "./skill-resolver.service.js";
 import { streamService } from "./stream.service.js";
 
 const SID = (id: string) => id.slice(0, 8);
@@ -142,7 +142,7 @@ export const agentRunService = {
         const currentSnapshot = await surfaceSnapshotRepository.findCurrentBySessionId(sessionId);
         const recentMessages = await messageRepository.findBySessionId(sessionId, { limit: 20 });
         const uploadedFiles = await fileRepository.findReadyWithContentBySessionId(sessionId);
-        const enabledSkills = await sessionSkillRepository.findBySessionId(sessionId);
+        const enabledSkills = await skillResolverService.resolveForSession(sessionId);
 
         const agentInput: AgentRunInput = {
           sessionId,
@@ -156,15 +156,7 @@ export const agentRunService = {
             originalName: file.originalName,
             content: file.content,
           })),
-          enabledSkills: enabledSkills
-            .filter((sessionSkill) => sessionSkill.enabled && sessionSkill.skill.isActive)
-            .map((sessionSkill) => ({
-              id: sessionSkill.skill.id,
-              name: sessionSkill.skill.name,
-              description: sessionSkill.skill.description,
-              content: sessionSkill.skill.content,
-              references: extractSkillReferences(sessionSkill.skill.metadata),
-            })),
+          enabledSkills,
           currentSnapshot: currentSnapshot ? (currentSnapshot.snapshot as AgentRunInput["currentSnapshot"]) : null,
           catalogId: config.catalog.id,
           catalogVersion: config.catalog.version,
@@ -509,43 +501,6 @@ export const agentRunService = {
     };
   },
 };
-
-function extractSkillReferences(metadata: unknown): AgentRunInput["enabledSkills"][number]["references"] {
-  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
-    return [];
-  }
-  const references = (metadata as { references?: unknown }).references;
-  if (!Array.isArray(references)) {
-    return [];
-  }
-  return references
-    .filter((item) => {
-      if (!item || typeof item !== "object" || Array.isArray(item)) return false;
-      const ref = item as Record<string, unknown>;
-      return (
-        typeof ref.id === "string" &&
-        ref.id.trim().length > 0 &&
-        typeof ref.title === "string" &&
-        ref.title.trim().length > 0 &&
-        typeof ref.content === "string" &&
-        ref.content.trim().length > 0
-      );
-    })
-    .map((item) => {
-      const ref = item as {
-        id: string;
-        title: string;
-        content: string;
-        description?: string | null;
-      };
-      return {
-        id: ref.id.trim(),
-        title: ref.title.trim(),
-        content: ref.content,
-        description: ref.description ?? null,
-      };
-    });
-}
 
 function extractSurfaceIds(messages: A2UIServerMessage[]): string[] {
   const surfaceIds = new Set<string>();

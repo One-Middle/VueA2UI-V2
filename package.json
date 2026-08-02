@@ -16,7 +16,8 @@
     "lint": "pnpm --filter @a2ui-platform/* -r lint",
     "repair:snapshots": "pnpm --filter @a2ui-platform/backend repair:snapshots",
     "format": "prettier --write .",
-    "skill:sync": "pnpm --filter @a2ui-platform/backend skill:sync"
+    "skill:sync": "pnpm --filter @a2ui-platform/backend skill:sync",
+    "skill:docs": "pnpm --filter @a2ui-platform/agent skill:docs"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

@@ -136,6 +136,10 @@ function formatToolCallSummary(row: ToolCallDto): string {
         <span>Catalog</span>
         <strong>{{ runtimeConfig?.catalogId ?? "-" }}</strong>
       </div>
+      <div class="summary-item">
+        <span>Platform Skill</span>
+        <strong>{{ runtimeConfig?.platformSkillSource ?? "-" }}</strong>
+      </div>
     </div>
 
     <section class="runs-section">
@@ -158,7 +162,7 @@ function formatToolCallSummary(row: ToolCallDto): string {
 <style scoped>
 .runtime-summary {
   display: grid;
-  grid-template-columns: repeat(4, minmax(140px, 1fr));
+  grid-template-columns: repeat(5, minmax(140px, 1fr));
   gap: 10px;
   margin-bottom: 18px;
 }

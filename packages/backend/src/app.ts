@@ -73,6 +73,7 @@ export function createApp() {
       catalogId: config.catalog.id,
       catalogVersion: config.catalog.version,
       rendererVersion: config.catalog.rendererVersion,
+      platformSkillSource: config.skills.platformSource,
     });
   });
 

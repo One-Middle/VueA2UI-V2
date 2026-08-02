@@ -3,8 +3,8 @@
  *
  * 职责：
  * - 从 @a2ui-platform/agent 的 skills/ 注册表读取所有内置 Skill 定义
- * - 读取对应的 .md 文件，解析 frontmatter + Markdown body
- * - 按 name + sourceType='builtin' 匹配已有数据库记录
+ * - platform Skill 从代码种子读取，builtin 示例 Skill 从 .md 读取
+ * - 按 name + sourceType 匹配已有数据库记录
  * - 已有 → 更新 content + 版本号 +1 + isActive=true + 恢复软删除
  * - 不存在 → 创建新记录
  * - 文件缺失或内容为空 → skip
@@ -15,7 +15,10 @@
 import { readFileSync, existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { BUILTIN_SKILLS } from "@a2ui-platform/agent";
+import {
+  BUILTIN_SKILLS,
+  getPlatformAutoEnabledSkills,
+} from "@a2ui-platform/agent";
 import { prisma } from "../db.js";
 
 // ─── 路径解析 ──────────────────────────────────────────
@@ -30,6 +33,14 @@ interface FrontmatterMeta {
   name?: string;
   description?: string;
   version?: number;
+}
+
+interface LocalSkillDefinition {
+  name: string;
+  description: string | null;
+  content: string;
+  version: number;
+  metadata: Record<string, unknown>;
 }
 
 interface SyncResult {
@@ -91,27 +102,24 @@ function parseFrontmatter(raw: string): FrontmatterMeta & { content: string } {
 
 async function syncBuiltinSkills(): Promise<SyncResult> {
   const result: SyncResult = { created: [], updated: [], skipped: [] };
+  const platformSkillsById = new Map(
+    getPlatformAutoEnabledSkills().map((skill) => [skill.id, skill]),
+  );
 
   for (const meta of BUILTIN_SKILLS) {
-    const filePath = resolve(skillsDir, meta.file);
-
-    if (!existsSync(filePath)) {
+    const definition = loadLocalSkillDefinition(meta, platformSkillsById);
+    if (!definition.ok) {
       result.skipped.push({
         name: meta.name,
-        reason: `文件不存在: ${filePath}`,
+        reason: definition.reason,
       });
-      console.info(`  [SKIP] ${meta.name} — 文件不存在: ${filePath}`);
+      console.info(`  [SKIP] ${meta.name} — ${definition.reason}`);
       continue;
     }
 
-    const raw = readFileSync(filePath, "utf-8");
-    const parsed = parseFrontmatter(raw);
+    const { name, description, content, version } = definition.skill;
 
-    const name = parsed.name ?? meta.name;
-    const description = parsed.description ?? meta.description ?? null;
-    const version = parsed.version ?? meta.version ?? 1;
-
-    if (!parsed.content.trim()) {
+    if (!content.trim()) {
       result.skipped.push({
         name,
         reason: "Skill 内容为空",
@@ -120,9 +128,22 @@ async function syncBuiltinSkills(): Promise<SyncResult> {
       continue;
     }
 
-    // 按 name + sourceType='builtin' 匹配已有记录（含软删除的）
+    const metadata = {
+      ...definition.skill.metadata,
+      builtinId: meta.id,
+      sourceFile: meta.file,
+      frontendVisible: meta.frontendVisible ?? true,
+      editable: meta.editable ?? true,
+      runtimeEnabled: meta.runtimeEnabled ?? false,
+    };
+
+    // platform Skill 首次迁移时可能已有旧 sourceType=builtin 记录，按 name 接管旧记录。
+    // 其他本地 Skill 继续按 name + sourceType 匹配，避免和手工 Skill 混淆。
     const existing = await prisma.skill.findFirst({
-      where: { name, sourceType: "builtin" },
+      where:
+        meta.sourceType === "platform"
+          ? { name }
+          : { name, sourceType: meta.sourceType },
     });
 
     if (existing) {
@@ -130,9 +151,11 @@ async function syncBuiltinSkills(): Promise<SyncResult> {
         where: { id: existing.id },
         data: {
           description,
-          content: parsed.content,
+          content,
+          sourceType: meta.sourceType,
           version: existing.version + 1,
           isActive: true,
+          metadata,
           deletedAt: null,
           updatedAt: new Date(),
         },
@@ -146,11 +169,11 @@ async function syncBuiltinSkills(): Promise<SyncResult> {
         data: {
           name,
           description,
-          content: parsed.content,
-          sourceType: "builtin",
+          content,
+          sourceType: meta.sourceType,
           version,
           isActive: true,
-          metadata: {},
+          metadata,
         },
       });
       result.created.push(name);
@@ -159,6 +182,55 @@ async function syncBuiltinSkills(): Promise<SyncResult> {
   }
 
   return result;
+}
+
+function loadLocalSkillDefinition(
+  meta: (typeof BUILTIN_SKILLS)[number],
+  platformSkillsById: Map<string, ReturnType<typeof getPlatformAutoEnabledSkills>[number]>,
+):
+  | { ok: true; skill: LocalSkillDefinition }
+  | { ok: false; reason: string } {
+  if (meta.sourceType === "platform") {
+    const skill = platformSkillsById.get(meta.id);
+    if (!skill) {
+      return { ok: false, reason: `platform 代码种子不存在: ${meta.id}` };
+    }
+    return {
+      ok: true,
+      skill: {
+        name: skill.name,
+        description: skill.description ?? meta.description ?? null,
+        content: skill.content,
+        version: meta.version ?? 1,
+        metadata: toMetadataObject(skill.metadata),
+      },
+    };
+  }
+
+  const filePath = resolve(skillsDir, meta.file);
+  if (!existsSync(filePath)) {
+    return { ok: false, reason: `文件不存在: ${filePath}` };
+  }
+
+  const raw = readFileSync(filePath, "utf-8");
+  const parsed = parseFrontmatter(raw);
+  return {
+    ok: true,
+    skill: {
+      name: parsed.name ?? meta.name,
+      description: parsed.description ?? meta.description ?? null,
+      content: parsed.content,
+      version: parsed.version ?? meta.version ?? 1,
+      metadata: {},
+    },
+  };
+}
+
+function toMetadataObject(metadata: unknown): Record<string, unknown> {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return {};
+  }
+  return metadata as Record<string, unknown>;
 }
 
 // ─── 入口 ──────────────────────────────────────────────

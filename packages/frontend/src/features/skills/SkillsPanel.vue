@@ -25,6 +25,7 @@ const workspace = useWorkspaceStore();
 const modalVisible = ref(false);
 const modalMode = ref<ModalMode>("create");
 const editingSkill = ref<SkillDto | null>(null);
+const togglingSkillIds = ref<Set<string>>(new Set());
 const form = ref({
   name: "",
   description: "",
@@ -47,7 +48,9 @@ const modalTitle = computed(() => {
 });
 
 const isBuiltin = computed(
-  () => editingSkill.value?.sourceType === "builtin",
+  () =>
+    editingSkill.value?.sourceType === "builtin" ||
+    editingSkill.value?.sourceType === "platform",
 );
 
 const isReadonly = computed(
@@ -166,16 +169,50 @@ const parseReferences = (raw: string): SkillReference[] => {
   });
 };
 
+/** 平台 Skill 由 resolver 自动启用，不走会话级开关。 */
+const isPlatformSkill = (skill: SkillDto) => skill.sourceType === "platform";
+
+/** Skill 在当前 UI 中是否显示为启用。 */
+const isSkillEnabled = (skill: SkillDto) =>
+  isPlatformSkill(skill) || workspace.enabledSkillIds.includes(skill.id);
+
 /** 会话级启用/禁用切换 */
-const toggleSkill = (skill: SkillDto) => {
-  workspace.enabledSkillIds.includes(skill.id)
-    ? workspace.disableSkill(skill.id)
-    : workspace.enableSkill(skill.id);
+const toggleSkill = async (skill: SkillDto, enabled: boolean) => {
+  if (isPlatformSkill(skill) || !workspace.activeSessionId) return;
+
+  togglingSkillIds.value = new Set([...togglingSkillIds.value, skill.id]);
+  try {
+    if (enabled) {
+      await workspace.enableSkill(skill.id);
+    } else {
+      await workspace.disableSkill(skill.id);
+    }
+  } finally {
+    const nextToggling = new Set(togglingSkillIds.value);
+    nextToggling.delete(skill.id);
+    togglingSkillIds.value = nextToggling;
+  }
+};
+
+/** 开关是否可点击。 */
+const isToggleDisabled = (skill: SkillDto) =>
+  !workspace.activeSessionId ||
+  !skill.isActive ||
+  isPlatformSkill(skill) ||
+  togglingSkillIds.value.has(skill.id);
+
+/** 开关旁状态文案。 */
+const skillToggleLabel = (skill: SkillDto) => {
+  if (isPlatformSkill(skill)) return "自动启用";
+  if (!workspace.activeSessionId) return "请选择会话";
+  return isSkillEnabled(skill) ? "已启用" : "未启用";
 };
 
 /** 来源类型中文标签 */
 const sourceTypeLabel = (type: string) => {
   switch (type) {
+    case "platform":
+      return "平台";
     case "builtin":
       return "内置";
     case "manual":
@@ -188,6 +225,8 @@ const sourceTypeLabel = (type: string) => {
 /** 来源类型 Tag 颜色 */
 const sourceTypeTagType = (type: string): "info" | "warning" | "default" => {
   switch (type) {
+    case "platform":
+      return "info";
     case "builtin":
       return "info";
     case "manual":
@@ -238,12 +277,12 @@ const sourceTypeTagType = (type: string): "info" | "warning" | "default" => {
           <n-button size="tiny" quaternary @click="openEdit(s)">编辑</n-button>
         </div>
         <div class="skill-toggle">
-          <span>{{
-            workspace.enabledSkillIds.includes(s.id) ? "已启用" : "未启用"
-          }}</span>
+          <span>{{ skillToggleLabel(s) }}</span>
           <n-switch
-            :value="workspace.enabledSkillIds.includes(s.id)"
-            @update:value="() => toggleSkill(s)"
+            :value="isSkillEnabled(s)"
+            :disabled="isToggleDisabled(s)"
+            :loading="togglingSkillIds.has(s.id)"
+            @update:value="(value) => toggleSkill(s, value)"
           />
         </div>
       </div>
