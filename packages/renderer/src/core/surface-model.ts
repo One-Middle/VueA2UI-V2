@@ -8,8 +8,6 @@
 import { reactive } from "vue";
 import type {
   A2UIComponent,
-  CreateSurfacePayload,
-  JsonObject,
   JsonValue,
 } from "@a2ui-platform/shared";
 import { ComponentModel } from "./component-model";
@@ -21,10 +19,6 @@ export class SurfaceModel {
   readonly surfaceId: string;
   /** 使用的 Catalog ID */
   readonly catalogId: string;
-  /** 主题配置（可选） */
-  theme?: JsonObject;
-  /** 是否向后端回传 dataModel 快照 */
-  sendDataModel: boolean;
   /** 组件映射（componentId → ComponentModel），使用 reactive 保持响应式 */
   components: Map<string, ComponentModel>;
   /** 数据模型 */
@@ -36,7 +30,6 @@ export class SurfaceModel {
   constructor(surfaceId: string, catalogId: string) {
     this.surfaceId = surfaceId;
     this.catalogId = catalogId;
-    this.sendDataModel = false;
     this.components = reactive(new Map<string, ComponentModel>()) as Map<
       string,
       ComponentModel
@@ -47,17 +40,11 @@ export class SurfaceModel {
   // ─── 创建 Surface ─────────────────────────────────────────
 
   /**
-   * 根据 CreateSurfacePayload 初始化或更新 surface。
-   * 注意：createSurface 消息通常在首次创建时发送，如果 surface 已存在
-   * 则更新 theme 和 sendDataModel 等字段。
+   * 初始化或更新 surface。
+   * 注意：createSurface 当前只声明 surface 与 Catalog 的绑定关系。
    */
-  createSurface(payload: CreateSurfacePayload): void {
-    if (payload.theme !== undefined) {
-      this.theme = payload.theme;
-    }
-    if (payload.sendDataModel !== undefined) {
-      this.sendDataModel = payload.sendDataModel;
-    }
+  createSurface(): void {
+    // 当前 createSurface 无额外可变字段，保留方法用于消息处理链路稳定。
   }
 
   // ─── 组件管理 ─────────────────────────────────────────────

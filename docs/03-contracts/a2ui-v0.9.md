@@ -19,6 +19,11 @@
 - `updateDataModel`
 - `deleteSurface`
 
+`createSurface` 只声明 surface 与 Catalog 的绑定关系，payload 只能包含：
+
+- `surfaceId`
+- `catalogId`
+
 生成 UI 时，推荐消息顺序：
 
 1. `createSurface`

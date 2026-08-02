@@ -42,14 +42,6 @@
             "catalogId": {
               "type": "string",
               "description": "该 surface 使用的 Catalog ID"
-            },
-            "theme": {
-              "type": "object",
-              "description": "可选的 UI 主题配置"
-            },
-            "sendDataModel": {
-              "type": "boolean",
-              "description": "是否发送 data model"
             }
           },
           "additionalProperties": false

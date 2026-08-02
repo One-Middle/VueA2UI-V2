@@ -24,8 +24,6 @@ export interface A2UIBaseMessage {
 export interface CreateSurfacePayload {
   surfaceId: string;
   catalogId: string;
-  theme?: JsonObject;
-  sendDataModel?: boolean;
 }
 
 export interface UpdateComponentsPayload {
@@ -206,8 +204,6 @@ export interface CatalogDefinition {
 export interface SurfaceState {
   surfaceId: string;
   catalogId: string;
-  theme?: JsonObject;
-  sendDataModel?: boolean;
   components: Record<string, A2UIComponent>;
   dataModel: JsonValue;
 }

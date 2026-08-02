@@ -57,7 +57,7 @@ export class MessageProcessor {
           payload.surfaceId,
           payload.catalogId
         );
-        surface.createSurface(payload);
+        surface.createSurface();
         surfaceIds.add(payload.surfaceId);
         logger.info(`创建 Surface → surfaceId=${payload.surfaceId}, catalogId=${payload.catalogId}`);
         handled = true;

@@ -44,12 +44,10 @@ export const snapshotService = {
     surfaces: Record<string, SurfaceState>
   ): void {
     if ("createSurface" in msg && msg.createSurface) {
-      const { surfaceId, catalogId, theme, sendDataModel } = msg.createSurface;
+      const { surfaceId, catalogId } = msg.createSurface;
       surfaces[surfaceId] = {
         surfaceId,
         catalogId,
-        theme,
-        sendDataModel,
         components: {},
         dataModel: {},
       };

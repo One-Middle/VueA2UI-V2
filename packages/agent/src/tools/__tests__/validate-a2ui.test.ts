@@ -5,6 +5,35 @@ import { validateA2UI } from "../validate-a2ui.js";
 const catalogId = "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json";
 
 describe("validateA2UI catalog properties", () => {
+  it("rejects removed createSurface theme and sendDataModel fields", () => {
+    const messages = [
+      {
+        version: "v0.9",
+        createSurface: {
+          surfaceId: "main",
+          catalogId,
+          theme: { primaryColor: "#2563eb" },
+          sendDataModel: true,
+        },
+      },
+    ] as unknown as A2UIServerMessage[];
+
+    const result = validateA2UI({
+      messages,
+      catalogId,
+      currentSnapshot: null,
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "A2UI_STRUCTURE",
+        }),
+      ]),
+    );
+  });
+
   it("rejects Card.children because Card only supports child/title", () => {
     const messages: A2UIServerMessage[] = [
       {

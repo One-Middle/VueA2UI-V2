@@ -28,7 +28,7 @@ Renderer 只接受 `version === "v0.9"` 的服务端消息。已支持的消息�
 
 | A2UI 信息 | 当前功能 | 实现说明 |
 | --- | --- | --- |
-| `createSurface` | 创建或更新一个 `SurfaceModel`，记录 `surfaceId`、`catalogId`，并接收可选 `theme`、`sendDataModel`。 | `theme` 和 `sendDataModel` 当前只进入 surface 状态，尚未形成完整主题渲染或 dataModel 自动回传链路。 |
+| `createSurface` | 创建或更新一个 `SurfaceModel`，记录 `surfaceId`、`catalogId`。 | 当前只声明 surface 与 Catalog 的绑定关系。 |
 | `updateDataModel` | 按 JSON Pointer 路径写入数据，支持替换根数据、写入对象路径和数组下标路径。 | `path` 为空、未提供或为 `/` 时替换整个 dataModel；深层路径会自动创建中间对象或数组。 |
 | `updateComponents` | 增量更新组件集合，新增、更新或删除 surface 内的组件，并触发 Vue 响应式渲染。 | 组件 `id` 不变且 `component` 类型不变时更新属性；类型变化时重建组件模型。 |
 | `deleteSurface` | 删除指定 surface，清理组件集合和 dataModel 订阅。 | 删除后对应 `A2uiSurface` 会显示 surface 缺失状态。 |
@@ -136,12 +136,10 @@ Renderer 支持只读属性脚本：
 - 属性脚本必须显式 `return` JSON-compatible 值；异常时使用 `fallback` 并派发 `a2ui:error`。
 - 样式脚本第一版只支持 `style.<白名单字段>.script`，解析结果仍经过 `visual-props.ts` 白名单。
 
-### 3.7 当前不支持或仅保留状态的信息
+### 3.7 当前不支持的信息
 
-以下 A2UI 信息即使能通过上游校验，也不代表当前 Renderer 已完整消费：
+以下信息不属于当前正式能力，Agent 不应生成：
 
-- `createSurface.theme`：仅保存到 `SurfaceModel.theme`，尚未驱动全局主题变量。
-- `createSurface.sendDataModel`：仅保存布尔状态，尚未自动在 action 中附带完整 dataModel 快照。
 - 任意 `className`、`css`、`innerHTML`、非受控脚本、事件处理器字段：Renderer 不消费。
 - 未注册组件类型：不会执行动态代码，只显示 fallback。
 - 历史扁平 action：`{ "action": { "name": "submit", "context": {} } }` 不再兼容，按钮点击时不会派发。

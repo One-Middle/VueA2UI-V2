@@ -670,8 +670,6 @@ function snapshotToRendererMessages(snapshot: SurfaceSnapshotDto): A2UIServerMes
       createSurface: {
         surfaceId: surface.surfaceId,
         catalogId: surface.catalogId,
-        theme: surface.theme,
-        sendDataModel: surface.sendDataModel,
       },
     });
 
