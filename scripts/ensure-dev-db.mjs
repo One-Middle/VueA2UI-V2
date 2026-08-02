@@ -1,21 +1,10 @@
 import { spawnSync } from "node:child_process";
-import fs from "node:fs";
 import net from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const backendDir = path.join(rootDir, "packages", "backend");
-const prismaClientDir = path.join(
-  rootDir,
-  "node_modules",
-  ".pnpm",
-  "@prisma+client@6.19.3_prisma@6.19.3_typescript@5.9.3__typescript@5.9.3",
-  "node_modules",
-  ".prisma",
-  "client"
-);
-const queryEnginePath = path.join(prismaClientDir, "query_engine-windows.dll.node");
 const databaseUrl = process.env.DATABASE_URL;
 
 if (!databaseUrl) {
@@ -43,13 +32,31 @@ runPrisma(["db", "push", "--skip-generate"]);
 console.log("[dev-db] 数据库准备完成。");
 
 function ensurePrismaClient() {
-  if (fs.existsSync(queryEnginePath)) {
+  if (canImportPrismaClient()) {
     console.log("[dev-db] 已检测到 Prisma Client，跳过 generate。");
     return;
   }
 
   console.log("[dev-db] 未检测到 Prisma Client，执行 prisma generate...");
   runPrisma(["generate"]);
+}
+
+function canImportPrismaClient() {
+  const result = spawnSync(
+    process.execPath,
+    [
+      "--input-type=module",
+      "--eval",
+      "import('@prisma/client').then((m) => process.exit(typeof m.PrismaClient === 'function' ? 0 : 1)).catch(() => process.exit(1));",
+    ],
+    {
+      cwd: backendDir,
+      env: process.env,
+      stdio: "ignore",
+    },
+  );
+
+  return result.status === 0;
 }
 
 function ensureDockerComposeAvailable() {

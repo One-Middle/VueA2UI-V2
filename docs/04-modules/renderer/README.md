@@ -99,6 +99,8 @@ packages/renderer/src/
 | `src/core/data-model.ts` | JSON Pointer 数据读写与订阅。 |
 | `src/core/data-model.test.ts` | dataModel 深层响应式、路径创建和订阅通知测试。 |
 | `src/core/data-context.ts` | 组件渲染时的数据读取、写入和表达式解析上下文。 |
+| `src/core/js-runtime.ts` | JSRuntime 兼容出口，对外保持受限脚本 API 稳定。 |
+| `src/core/js-runtime/` | JSRuntime 工厂、配置、通用校验、AST guard、SES 实现和 new Function 实现。 |
 | `src/core/component-context.ts` | 组件渲染上下文，封装 action/error 派发能力。 |
 | `src/vue/context.ts` | Vue provide/inject 上下文定义。 |
 | `src/vue/A2uiSurface.vue` | 单个 surface 的 Vue 渲染入口。 |
@@ -117,6 +119,7 @@ packages/renderer/src/
 | `SurfaceModel` | `src/core/surface-model.ts` | 管理单个 surface 的 root、组件和数据。 | 单个 UI surface 的核心状态模型。 |
 | `ComponentModel` | `src/core/component-model.ts` | 保存组件类型、props、children 引用等。 | 组件树渲染和更新的基础数据结构。 |
 | `DataModel` | `src/core/data-model.ts` | 处理 JSON Pointer 数据读写与订阅。 | 支撑数据绑定和动态 UI 更新。 |
+| `JSRuntime` | `src/core/js-runtime/` | 执行属性脚本和 `action.script`。 | 将脚本声明校验、执行路径选择、安全约束与调用方解耦。 |
 | `ComponentContext` | `src/core/component-context.ts` | 封装 action/error 派发和动态上下文。 | Basic 组件与宿主前端交互的边界。 |
 | `A2uiComponent` | `src/vue/A2uiComponent.vue` | 递归渲染组件模型。 | 组件树从模型到 Vue 视图的核心入口。 |
 | `catalog-registry` | `src/catalog-registry.ts` | 注册 Basic Catalog 类型与 Vue 组件映射。 | 新增或调整 Basic 组件时必须同步维护。 |
@@ -178,7 +181,9 @@ Action 格式说明：
 属性脚本说明：
 
 - Renderer 支持 `{ script: { code, deps, fallback } }` 属性脚本，用于只读计算属性值。
-- 属性脚本通过 SES `Compartment` 同步执行，只注入 `dataModel.get`。
+- JSRuntime 通过工厂创建执行对象，当前默认使用 `new Function` 路径，并在执行前启用 AST guard；SES `Compartment` 路径仍保留，可通过 `src/core/js-runtime/js-runtime.config.ts` 切换。
+- 属性脚本只注入 `dataModel.get`；`action.script` 注入 `dataModel.get/set`、`actions.emit` 和受控 `context`。
+- `new Function` 路径会把常见浏览器全局变量以 `undefined` 参数遮蔽，并通过 AST guard 拒绝 `window`、`document`、`globalThis`、`fetch`、`Function`、`eval`、`constructor`、`prototype`、`__proto__`、动态成员访问等高风险入口。
 - `deps` 必填，Renderer 会注册最小订阅并在依赖路径变化后触发组件属性重新计算。
 - 第一版只支持 `style.<白名单字段>.script`，不支持 `style.script` 返回完整样式对象。
 

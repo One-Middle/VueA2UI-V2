@@ -1,5 +1,14 @@
 # 更新日志
 
+## 2026-08-02
+
+### Renderer
+
+- JSRuntime 从单一 SES `Compartment` 实现调整为工厂 + 双实现：默认使用 `new Function` 路径，保留 SES 路径并可通过 `js-runtime.config.ts` 切换。
+- `new Function` 路径新增 AST guard，执行前拦截浏览器全局对象、动态执行能力、原型链逃逸入口和动态成员访问等高风险脚本。
+- 新增 JSRuntime 回归测试，覆盖属性脚本、`action.script`、AST guard 拦截和受控 dataModel/actions 能力。
+- 修复 `action.script` 与属性脚本 `{ script }` 形状相同导致 action 解析被提前当成属性脚本执行的问题。
+
 ## 2026-07-26
 
 ### 文档

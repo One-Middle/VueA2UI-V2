@@ -69,7 +69,7 @@ export function resolveComponentAction(
   rawAction: unknown,
   resolveValue: ActionValueResolver
 ): RendererComponentAction | null {
-  const action = resolveValue(rawAction);
+  const action = isPlainObject(rawAction) ? rawAction : resolveValue(rawAction);
   if (!isPlainObject(action)) {
     return null;
   }

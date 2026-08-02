@@ -53,7 +53,7 @@ Renderer 当前支持基于 JSON Pointer 的数据模型能力：
 | --- | --- | --- |
 | `updateDataModel.path` + `value` | 写入或替换数据模型中的指定路径。 | 初始化表单值、列表数据、状态值。 |
 | `{ "path": "/some/value" }` 动态引用 | 组件属性中只有 `path` 一个字段的对象会被解析为 dataModel 取值，根替换和深层路径更新都会触发 Vue 响应式刷新。 | `Text.text`、`Image.url`、`Button.action.context`、表单 `value/text` 等动态绑定。 |
-| `{ "script": { "code", "deps", "fallback" } }` 属性脚本 | 组件属性可通过 SES 受限脚本只读访问 `dataModel.get` 并返回 JSON-compatible 值；`deps` 变化会触发重新执行。 | `Text.text`、已接入通用视觉属性的 `style.<白名单字段>`。 |
+| `{ "script": { "code", "deps", "fallback" } }` 属性脚本 | 组件属性可通过 JSRuntime 只读访问 `dataModel.get` 并返回 JSON-compatible 值；默认执行路径为 `new Function` + AST guard，SES `Compartment` 路径可配置切换；`deps` 变化会触发重新执行。 | `Text.text`、已接入通用视觉属性的 `style.<白名单字段>`。 |
 | 相对路径上下文 | `DataContext` 支持绝对路径和相对路径拼接，递归渲染时会向子组件传递当前 dataModel 作用域。 | 动态列表模板、嵌套容器内的相对路径绑定。 |
 | 表单类组件写回 | 部分输入组件在绑定值为 `{ path }` 时，会把用户输入写回 dataModel。 | `TextField.text`、`CheckBox.value`、`ChoicePicker.value`、`Slider.value`、`DateTimeInput.value`。 |
 
@@ -80,7 +80,7 @@ Renderer 当前支持基于 JSON Pointer 的数据模型能力：
 | action 声明类型 | 示例 | 当前行为 |
 | --- | --- | --- |
 | 正式事件 action：`action.event` | `{ "action": { "event": { "name": "submit", "context": { "form": { "path": "/form" } } } } }` | 支持。点击按钮时解析为 `kind: "event"`，读取 `event.name`，解析 `event.context` 后派发标准 A2UI action 消息。 |
-| 受限脚本 action：`action.script` | `{ "action": { "script": { "code": "const count = Number(dataModel.get('/count') ?? 0); dataModel.set('/count', count + 1); actions.emit('changed', { count: count + 1 });", "deps": ["/count"] } } }` | 支持。点击按钮时在 SES `Compartment` 中同步执行脚本，可读写当前 surface 的 `dataModel`，并通过 `actions.emit` 派发标准 A2UI action 消息。 |
+| 受限脚本 action：`action.script` | `{ "action": { "script": { "code": "const count = Number(dataModel.get('/count') ?? 0); dataModel.set('/count', count + 1); actions.emit('changed', { count: count + 1 });", "deps": ["/count"] } } }` | 支持。点击按钮时通过 JSRuntime 同步执行脚本，可读写当前 surface 的 `dataModel`，并通过 `actions.emit` 派发标准 A2UI action 消息。默认执行路径为 `new Function` + AST guard，SES `Compartment` 路径可配置切换。 |
 | 未来函数调用 action：`action.functionCall` | `{ "action": { "functionCall": { "call": "openUrl", "args": { "url": "https://a2ui.org" } } } }` | 只识别，不执行。`Button` 点击时会忽略 `kind: "functionCall"`，不会派发 `a2ui:action`，也不会调用浏览器或后端能力。 |
 | 空 action、非对象 action、缺少有效名称的 action | `{ "action": {} }` | 不派发。 |
 
@@ -129,8 +129,9 @@ Renderer 支持只读属性脚本：
 
 当前规则：
 
-- 属性脚本使用 SES `Compartment` 同步执行。
+- 属性脚本使用 JSRuntime 同步执行；当前默认路径为 `new Function` + AST guard，SES `Compartment` 路径可配置切换。
 - 属性脚本只注入 `dataModel.get`，不注入 `dataModel.set`、`actions`、DOM、网络或浏览器存储能力。
+- `new Function` 路径会将常见浏览器全局变量替换为 `undefined`，并通过 AST guard 拒绝 `window`、`document`、`globalThis`、`fetch`、`Function`、`eval`、`constructor`、`prototype`、`__proto__`、动态成员访问等高风险入口。
 - `deps` 必填，Renderer 会通过 `DataModel.subscribe` 建立最小订阅，依赖变化后触发组件属性重新计算。
 - 属性脚本必须显式 `return` JSON-compatible 值；异常时使用 `fallback` 并派发 `a2ui:error`。
 - 样式脚本第一版只支持 `style.<白名单字段>.script`，解析结果仍经过 `visual-props.ts` 白名单。
@@ -243,6 +244,7 @@ Renderer 已提供通用视觉属性解析工具：`packages/renderer/src/compon
 
 - `packages/renderer/src/core/surface-model.test.ts`
 - `packages/renderer/src/core/data-model.test.ts`
+- `packages/renderer/src/core/js-runtime.test.ts`
 - `packages/renderer/src/vue/datamodel-reactivity.test.ts`
 - `packages/renderer/src/components/basic/visual-props.test.ts`
 
@@ -253,6 +255,7 @@ Renderer 已提供通用视觉属性解析工具：`packages/renderer/src/compon
 - 执行 `action.script`，验证 dataModel 写入和 `actions.emit` 派发。
 - 执行 `Text.text.script`，验证 `deps` 变化后的重新计算。
 - 执行 `style.<白名单字段>.script`，验证动态样式仍受白名单约束。
+- 验证 JSRuntime 默认 `new Function` 路径、AST guard 高风险语法拦截和原型链逃逸入口拦截。
 - 确认历史扁平 action 当前不会派发。
 - 确认 `action.functionCall` 当前不会执行、不会派发。
 
