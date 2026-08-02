@@ -16,6 +16,8 @@
   },
   "scripts": {
     "build": "vue-tsc -p tsconfig.json --noEmit && vite build",
+    "demo": "vite --config renderer-capability-demo/vite.config.ts --host 127.0.0.1",
+    "demo:build": "vite build --config renderer-capability-demo/vite.config.ts",
     "typecheck": "vue-tsc -p tsconfig.json --noEmit",
     "test": "vitest run --passWithNoTests",
     "lint": "vue-tsc -p tsconfig.json --noEmit"
