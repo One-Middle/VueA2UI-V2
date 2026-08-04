@@ -11,6 +11,7 @@ import {
 import A2uiComponent from "../../vue/A2uiComponent.vue";
 import {
   resolveBooleanProp,
+  resolveStringProp,
   resolveVisualClasses,
   resolveVisualStyle,
 } from "./visual-props";
@@ -37,12 +38,47 @@ const isLoading = computed(() => resolveBooleanProp(ctx, "loading"));
 
 const isFullWidth = computed(() => resolveBooleanProp(ctx, "fullWidth"));
 
+const label = computed(() => resolveStringProp(ctx, "label"));
+
+const icon = computed(() => resolveStringProp(ctx, "icon"));
+
+const iconPosition = computed(() => resolveStringProp(ctx, "iconPosition") || "left");
+
+const intent = computed(() => resolveStringProp(ctx, "intent") || "default");
+
+const shape = computed(() => resolveStringProp(ctx, "shape") || "rounded");
+
+const importance = computed(() => resolveStringProp(ctx, "importance") || "normal");
+
+const iconText = computed(() => {
+  const fallbackMap: Record<string, string> = {
+    search: "🔍",
+    close: "✕",
+    check: "✓",
+    plus: "+",
+    minus: "−",
+    delete: "🗑",
+    edit: "✎",
+    warning: "⚠",
+    play_arrow: "▶",
+    pause: "Ⅱ",
+    skip_next: "⏭",
+    skip_previous: "⏮",
+    chevron_right: "›",
+  };
+  return fallbackMap[icon.value] ?? icon.value;
+});
+
 const buttonClasses = computed(() => [
   "a2ui-button",
   ...resolveVisualClasses(ctx, "a2ui-button"),
+  `a2ui-button--intent-${intent.value}`,
+  `a2ui-button--shape-${shape.value}`,
+  `a2ui-button--importance-${importance.value}`,
   {
     "a2ui-button--full-width": isFullWidth.value,
     "a2ui-button--loading": isLoading.value,
+    "a2ui-button--icon-only": iconPosition.value === "only",
   },
 ]);
 
@@ -85,5 +121,18 @@ function handleClick(): void {
       :component-id="childComponentId"
       :base-path="ctx.dataContext.basePath"
     />
+    <template v-else>
+      <span
+        v-if="icon && iconPosition !== 'right'"
+        class="a2ui-button-icon"
+        aria-hidden="true"
+      >{{ iconText }}</span>
+      <span v-if="label && iconPosition !== 'only'" class="a2ui-button-label">{{ label }}</span>
+      <span
+        v-if="icon && iconPosition === 'right'"
+        class="a2ui-button-icon"
+        aria-hidden="true"
+      >{{ iconText }}</span>
+    </template>
   </button>
 </template>

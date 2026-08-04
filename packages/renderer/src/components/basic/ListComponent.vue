@@ -5,6 +5,7 @@
 import { computed, inject } from "vue";
 import { type ComponentContext, componentContextKey } from "../../vue/context";
 import A2uiComponent from "../../vue/A2uiComponent.vue";
+import { resolveBooleanProp, resolveStringProp } from "./visual-props";
 
 const props = defineProps<{ surfaceId: string; componentId: string }>();
 
@@ -30,13 +31,38 @@ const itemBasePaths = computed(() => {
 /** 静态 children（字符串列表） */
 const staticChildren = computed(() => ctx.componentModel.getStaticChildren());
 
+const emptyText = computed(() => resolveStringProp(ctx, "emptyText"));
+
+const isLoading = computed(() => resolveBooleanProp(ctx, "loading"));
+
+const itemRole = computed(() => resolveStringProp(ctx, "itemRole") || "default");
+
+const hasDividers = computed(() => resolveBooleanProp(ctx, "dividers"));
+
+const listClasses = computed(() => [
+  "a2ui-list",
+  `a2ui-list--item-role-${itemRole.value}`,
+  {
+    "a2ui-list--dividers": hasDividers.value,
+    "a2ui-list--loading": isLoading.value,
+  },
+]);
+
 function appendPathSegment(basePath: string, segment: string): string {
   return basePath === "/" ? `/${segment}` : `${basePath}/${segment}`;
 }
 </script>
 
 <template>
-  <ul class="a2ui-list" :data-component-id="componentId">
+  <ul :class="listClasses" :data-component-id="componentId">
+    <li v-if="isLoading" class="a2ui-list-status">加载中...</li>
+    <li
+      v-else-if="emptyText && staticChildren.length === 0 && itemBasePaths.length === 0"
+      class="a2ui-list-status"
+    >
+      {{ emptyText }}
+    </li>
+    <template v-else>
     <!-- 静态子组件 -->
     <li v-for="childId in staticChildren" :key="childId">
       <A2uiComponent
@@ -57,5 +83,6 @@ function appendPathSegment(basePath: string, segment: string): string {
         :base-path="itemBasePath"
       />
     </li>
+    </template>
   </ul>
 </template>

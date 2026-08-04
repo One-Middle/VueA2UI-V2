@@ -14,6 +14,9 @@ import AudioPlayerComponent from "./basic/AudioPlayerComponent.vue";
 import DividerComponent from "./basic/DividerComponent.vue";
 import RowComponent from "./basic/RowComponent.vue";
 import ColumnComponent from "./basic/ColumnComponent.vue";
+import GridComponent from "./basic/GridComponent.vue";
+import ContainerComponent from "./basic/ContainerComponent.vue";
+import SpacerComponent from "./basic/SpacerComponent.vue";
 import ListComponent from "./basic/ListComponent.vue";
 import CardComponent from "./basic/CardComponent.vue";
 import TabsComponent from "./basic/TabsComponent.vue";
@@ -35,6 +38,9 @@ export function registerBasicCatalog(): void {
   catalogRegistry.set("Divider", DividerComponent);
   catalogRegistry.set("Row", RowComponent);
   catalogRegistry.set("Column", ColumnComponent);
+  catalogRegistry.set("Grid", GridComponent);
+  catalogRegistry.set("Container", ContainerComponent);
+  catalogRegistry.set("Spacer", SpacerComponent);
   catalogRegistry.set("List", ListComponent);
   catalogRegistry.set("Card", CardComponent);
   catalogRegistry.set("Tabs", TabsComponent);
@@ -49,6 +55,7 @@ export function registerBasicCatalog(): void {
 
 export { TextComponent, ImageComponent, IconComponent, VideoComponent,
   AudioPlayerComponent, DividerComponent, RowComponent, ColumnComponent,
+  GridComponent, ContainerComponent, SpacerComponent,
   ListComponent, CardComponent, TabsComponent, ModalComponent, ButtonComponent,
   TextFieldComponent, CheckBoxComponent, ChoicePickerComponent, SliderComponent,
   DateTimeInputComponent };

@@ -4,6 +4,7 @@
  */
 import { computed, inject } from "vue";
 import { type ComponentContext, componentContextKey } from "../../vue/context";
+import { resolveBooleanProp, resolveStringProp } from "./visual-props";
 
 const props = defineProps<{ surfaceId: string; componentId: string }>();
 
@@ -41,16 +42,49 @@ const label = computed(() => {
   const raw = ctx.componentModel.getProperty("label");
   return ctx.resolveValue(raw) ?? "";
 });
+
+const description = computed(() => resolveStringProp(ctx, "description"));
+
+const placeholder = computed(() => resolveStringProp(ctx, "placeholder"));
+
+const helpText = computed(() => resolveStringProp(ctx, "helpText"));
+
+const errorText = computed(() => resolveStringProp(ctx, "errorText"));
+
+const validationState = computed(() => resolveStringProp(ctx, "validationState") || (errorText.value ? "error" : "default"));
+
+const density = computed(() => resolveStringProp(ctx, "density") || "comfortable");
+
+const isDisabled = computed(() => resolveBooleanProp(ctx, "disabled"));
+
+const isRequired = computed(() => resolveBooleanProp(ctx, "required"));
+
+const isReadonly = computed(() => resolveBooleanProp(ctx, "readonly"));
+
+const fieldClasses = computed(() => [
+  "a2ui-datetimeinput",
+  `a2ui-field--validation-${validationState.value}`,
+  `a2ui-field--density-${density.value}`,
+]);
 </script>
 
 <template>
-  <label class="a2ui-datetimeinput" :data-component-id="componentId">
-    <span v-if="label" class="a2ui-datetimeinput-label">{{ label }}</span>
+  <label :class="fieldClasses" :data-component-id="componentId">
+    <span v-if="label" class="a2ui-datetimeinput-label">
+      {{ label }}<span v-if="isRequired" class="a2ui-field-required">*</span>
+    </span>
+    <span v-if="description" class="a2ui-field-description">{{ description }}</span>
     <input
       :type="inputType"
       class="a2ui-datetimeinput-input"
       :value="currentValue"
+      :placeholder="placeholder"
+      :disabled="isDisabled"
+      :required="isRequired"
+      :readonly="isReadonly"
       @input="currentValue = ($event.target as HTMLInputElement).value"
     />
+    <span v-if="errorText" class="a2ui-field-error">{{ errorText }}</span>
+    <span v-else-if="helpText" class="a2ui-field-help">{{ helpText }}</span>
   </label>
 </template>

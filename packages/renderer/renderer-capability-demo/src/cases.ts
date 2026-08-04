@@ -1,3 +1,22 @@
+/**
+ * Renderer 能力 demo 示例数据。
+ *
+ * 职责：
+ * - 维护可直接回放的 A2UI v0.9 server messages。
+ * - 用示例覆盖 Basic Catalog 的语义字段、布局组件、绑定和脚本能力。
+ *
+ * 不负责：
+ * - 定义正式协议字段；正式字段以 shared 类型和 Agent schema 为准。
+ * - 校验消息合法性；demo 只消费本地可信样例。
+ *
+ * 引用：
+ * - @a2ui-platform/shared
+ * 被引用：
+ * - App.vue
+ * 注意：
+ * - 示例优先使用组件语义字段，避免通过 style 模拟业务含义。
+ */
+
 import type {
   A2UIComponent,
   A2UIServerMessage,
@@ -6,6 +25,89 @@ import type {
 
 export const CATALOG_ID =
   "https://a2ui.org/specification/v0.9/catalogs/basic/catalog.json";
+
+const svgDataUri = (svg: string): string =>
+  `data:image/svg+xml,${encodeURIComponent(svg)}`;
+
+const liveKitchenCover = svgDataUri(`
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 520">
+  <defs>
+    <linearGradient id="window" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#dff7d4"/>
+      <stop offset="1" stop-color="#f8fafc"/>
+    </linearGradient>
+    <linearGradient id="counter" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#d7b47a"/>
+      <stop offset="1" stop-color="#f4d99d"/>
+    </linearGradient>
+    <filter id="blur">
+      <feGaussianBlur stdDeviation="18"/>
+    </filter>
+  </defs>
+  <rect width="720" height="520" fill="#efe6d2"/>
+  <rect x="420" y="24" width="164" height="216" rx="8" fill="url(#window)"/>
+  <path d="M444 36v190M484 36v190M524 36v190M564 36v190M430 96h144M430 156h144" stroke="#b7d8a9" stroke-width="5" opacity="0.55"/>
+  <rect x="32" y="70" width="214" height="142" rx="12" fill="#baa37f"/>
+  <rect x="52" y="92" width="48" height="34" rx="4" fill="#f8fafc" opacity="0.65"/>
+  <rect x="112" y="92" width="46" height="34" rx="4" fill="#f8fafc" opacity="0.58"/>
+  <rect x="170" y="92" width="42" height="34" rx="4" fill="#f8fafc" opacity="0.5"/>
+  <circle cx="286" cy="116" r="34" fill="#efe9dc" stroke="#9c8b70" stroke-width="5"/>
+  <path d="M286 96v22l17 12" stroke="#766853" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <path d="M342 76h38v92h-38z" fill="#f2f6ef"/>
+  <path d="M360 76v-38" stroke="#415349" stroke-width="7" stroke-linecap="round"/>
+  <path d="M330 118c28-22 62-22 88 0" fill="#6d8472"/>
+  <rect x="0" y="314" width="720" height="118" fill="url(#counter)"/>
+  <rect x="0" y="432" width="720" height="88" fill="#7a6b54" opacity="0.78"/>
+  <ellipse cx="362" cy="374" rx="250" ry="48" fill="#efe1bd" opacity="0.5" filter="url(#blur)"/>
+  <path d="M320 170c48-24 104 4 108 62l6 100h-158l8-102c3-27 15-47 36-60z" fill="#f8fafc"/>
+  <path d="M300 214c-38 36-56 78-50 126" stroke="#f8fafc" stroke-width="32" stroke-linecap="round"/>
+  <path d="M428 224c36 30 52 64 56 106" stroke="#f8fafc" stroke-width="32" stroke-linecap="round"/>
+  <circle cx="356" cy="142" r="42" fill="#e6b28a"/>
+  <path d="M318 134c8-44 76-52 96-9-20 4-42 2-62-7-10 13-21 18-34 16z" fill="#172121"/>
+  <path d="M334 178c18 14 42 14 58 0" stroke="#b98060" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <path d="M224 336c50-34 112-36 164 0" fill="#d4b87e"/>
+  <circle cx="258" cy="320" r="18" fill="#6aa84f"/>
+  <circle cx="290" cy="312" r="20" fill="#9ac36b"/>
+  <circle cx="326" cy="320" r="18" fill="#6aa84f"/>
+  <rect x="458" y="320" width="78" height="52" rx="10" fill="#f7f7f2" stroke="#c7bfa8" stroke-width="4"/>
+  <rect x="538" y="322" width="72" height="46" rx="22" fill="#f2c2b8"/>
+  <rect x="268" y="250" width="124" height="38" rx="10" transform="rotate(12 330 269)" fill="#ffffff"/>
+  <rect x="276" y="255" width="50" height="28" rx="5" transform="rotate(12 301 269)" fill="#d71920"/>
+  <rect x="332" y="262" width="46" height="12" rx="3" transform="rotate(12 355 268)" fill="#93c47d"/>
+</svg>`);
+
+const waterThumb = svgDataUri(`
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160">
+  <rect width="160" height="160" rx="18" fill="#f8fafc"/>
+  <rect x="26" y="70" width="82" height="56" rx="8" fill="#ffffff" stroke="#e5e7eb" stroke-width="4"/>
+  <rect x="30" y="82" width="74" height="26" rx="4" fill="#d71920"/>
+  <text x="39" y="101" fill="#ffffff" font-family="Arial, sans-serif" font-size="16" font-weight="700">山泉</text>
+  <rect x="92" y="34" width="34" height="94" rx="9" fill="#e0f2fe" stroke="#93c5fd" stroke-width="4"/>
+  <rect x="96" y="62" width="26" height="28" rx="4" fill="#d71920"/>
+  <rect x="98" y="24" width="22" height="14" rx="4" fill="#ef4444"/>
+  <circle cx="42" cy="55" r="14" fill="#22c55e"/>
+  <circle cx="64" cy="48" r="18" fill="#84cc16"/>
+</svg>`);
+
+const albumCover = svgDataUri(`
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
+  <defs>
+    <linearGradient id="albumBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0f172a"/>
+      <stop offset="0.48" stop-color="#0ea5e9"/>
+      <stop offset="1" stop-color="#f97316"/>
+    </linearGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="18"/>
+    </filter>
+  </defs>
+  <rect width="640" height="640" rx="48" fill="url(#albumBg)"/>
+  <circle cx="214" cy="206" r="92" fill="#f8fafc" opacity="0.24" filter="url(#soft)"/>
+  <circle cx="430" cy="394" r="148" fill="#111827" opacity="0.45"/>
+  <circle cx="430" cy="394" r="42" fill="#f8fafc" opacity="0.92"/>
+  <path d="M188 424c92-132 172-188 264-168" fill="none" stroke="#f8fafc" stroke-width="22" stroke-linecap="round" opacity="0.88"/>
+  <text x="70" y="558" fill="#f8fafc" font-family="Arial, sans-serif" font-size="42" font-weight="700">Northline</text>
+</svg>`);
 
 export interface DemoCase {
   id: string;
@@ -47,71 +149,127 @@ const surface = (
 
 export const demoCases: DemoCase[] = [
   {
-    id: "vote",
-    title: "Voting Card",
-    subtitle: "投票卡片，覆盖动态 List、脚本 action 和状态绑定",
-    icon: "V",
-    accent: "#059669",
-    capabilities: ["List 模板", "dataModel 写回", "Button.action.script", "事件派发"],
+    id: "semantic-store",
+    title: "Live Commerce",
+    subtitle: "直播商品卡，展示媒体封面、商品货架和双购买 CTA",
+    icon: "S",
+    accent: "#f97316",
+    capabilities: [
+      "Container",
+      "Image.role",
+      "Text.role",
+      "Button.intent",
+      "action.event",
+    ],
     messages: surface(
       {
-        poll: {
-          title: "下一阶段优先打磨什么？",
-          summary: "团队投票会实时更新本地结果。",
-          totalVotes: 842,
-          selectedId: "",
-          options: [
-            { id: "bindings", label: "数据绑定体验", votes: 312, percent: 37, percentLabel: "37%" },
-            { id: "visual", label: "视觉组件质感", votes: 286, percent: 34, percentLabel: "34%" },
-            { id: "runtime", label: "JSRuntime 交互", votes: 168, percent: 20, percentLabel: "20%" },
-            { id: "forms", label: "表单组件能力", votes: 76, percent: 9, percentLabel: "9%" },
-          ],
+        live: {
+          badge: "直播中",
+          title: "农夫山泉 好礼相送",
+          cta: "去逛逛",
+          viewers: "3000+",
+          likes: "1444",
+          cover: liveKitchenCover,
+        },
+        product: {
+          sku: "spring-water-5l-4",
+          brand: "天猫",
+          title: "农夫山泉旗舰店红盖5l*4桶饮用水",
+          detail: "详情",
+          price: "¥31.9",
+          subsidy: "补贴价",
+          sales: "已售3万+",
+          benefit: "淘宝秒杀 直降9.6元",
+          thumbnail: waterThumb,
         },
       },
       [
-        { id: "root", component: "Card", child: "voteBody", variant: "elevated", style: { maxWidth: "390px", padding: "18px", borderRadius: "22px", shadow: "md", backgroundColor: "#ffffff" } },
-        { id: "voteBody", component: "Column", children: ["voteBadge", "voteTitle", "voteSummary", "voteList", "voteFooter"], gap: "12px" },
-        { id: "voteBadge", component: "Text", text: "ACTIVE POLL", usageHint: "caption", tone: "success", style: { padding: "4px 8px", borderRadius: "999px", backgroundColor: "#DCFCE7", fontWeight: 700, alignSelf: "start" } },
-        { id: "voteTitle", component: "Text", text: { path: "/poll/title" }, usageHint: "h3", style: { lineHeight: 1.18 } },
-        { id: "voteSummary", component: "Text", text: { path: "/poll/summary" }, usageHint: "caption", tone: "neutral" },
-        { id: "voteList", component: "List", children: [{ path: "/poll/options", componentId: "voteOption" }] },
-        { id: "voteOption", component: "Card", child: "voteOptionBody", variant: "plain", style: { padding: "8px 0", borderColor: "transparent", shadow: "none" } },
-        { id: "voteOptionBody", component: "Column", children: ["voteOptionTop", "voteProgress"], gap: "7px" },
-        { id: "voteOptionTop", component: "Row", children: ["voteButton", "votePercent"], alignment: "center", distribution: "spaceBetween", gap: "10px" },
-        { id: "voteOptionLabel", component: "Text", text: { path: "label" }, usageHint: "body" },
+        { id: "root", component: "Container", child: "liveCard", width: "content", padding: "none" },
+        { id: "liveCard", component: "Card", child: "liveBody", role: "media", density: "compact", variant: "plain", style: { padding: 0, borderRadius: "20px", borderColor: "transparent", shadow: "md", backgroundColor: "#ffffff", overflow: "hidden" } },
+        { id: "liveBody", component: "Column", children: ["heroImage", "liveStrip", "productShelf", "commerceActions"], gap: "0" },
+        { id: "heroImage", component: "Image", url: { path: "/live/cover" }, alt: "Live kitchen", role: "hero", shape: "square", fit: "cover", aspectRatio: "16:13" },
+        { id: "liveStrip", component: "Row", children: ["liveTitleGroup", "liveVisit"], role: "actions", distribution: "spaceBetween", alignment: "center", wrap: false, style: { padding: "10px 12px", backgroundColor: "#3d3b36", gap: "10px" } },
+        { id: "liveTitleGroup", component: "Row", children: ["liveBadge", "liveTitle"], role: "metadata", alignment: "center", gap: "8px", wrap: false },
+        { id: "liveBadge", component: "Text", text: { path: "/live/badge" }, usageHint: "caption", role: "discount", style: { padding: "2px 6px", borderRadius: "4px", backgroundColor: "#ff2f64", color: "#ffffff", fontWeight: 800 } },
+        { id: "liveTitle", component: "Text", text: { path: "/live/title" }, usageHint: "body", truncate: true, style: { color: "#ffffff", fontWeight: 700, minWidth: "0" } },
+        { id: "liveVisit", component: "Button", label: { path: "/live/cta" }, icon: "chevron_right", iconPosition: "right", importance: "quiet", shape: "pill", action: { event: { name: "openLiveRoom", context: { title: { path: "/live/title" } } } }, style: { color: "#ffffff", padding: "4px 0", minWidth: "64px" } },
+        { id: "productShelf", component: "Row", children: ["productThumb", "productInfo"], role: "mediaObject", gap: "10px", alignment: "center", wrap: false, style: { padding: "10px 12px 6px" } },
+        { id: "productThumb", component: "Image", url: { path: "/product/thumbnail" }, alt: "Product thumbnail", role: "thumbnail", shape: "rounded", fit: "cover", aspectRatio: "1:1", style: { width: "46px" } },
+        { id: "productInfo", component: "Column", children: ["productTitleRow", "priceRow", "benefitRow"], gap: "4px", style: { minWidth: "0", flex: 1 } },
+        { id: "productTitleRow", component: "Row", children: ["productBrand", "productTitle", "productDetail"], role: "metadata", alignment: "center", gap: "4px", wrap: false },
+        { id: "productBrand", component: "Text", text: { path: "/product/brand" }, usageHint: "body", role: "discount", style: { fontWeight: 800 } },
+        { id: "productTitle", component: "Text", text: { path: "/product/title" }, usageHint: "body", emphasis: "strong", truncate: true, style: { minWidth: "0" } },
+        { id: "productDetail", component: "Text", text: { script: { code: "return `${dataModel.get('/product/detail')} ›`;", deps: ["/product/detail"], fallback: "详情 ›" } }, usageHint: "caption", emphasis: "muted", style: { minWidth: "38px" } },
+        { id: "priceRow", component: "Row", children: ["productPrice", "productSubsidy", "productSales"], role: "metadata", alignment: "end", gap: "4px", wrap: false },
+        { id: "productPrice", component: "Text", text: { path: "/product/price" }, role: "price", variant: "metric", tone: "warning", style: { fontSize: "22px" } },
+        { id: "productSubsidy", component: "Text", text: { path: "/product/subsidy" }, role: "discount", usageHint: "caption" },
+        { id: "productSales", component: "Text", text: { path: "/product/sales" }, usageHint: "caption", emphasis: "muted" },
+        { id: "benefitRow", component: "Text", text: { path: "/product/benefit" }, usageHint: "caption", role: "discount", style: { textAlign: "right" } },
+        { id: "commerceActions", component: "Row", children: ["socialStats", "cartButton", "buyButton"], role: "actions", alignment: "center", gap: "8px", wrap: false, style: { padding: "8px 12px 12px" } },
+        { id: "socialStats", component: "Row", children: ["commentMetric", "starMetric"], role: "metadata", gap: "10px", wrap: false, style: { minWidth: "88px" } },
+        { id: "commentMetric", component: "Column", children: ["commentIcon", "commentCount"], gap: "2px", style: { alignItems: "center" } },
+        { id: "commentIcon", component: "Icon", icon: "chat_bubble", semantic: "comment", label: "comments", size: "md" },
+        { id: "commentCount", component: "Text", text: { path: "/live/viewers" }, usageHint: "caption", emphasis: "muted" },
+        { id: "starMetric", component: "Column", children: ["starIcon", "starCount"], gap: "2px", style: { alignItems: "center" } },
+        { id: "starIcon", component: "Icon", icon: "star", semantic: "favorite", label: "favorites", size: "md" },
+        { id: "starCount", component: "Text", text: { path: "/live/likes" }, usageHint: "caption", emphasis: "muted" },
         {
-          id: "voteButton",
+          id: "cartButton",
           component: "Button",
-          child: "voteOptionLabel",
-          variant: "ghost",
-          fullWidth: false,
-          style: { padding: "4px 0", color: "#111827", backgroundColor: "transparent" },
+          label: "加入购物车",
+          intent: "warning",
+          shape: "rounded",
+          importance: "prominent",
+          fullWidth: true,
           action: {
-            script: {
-              code: "const id = String(context.optionId || ''); const options = dataModel.get('/poll/options') || []; const current = String(dataModel.get('/poll/selectedId') || ''); const nextOptions = options.map((item) => item.id === id && current !== id ? { ...item, votes: Number(item.votes || 0) + 1 } : item); const total = nextOptions.reduce((sum, item) => sum + Number(item.votes || 0), 0); const normalized = nextOptions.map((item) => ({ ...item, percent: Math.round((Number(item.votes || 0) / total) * 100), percentLabel: `${Math.round((Number(item.votes || 0) / total) * 100)}%` })); dataModel.set('/poll/options', normalized); dataModel.set('/poll/totalVotes', total); dataModel.set('/poll/selectedId', id); actions.emit('voteChanged', { optionId: id, totalVotes: total });",
-              deps: ["/poll/options", "/poll/selectedId"],
-              context: { optionId: { path: "id" } },
+            event: {
+              name: "addToCart",
+              context: {
+                sku: { path: "/product/sku" },
+                title: { path: "/product/title" },
+              },
             },
           },
         },
-        { id: "votePercent", component: "Text", text: { path: "percentLabel" }, usageHint: "caption", tone: "neutral", style: { fontWeight: 700 } },
-        { id: "voteProgress", component: "Slider", min: 0, max: 100, step: 1, value: { path: "percent" }, showValue: false, disabled: true },
-        { id: "voteFooter", component: "Text", text: { script: { code: "return `${dataModel.get('/poll/totalVotes') || 0} votes · Tap an option to update`; ", deps: ["/poll/totalVotes"], fallback: "Tap an option to update" } }, usageHint: "caption", tone: "neutral" },
+        {
+          id: "buyButton",
+          component: "Button",
+          label: "立即购买",
+          intent: "danger",
+          shape: "rounded",
+          importance: "prominent",
+          fullWidth: true,
+          style: { backgroundColor: "#ff5a1f" },
+          action: {
+            event: {
+              name: "buyNow",
+              context: {
+                sku: { path: "/product/sku" },
+                price: { path: "/product/price" },
+                title: { path: "/product/title" },
+              },
+            },
+          },
+        },
       ],
     ),
   },
   {
     id: "course",
-    title: "Course Card",
-    subtitle: "可交互课表，覆盖新增课程、状态流转和事件派发",
+    title: "Course Planner",
+    subtitle: "课程表单，展示表单语义、segmented 选择器和状态脚本",
     icon: "C",
     accent: "#2563eb",
-    capabilities: ["TextField 写回", "ChoicePicker", "状态脚本", "课程事件"],
+    capabilities: [
+      "表单语义",
+      "ChoicePicker.mode",
+      "List.emptyText",
+      "action.script",
+      "状态写回",
+    ],
     messages: surface(
       {
         school: {
-          today: "周三",
-          campus: "明理楼",
           draft: {
             day: "周三",
             time: "16:00 - 17:30",
@@ -127,30 +285,26 @@ export const demoCases: DemoCase[] = [
         },
       },
       [
-        { id: "root", component: "Column", children: ["courseHero", "courseComposer", "courseList", "courseStats"], gap: "14px", style: { maxWidth: "390px", padding: "4px" } },
-        { id: "courseHero", component: "Card", child: "courseHeroBody", variant: "elevated", style: { padding: "18px", borderRadius: "22px", shadow: "md", backgroundColor: "#F8FBFF" } },
-        { id: "courseHeroBody", component: "Column", children: ["courseKicker", "courseTitle", "courseSummary"], gap: "6px" },
-        { id: "courseKicker", component: "Text", text: "TODAY SCHEDULE", usageHint: "caption", tone: "brand", style: { fontWeight: 800 } },
-        { id: "courseTitle", component: "Text", text: "本周课程安排", usageHint: "h2" },
-        { id: "courseSummary", component: "Text", text: { script: { code: "const courses = dataModel.get('/school/courses') || []; const active = courses.filter((item) => item.status === '进行中').length; const done = courses.filter((item) => item.status === '已完成').length; return `${dataModel.get('/school/today')} · ${courses.length} 门课程 · ${active} 进行中 · ${done} 已完成`; ", deps: ["/school/today", "/school/courses"], fallback: "课程概览" } }, usageHint: "caption", tone: "neutral" },
-        { id: "courseComposer", component: "Card", child: "courseComposerBody", variant: "filled", style: { padding: "12px", borderRadius: "18px", backgroundColor: "#FFFFFF", shadow: "sm" } },
-        { id: "courseComposerBody", component: "Column", children: ["courseComposerTitle", "courseNameField", "courseDayTimeRow", "courseRoomTeacherRow", "courseAddButton"], gap: "10px" },
-        { id: "courseComposerTitle", component: "Text", text: "新增课程", usageHint: "caption", tone: "brand", style: { fontWeight: 800 } },
-        { id: "courseNameField", component: "TextField", label: "课程名称", text: { path: "/school/draft/name" }, usageHint: "shortText" },
-        { id: "courseDayTimeRow", component: "Row", children: ["courseDayPickerWrap", "courseTimeField"], gap: "10px", alignment: "end", wrap: false },
-        { id: "courseDayPickerWrap", component: "Column", children: ["courseDayPickerLabel", "courseDayPicker"], gap: "4px", style: { minWidth: "104px" } },
-        { id: "courseDayPickerLabel", component: "Text", text: "星期", usageHint: "caption", tone: "neutral" },
-        { id: "courseDayPicker", component: "ChoicePicker", label: "星期", options: [{ label: "周一", value: "周一" }, { label: "周二", value: "周二" }, { label: "周三", value: "周三" }, { label: "周四", value: "周四" }, { label: "周五", value: "周五" }], value: { path: "/school/draft/day" } },
-        { id: "courseTimeField", component: "TextField", label: "时间", text: { path: "/school/draft/time" }, usageHint: "shortText" },
-        { id: "courseRoomTeacherRow", component: "Row", children: ["courseRoomField", "courseTeacherField"], gap: "10px", wrap: false },
-        { id: "courseRoomField", component: "TextField", label: "教室", text: { path: "/school/draft/room" }, usageHint: "shortText" },
-        { id: "courseTeacherField", component: "TextField", label: "老师", text: { path: "/school/draft/teacher" }, usageHint: "shortText" },
-        { id: "courseAddText", component: "Text", text: "添加课程", style: { color: "#ffffff", fontWeight: 800 } },
+        { id: "root", component: "Container", child: "courseStack", width: "content", padding: "none" },
+        { id: "courseStack", component: "Column", children: ["courseHero", "courseComposer", "courseList", "courseStats"], gap: "14px" },
+        { id: "courseHero", component: "Card", child: "courseHeroBody", role: "summary", density: "spacious", variant: "elevated", header: "本周课程安排", subtitle: "表单输入会直接写回 dataModel" },
+        { id: "courseHeroBody", component: "Grid", columns: 3, gap: "8px", children: ["courseTotal", "courseActive", "courseDone"] },
+        { id: "courseTotal", component: "Text", text: { script: { code: "const courses = dataModel.get('/school/courses') || []; return `${courses.length} 门`; ", deps: ["/school/courses"], fallback: "0 门" } }, role: "price", usageHint: "h4" },
+        { id: "courseActive", component: "Text", text: { script: { code: "const courses = dataModel.get('/school/courses') || []; return `${courses.filter((item) => item.status === '进行中').length} 进行中`; ", deps: ["/school/courses"], fallback: "0 进行中" } }, role: "status", emphasis: "warning", usageHint: "caption" },
+        { id: "courseDone", component: "Text", text: { script: { code: "const courses = dataModel.get('/school/courses') || []; return `${courses.filter((item) => item.status === '已完成').length} 完成`; ", deps: ["/school/courses"], fallback: "0 完成" } }, role: "status", emphasis: "success", usageHint: "caption" },
+        { id: "courseComposer", component: "Card", child: "courseComposerBody", role: "form", density: "compact", variant: "filled", header: "新增课程", subtitle: "试试修改课程名后点击添加" },
+        { id: "courseComposerBody", component: "Column", children: ["courseNameField", "courseDayPicker", "courseRoomTeacherGrid", "courseAddButton"], gap: "10px" },
+        { id: "courseNameField", component: "TextField", label: "课程名称", name: "courseName", text: { path: "/school/draft/name" }, usageHint: "shortText", placeholder: "请输入课程名称", helpText: "为空时不会添加课程。", validationState: "success", density: "compact" },
+        { id: "courseDayPicker", component: "ChoicePicker", label: "星期", name: "day", mode: "segmented", options: [{ label: "周一", value: "周一" }, { label: "周二", value: "周二" }, { label: "周三", value: "周三" }, { label: "周四", value: "周四" }, { label: "周五", value: "周五" }], value: { path: "/school/draft/day" }, density: "compact" },
+        { id: "courseRoomTeacherGrid", component: "Grid", columns: 2, gap: "8px", children: ["courseRoomField", "courseTeacherField"] },
+        { id: "courseRoomField", component: "TextField", label: "教室", name: "room", text: { path: "/school/draft/room" }, usageHint: "shortText", density: "compact" },
+        { id: "courseTeacherField", component: "TextField", label: "老师", name: "teacher", text: { path: "/school/draft/teacher" }, usageHint: "shortText", density: "compact" },
         {
           id: "courseAddButton",
           component: "Button",
-          child: "courseAddText",
-          variant: "primary",
+          label: "添加课程",
+          icon: "plus",
+          intent: "primary",
           fullWidth: true,
           action: {
             script: {
@@ -159,71 +313,78 @@ export const demoCases: DemoCase[] = [
             },
           },
         },
-        { id: "courseList", component: "List", children: [{ path: "/school/courses", componentId: "courseItem" }] },
-        { id: "courseItem", component: "Card", child: "courseItemBody", variant: "filled", style: { padding: "14px", borderRadius: "18px", backgroundColor: "#ffffff", shadow: "sm" } },
-        { id: "courseItemBody", component: "Row", children: ["courseTimeBox", "courseInfo", "courseStatusBox"], gap: "12px", alignment: "center", distribution: "spaceBetween", wrap: false },
-        { id: "courseTimeBox", component: "Column", children: ["courseDay", "courseTime"], gap: "2px", style: { minWidth: "82px" } },
-        { id: "courseDay", component: "Text", text: { path: "day" }, usageHint: "caption", tone: "brand", style: { fontWeight: 800 } },
-        { id: "courseTime", component: "Text", text: { path: "time" }, usageHint: "caption", tone: "neutral" },
-        { id: "courseInfo", component: "Column", children: ["courseName", "courseRoom", "courseTeacher"], gap: "3px", style: { minWidth: "128px" } },
-        { id: "courseName", component: "Text", text: { path: "name" }, usageHint: "h4", maxLines: 1 },
-        { id: "courseRoom", component: "Text", text: { path: "room" }, usageHint: "caption", tone: "neutral" },
-        { id: "courseTeacher", component: "Text", text: { path: "teacher" }, usageHint: "caption", tone: "neutral" },
-        { id: "courseStatusBox", component: "Column", children: ["courseStatus", "courseStartButton", "courseDoneButton"], gap: "6px", style: { alignSelf: "stretch", minWidth: "72px" } },
-        { id: "courseStatus", component: "Text", text: { path: "status" }, usageHint: "caption", tone: "success", style: { padding: "4px 8px", borderRadius: "999px", backgroundColor: "#ECFDF3", fontWeight: 700 } },
-        { id: "courseStartText", component: "Text", text: "开始" },
-        { id: "courseStartButton", component: "Button", child: "courseStartText", variant: "outline", size: "sm", action: { script: { code: "const id = String(context.courseId || ''); const courses = dataModel.get('/school/courses') || []; const next = courses.map((item) => item.id === id ? { ...item, status: '进行中' } : item); dataModel.set('/school/courses', next); actions.emit('courseStarted', { id });", deps: ["/school/courses"], context: { courseId: { path: "id" } } } } },
-        { id: "courseDoneText", component: "Text", text: "完成" },
-        { id: "courseDoneButton", component: "Button", child: "courseDoneText", variant: "ghost", size: "sm", action: { script: { code: "const id = String(context.courseId || ''); const courses = dataModel.get('/school/courses') || []; const next = courses.map((item) => item.id === id ? { ...item, status: '已完成' } : item); dataModel.set('/school/courses', next); actions.emit('courseCompleted', { id });", deps: ["/school/courses"], context: { courseId: { path: "id" } } } } },
-        { id: "courseStats", component: "Card", child: "courseStatsBody", variant: "plain", style: { padding: "12px", borderRadius: "18px", backgroundColor: "#F8FAFC", shadow: "none" } },
-        { id: "courseStatsBody", component: "Row", children: ["courseTotalStat", "courseActiveStat", "courseDoneStat"], alignment: "center", distribution: "spaceBetween", wrap: false },
-        { id: "courseTotalStat", component: "Text", text: { script: { code: "const courses = dataModel.get('/school/courses') || []; return `${courses.length} total`; ", deps: ["/school/courses"], fallback: "0 total" } }, usageHint: "caption", tone: "neutral" },
-        { id: "courseActiveStat", component: "Text", text: { script: { code: "const courses = dataModel.get('/school/courses') || []; return `${courses.filter((item) => item.status === '进行中').length} active`; ", deps: ["/school/courses"], fallback: "0 active" } }, usageHint: "caption", tone: "brand" },
-        { id: "courseDoneStat", component: "Text", text: { script: { code: "const courses = dataModel.get('/school/courses') || []; return `${courses.filter((item) => item.status === '已完成').length} done`; ", deps: ["/school/courses"], fallback: "0 done" } }, usageHint: "caption", tone: "success" },
+        { id: "courseList", component: "List", children: [{ path: "/school/courses", componentId: "courseItem" }], emptyText: "暂无课程", itemRole: "card", dividers: false },
+        { id: "courseItem", component: "Card", child: "courseItemBody", role: "summary", density: "compact", variant: "filled" },
+        { id: "courseItemBody", component: "Row", children: ["courseInfo", "courseStatusActions"], role: "mediaObject", alignment: "center", distribution: "spaceBetween", gap: "10px", wrap: false },
+        { id: "courseInfo", component: "Column", children: ["courseName", "courseMeta", "courseRoom", "courseTeacher"], gap: "3px" },
+        { id: "courseName", component: "Text", text: { path: "name" }, usageHint: "h4", truncate: true },
+        { id: "courseMeta", component: "Text", text: { path: "time" }, usageHint: "caption", emphasis: "muted" },
+        { id: "courseRoom", component: "Text", text: { path: "room" }, usageHint: "caption", emphasis: "muted" },
+        { id: "courseTeacher", component: "Text", text: { path: "teacher" }, usageHint: "caption", emphasis: "muted" },
+        { id: "courseStatusActions", component: "Column", children: ["courseStatus", "courseStartButton", "courseDoneButton"], gap: "6px", alignment: "end" },
+        { id: "courseStatus", component: "Text", text: { path: "status" }, role: "status", emphasis: "success", usageHint: "caption" },
+        { id: "courseStartButton", component: "Button", label: "开始", intent: "secondary", size: "sm", action: { script: { code: "const id = String(context.courseId || ''); const courses = dataModel.get('/school/courses') || []; dataModel.set('/school/courses', courses.map((item) => item.id === id ? { ...item, status: '进行中' } : item)); actions.emit('courseStarted', { id });", deps: ["/school/courses"], context: { courseId: { path: "id" } } } } },
+        { id: "courseDoneButton", component: "Button", label: "完成", importance: "quiet", size: "sm", action: { script: { code: "const id = String(context.courseId || ''); const courses = dataModel.get('/school/courses') || []; dataModel.set('/school/courses', courses.map((item) => item.id === id ? { ...item, status: '已完成' } : item)); actions.emit('courseCompleted', { id });", deps: ["/school/courses"], context: { courseId: { path: "id" } } } } },
+        { id: "courseStats", component: "Text", text: "Tip: segmented picker、TextField、Button.script 都在这个 case 中联动。", usageHint: "caption", role: "emptyState" },
       ],
     ),
   },
   {
     id: "music",
     title: "Music Player",
-    subtitle: "音乐播放器，覆盖媒体布局、Icon 脚本和本地状态",
+    subtitle: "播放器，展示媒体角色、图标语义和本地状态切换",
     icon: "M",
     accent: "#0f766e",
-    capabilities: ["Image 媒体", "Icon 属性脚本", "Slider 绑定", "本地播放状态"],
+    capabilities: [
+      "Image.role",
+      "Icon.semantic",
+      "Slider.valueDisplay",
+      "Button.shape",
+      "action.script",
+    ],
     messages: surface(
       {
         player: { isPlaying: false, progress: 32, isFavorite: false },
-        song: { title: "Midnight Drive", artist: "Synthwave Dreams", coverUrl: "https://picsum.photos/seed/a2ui-music/640/640" },
+        song: {
+          title: "Midnight Drive",
+          artist: "Synthwave Dreams",
+          coverUrl: albumCover,
+        },
       },
       [
-        { id: "root", component: "Card", child: "musicBody", preset: "media", variant: "elevated", style: { maxWidth: "390px", padding: "14px", borderRadius: "24px", shadow: "md", backgroundColor: "#0F2A2E", color: "#ffffff" } },
+        { id: "root", component: "Container", child: "musicCard", width: "content", padding: "none" },
+        { id: "musicCard", component: "Card", child: "musicBody", role: "media", density: "compact", preset: "media", variant: "elevated", style: { backgroundColor: "#0F2A2E", color: "#ffffff" } },
         { id: "musicBody", component: "Column", children: ["cover", "musicInfoRow", "musicProgress", "musicControls"], gap: "14px" },
-        { id: "cover", component: "Image", url: { path: "/song/coverUrl" }, alt: "Album cover", fit: "cover", aspectRatio: "1:1", style: { borderRadius: "18px" } },
-        { id: "musicInfoRow", component: "Row", children: ["songText", "favButton"], alignment: "center", distribution: "spaceBetween", wrap: false },
+        { id: "cover", component: "Image", url: { path: "/song/coverUrl" }, alt: "Album cover", role: "cover", shape: "rounded", fit: "cover", aspectRatio: "1:1", caption: "Live renderer state" },
+        { id: "musicInfoRow", component: "Row", children: ["songText", "favButton"], role: "mediaObject", alignment: "center", distribution: "spaceBetween", wrap: false },
         { id: "songText", component: "Column", children: ["songLabel", "songTitle", "songArtist"], gap: "3px" },
-        { id: "songLabel", component: "Text", text: "NOW PLAYING", usageHint: "caption", style: { color: "#9FE7D2", fontWeight: 800 } },
-        { id: "songTitle", component: "Text", text: { path: "/song/title" }, usageHint: "h3", style: { color: "#ffffff" }, maxLines: 1 },
-        { id: "songArtist", component: "Text", text: { path: "/song/artist" }, usageHint: "caption", style: { color: "#C7D7D4" } },
-        { id: "favIcon", component: "Icon", name: { script: { code: "return dataModel.get('/player/isFavorite') ? 'favorite' : 'favorite_border';", deps: ["/player/isFavorite"], fallback: "favorite_border" } }, tone: "danger" },
-        { id: "favButton", component: "Button", child: "favIcon", variant: "ghost", preset: "buttonIcon", action: { script: { code: "const next = !Boolean(dataModel.get('/player/isFavorite')); dataModel.set('/player/isFavorite', next); actions.emit('favoriteChanged', { isFavorite: next });", deps: ["/player/isFavorite"] } } },
-        { id: "musicProgress", component: "Slider", min: 0, max: 100, step: 1, value: { path: "/player/progress" }, showValue: false },
-        { id: "musicControls", component: "Row", children: ["prevButton", "playButton", "nextButton"], alignment: "center", distribution: "spaceEvenly", wrap: false },
-        { id: "prevIcon", component: "Icon", name: "skip_previous", size: "lg" },
-        { id: "prevButton", component: "Button", child: "prevIcon", variant: "ghost", preset: "buttonIcon", action: { event: { name: "previousTrack", context: { title: { path: "/song/title" } } } } },
-        { id: "playIcon", component: "Icon", name: { script: { code: "return dataModel.get('/player/isPlaying') ? 'pause' : 'play_arrow';", deps: ["/player/isPlaying"], fallback: "play_arrow" } }, size: "lg" },
-        { id: "playButton", component: "Button", child: "playIcon", variant: "primary", size: "lg", preset: "buttonIcon", action: { script: { code: "const next = !Boolean(dataModel.get('/player/isPlaying')); dataModel.set('/player/isPlaying', next); actions.emit('playToggled', { isPlaying: next });", deps: ["/player/isPlaying"] } } },
-        { id: "nextIcon", component: "Icon", name: "skip_next", size: "lg" },
-        { id: "nextButton", component: "Button", child: "nextIcon", variant: "ghost", preset: "buttonIcon", action: { event: { name: "nextTrack", context: { title: { path: "/song/title" } } } } },
+        { id: "songLabel", component: "Text", text: "NOW PLAYING", usageHint: "caption", emphasis: "success" },
+        { id: "songTitle", component: "Text", text: { path: "/song/title" }, usageHint: "h3", truncate: true, style: { color: "#ffffff" } },
+        { id: "songArtist", component: "Text", text: { path: "/song/artist" }, usageHint: "caption", emphasis: "muted" },
+        { id: "favIcon", component: "Icon", name: { script: { code: "return dataModel.get('/player/isFavorite') ? 'favorite' : 'favorite_border';", deps: ["/player/isFavorite"], fallback: "favorite_border" } }, semantic: "action", label: "收藏", status: "danger", tone: "danger" },
+        { id: "favButton", component: "Button", child: "favIcon", importance: "quiet", shape: "circle", action: { script: { code: "const next = !Boolean(dataModel.get('/player/isFavorite')); dataModel.set('/player/isFavorite', next); actions.emit('favoriteChanged', { isFavorite: next });", deps: ["/player/isFavorite"] } } },
+        { id: "musicProgress", component: "Slider", min: 0, max: 100, step: 1, value: { path: "/player/progress" }, valueDisplay: "none" },
+        { id: "musicControls", component: "Row", children: ["prevButton", "playButton", "nextButton"], role: "actions", alignment: "center", distribution: "spaceEvenly", wrap: false },
+        { id: "prevButton", component: "Button", icon: "skip_previous", iconPosition: "only", importance: "quiet", shape: "circle", action: { event: { name: "previousTrack", context: { title: { path: "/song/title" } } } } },
+        { id: "playIcon", component: "Icon", name: { script: { code: "return dataModel.get('/player/isPlaying') ? 'pause' : 'play_arrow';", deps: ["/player/isPlaying"], fallback: "play_arrow" } }, semantic: "action", label: "播放切换", size: "lg" },
+        { id: "playButton", component: "Button", child: "playIcon", intent: "primary", shape: "circle", importance: "prominent", size: "lg", action: { script: { code: "const next = !Boolean(dataModel.get('/player/isPlaying')); dataModel.set('/player/isPlaying', next); actions.emit('playToggled', { isPlaying: next });", deps: ["/player/isPlaying"] } } },
+        { id: "nextButton", component: "Button", icon: "skip_next", iconPosition: "only", importance: "quiet", shape: "circle", action: { event: { name: "nextTrack", context: { title: { path: "/song/title" } } } } },
       ],
     ),
   },
   {
-    id: "todo",
-    title: "Todo List",
-    subtitle: "待办清单，覆盖输入、复选框、脚本新增和批量清理",
-    icon: "T",
+    id: "workboard",
+    title: "Work Board",
+    subtitle: "待办看板，展示 CheckBox、List 状态和批量脚本",
+    icon: "W",
     accent: "#0ea5e9",
-    capabilities: ["TextField 写回", "CheckBox 写回", "List 模板", "批量脚本"],
+    capabilities: [
+      "CheckBox 写回",
+      "List.dividers",
+      "Text.truncate",
+      "Button.intent",
+      "批量脚本",
+    ],
     messages: surface(
       {
         todo: {
@@ -236,22 +397,19 @@ export const demoCases: DemoCase[] = [
         },
       },
       [
-        { id: "root", component: "Card", child: "todoBody", variant: "elevated", style: { maxWidth: "390px", padding: "18px", borderRadius: "24px", shadow: "md", backgroundColor: "#ffffff" } },
-        { id: "todoBody", component: "Column", children: ["todoHeader", "todoComposer", "todoList", "todoActions"], gap: "14px" },
-        { id: "todoHeader", component: "Column", children: ["todoBadge", "todoTitle", "todoSummary"], gap: "6px" },
-        { id: "todoBadge", component: "Text", text: "TODAY TASKS", usageHint: "caption", tone: "brand", style: { padding: "4px 8px", borderRadius: "999px", backgroundColor: "#E0F2FE", fontWeight: 800, alignSelf: "start" } },
-        { id: "todoTitle", component: "Text", text: "Renderer 待办清单", usageHint: "h3" },
-        { id: "todoSummary", component: "Text", text: { script: { code: "const items = dataModel.get('/todo/items') || []; const done = items.filter((item) => item.done).length; return `${done}/${items.length} completed · ${items.length - done} open`; ", deps: ["/todo/items"], fallback: "0/0 completed" } }, usageHint: "caption", tone: "neutral" },
-        { id: "todoComposer", component: "Card", child: "todoComposerBody", variant: "filled", style: { padding: "12px", borderRadius: "18px", backgroundColor: "#F8FAFC" } },
-        { id: "todoComposerBody", component: "Column", children: ["todoDraftField", "todoAddButton"], gap: "10px" },
-        { id: "todoDraftField", component: "TextField", label: "新增任务", text: { path: "/todo/draft" }, usageHint: "shortText" },
-        { id: "todoAddText", component: "Text", text: "添加到清单", style: { color: "#ffffff", fontWeight: 800 } },
+        { id: "root", component: "Container", child: "todoCard", width: "content", padding: "none" },
+        { id: "todoCard", component: "Card", child: "todoBody", role: "summary", density: "comfortable", variant: "elevated", header: "Renderer 待办清单", subtitle: "复选框和按钮脚本都会改写 dataModel" },
+        { id: "todoBody", component: "Column", children: ["todoSummary", "todoComposer", "todoList", "todoActions"], gap: "14px" },
+        { id: "todoSummary", component: "Text", text: { script: { code: "const items = dataModel.get('/todo/items') || []; const done = items.filter((item) => item.done).length; return `${done}/${items.length} completed · ${items.length - done} open`; ", deps: ["/todo/items"], fallback: "0/0 completed" } }, role: "status", emphasis: "success", usageHint: "caption" },
+        { id: "todoComposer", component: "Grid", columns: "auto", minItemWidth: "180px", gap: "8px", children: ["todoDraftField", "todoAddButton"] },
+        { id: "todoDraftField", component: "TextField", label: "新增任务", text: { path: "/todo/draft" }, usageHint: "shortText", placeholder: "输入任务标题", density: "compact", helpText: "添加后会清空输入框。" },
         {
           id: "todoAddButton",
           component: "Button",
-          child: "todoAddText",
-          variant: "primary",
-          fullWidth: true,
+          label: "添加",
+          icon: "plus",
+          intent: "primary",
+          shape: "pill",
           action: {
             script: {
               code: "const title = String(dataModel.get('/todo/draft') || '').trim(); if (!title) { actions.emit('todoSkipped', { reason: 'empty' }); return; } const items = dataModel.get('/todo/items') || []; const next = [...items, { id: `task-${items.length + 1}`, title, project: 'Renderer Lab', done: false, priority: 'Normal' }]; dataModel.set('/todo/items', next); dataModel.set('/todo/draft', ''); actions.emit('todoAdded', { title, total: next.length });",
@@ -259,62 +417,34 @@ export const demoCases: DemoCase[] = [
             },
           },
         },
-        { id: "todoList", component: "List", children: [{ path: "/todo/items", componentId: "todoItem" }] },
-        { id: "todoItem", component: "Card", child: "todoItemBody", variant: "filled", style: { padding: "12px", borderRadius: "18px", backgroundColor: "#FFFFFF", shadow: "sm" } },
-        { id: "todoItemBody", component: "Row", children: ["todoCheck", "todoMeta", "todoPriority"], alignment: "center", distribution: "spaceBetween", gap: "10px", wrap: false },
-        { id: "todoCheck", component: "CheckBox", label: { path: "title" }, value: { path: "done" } },
-        { id: "todoMeta", component: "Column", children: ["todoProject", "todoState"], gap: "3px", style: { minWidth: "86px" } },
-        { id: "todoProject", component: "Text", text: { path: "project" }, usageHint: "caption", tone: "neutral" },
-        { id: "todoState", component: "Text", text: "复选框写回", usageHint: "caption", tone: "success", style: { fontWeight: 800 } },
-        { id: "todoPriority", component: "Text", text: { path: "priority" }, usageHint: "caption", tone: "brand", style: { padding: "4px 8px", borderRadius: "999px", backgroundColor: "#EFF6FF", fontWeight: 800 } },
-        { id: "todoActions", component: "Row", children: ["clearDoneButton", "todoOpenCount"], alignment: "center", distribution: "spaceBetween", wrap: false },
-        { id: "clearDoneText", component: "Text", text: "清理已完成" },
-        { id: "clearDoneButton", component: "Button", child: "clearDoneText", variant: "outline", size: "sm", action: { script: { code: "const items = dataModel.get('/todo/items') || []; const next = items.filter((item) => !item.done); dataModel.set('/todo/items', next); actions.emit('completedCleared', { removed: items.length - next.length, remaining: next.length });", deps: ["/todo/items"] } } },
-        { id: "todoOpenCount", component: "Text", text: { script: { code: "const items = dataModel.get('/todo/items') || []; return `${items.filter((item) => !item.done).length} open`; ", deps: ["/todo/items"], fallback: "0 open" } }, usageHint: "caption", tone: "neutral" },
-      ],
-    ),
-  },
-  {
-    id: "product",
-    title: "Product Card",
-    subtitle: "商品卡片，覆盖图片、价格指标和业务事件",
-    icon: "P",
-    accent: "#d97706",
-    capabilities: ["Image", "价格指标", "Button.action.event", "视觉层级"],
-    messages: surface(
-      {
-        product: {
-          sku: "keyboard-lite",
-          title: "FlowKey 轻量机械键盘",
-          desc: "低噪轴体、热插拔、三模连接，适合编程与移动办公。",
-          price: "¥399",
-          rating: "4.8",
-          image: "https://picsum.photos/seed/a2ui-keyboard/720/480",
-        },
-      },
-      [
-        { id: "root", component: "Card", child: "productBody", variant: "elevated", style: { maxWidth: "390px", padding: "14px", borderRadius: "24px", shadow: "md" } },
-        { id: "productBody", component: "Column", children: ["productImage", "productMeta", "productTitle", "productDesc", "productBuyRow"], gap: "11px" },
-        { id: "productImage", component: "Image", url: { path: "/product/image" }, alt: "Product", fit: "cover", aspectRatio: "16:10", style: { borderRadius: "18px" } },
-        { id: "productMeta", component: "Row", children: ["productBadge", "productRating"], alignment: "center", distribution: "spaceBetween" },
-        { id: "productBadge", component: "Text", text: "LIMITED DROP", usageHint: "caption", tone: "warning", style: { padding: "4px 8px", borderRadius: "999px", backgroundColor: "#FEF3C7", fontWeight: 800 } },
-        { id: "productRating", component: "Text", text: { script: { code: "return `★ ${dataModel.get('/product/rating')}`;", deps: ["/product/rating"], fallback: "★ 4.8" } }, usageHint: "caption", tone: "neutral", style: { fontWeight: 700 } },
-        { id: "productTitle", component: "Text", text: { path: "/product/title" }, usageHint: "h3", maxLines: 1 },
-        { id: "productDesc", component: "Text", text: { path: "/product/desc" }, usageHint: "caption", tone: "neutral", maxLines: 2 },
-        { id: "productBuyRow", component: "Row", children: ["productPrice", "productBuyButton"], alignment: "center", distribution: "spaceBetween", wrap: false },
-        { id: "productPrice", component: "Text", text: { path: "/product/price" }, variant: "metric", tone: "brand" },
-        { id: "productBuyText", component: "Text", text: "加入购物车", style: { color: "#ffffff", fontWeight: 700 } },
-        { id: "productBuyButton", component: "Button", child: "productBuyText", variant: "primary", action: { event: { name: "addToCart", context: { sku: { path: "/product/sku" }, title: { path: "/product/title" } } } } },
+        { id: "todoList", component: "List", children: [{ path: "/todo/items", componentId: "todoItem" }], emptyText: "暂无任务", itemRole: "card", dividers: true },
+        { id: "todoItem", component: "Card", child: "todoItemBody", role: "summary", density: "compact", variant: "plain" },
+        { id: "todoItemBody", component: "Row", children: ["todoCheck", "todoTitle", "todoMeta", "todoPriority"], role: "mediaObject", alignment: "center", distribution: "spaceBetween", gap: "10px", wrap: false },
+        { id: "todoCheck", component: "CheckBox", value: { path: "done" }, density: "compact" },
+        { id: "todoTitle", component: "Text", text: { path: "title" }, usageHint: "body", truncate: true, style: { minWidth: "86px" } },
+        { id: "todoMeta", component: "Column", children: ["todoProject", "todoState"], gap: "3px" },
+        { id: "todoProject", component: "Text", text: { path: "project" }, usageHint: "caption", emphasis: "muted" },
+        { id: "todoState", component: "Text", text: "复选框写回", role: "status", emphasis: "success", usageHint: "caption" },
+        { id: "todoPriority", component: "Text", text: { path: "priority" }, role: "status", emphasis: "warning", usageHint: "caption", truncate: true },
+        { id: "todoActions", component: "Row", children: ["clearDoneButton", "todoOpenCount"], role: "actions", distribution: "spaceBetween", alignment: "center", wrap: false },
+        { id: "clearDoneButton", component: "Button", label: "清理已完成", intent: "secondary", size: "sm", action: { script: { code: "const items = dataModel.get('/todo/items') || []; const next = items.filter((item) => !item.done); dataModel.set('/todo/items', next); actions.emit('completedCleared', { removed: items.length - next.length, remaining: next.length });", deps: ["/todo/items"] } } },
+        { id: "todoOpenCount", component: "Text", text: { script: { code: "const items = dataModel.get('/todo/items') || []; return `${items.filter((item) => !item.done).length} open`; ", deps: ["/todo/items"], fallback: "0 open" } }, usageHint: "caption", emphasis: "muted" },
       ],
     ),
   },
   {
     id: "metrics",
     title: "Metrics Board",
-    subtitle: "数据看板，覆盖指标卡、派生文案和动态颜色",
+    subtitle: "数据看板，展示 Grid 指标卡、派生文案和状态语义",
     icon: "D",
     accent: "#7c3aed",
-    capabilities: ["属性脚本", "Metric 文本", "响应式数据", "多卡片布局"],
+    capabilities: [
+      "Grid 指标",
+      "Card.role=metric",
+      "属性脚本",
+      "Text.emphasis",
+      "事件回传",
+    ],
     messages: surface(
       {
         metrics: {
@@ -325,28 +455,23 @@ export const demoCases: DemoCase[] = [
         },
       },
       [
-        { id: "root", component: "Column", children: ["metricsHeader", "metricsRow", "riskCard"], gap: "14px", style: { maxWidth: "390px", padding: "4px" } },
-        { id: "metricsHeader", component: "Column", children: ["metricsTitle", "metricsSub"], gap: "4px" },
-        { id: "metricsTitle", component: "Text", text: "今日经营概览", usageHint: "h2" },
-        { id: "metricsSub", component: "Text", text: "关键指标会根据 dataModel 派生展示状态。", usageHint: "caption", tone: "neutral" },
-        { id: "metricsRow", component: "Row", children: ["conversionCard", "ordersCard"], gap: "12px", alignment: "stretch", wrap: false },
-        { id: "conversionCard", component: "Card", child: "conversionBody", variant: "filled", style: { padding: "16px", borderRadius: "18px", backgroundColor: "#ECFDF5", minWidth: "150px" } },
-        { id: "conversionBody", component: "Column", children: ["conversionLabel", "conversionValue", "conversionHint"], gap: "5px" },
-        { id: "conversionLabel", component: "Text", text: "转化率", usageHint: "caption", tone: "neutral" },
-        { id: "conversionValue", component: "Text", text: { script: { code: "return `${Math.round(Number(dataModel.get('/metrics/conversion') || 0) * 1000) / 10}%`;", deps: ["/metrics/conversion"], fallback: "0%" } }, variant: "metric", tone: "brand" },
-        { id: "conversionHint", component: "Text", text: { script: { code: "return Number(dataModel.get('/metrics/conversion') || 0) >= 0.18 ? '表现良好' : '需要关注';", deps: ["/metrics/conversion"], fallback: "暂无状态" } }, usageHint: "caption", tone: "success" },
-        { id: "ordersCard", component: "Card", child: "ordersBody", variant: "filled", style: { padding: "16px", borderRadius: "18px", backgroundColor: "#F8FAFC", minWidth: "150px" } },
-        { id: "ordersBody", component: "Column", children: ["ordersLabel", "ordersValue", "revenue"], gap: "5px" },
-        { id: "ordersLabel", component: "Text", text: "订单数", usageHint: "caption", tone: "neutral" },
-        { id: "ordersValue", component: "Text", text: { script: { code: "return String(dataModel.get('/metrics/orders') || 0);", deps: ["/metrics/orders"], fallback: "0" } }, variant: "metric" },
-        { id: "revenue", component: "Text", text: { path: "/metrics/revenue" }, usageHint: "caption", tone: "neutral" },
-        { id: "riskCard", component: "Card", child: "riskBody", variant: "elevated", style: { padding: "16px", borderRadius: "18px", shadow: "sm" } },
-        { id: "riskBody", component: "Row", children: ["riskCopy", "riskButton"], alignment: "center", distribution: "spaceBetween", wrap: false },
-        { id: "riskCopy", component: "Column", children: ["riskTitle", "riskHint"], gap: "4px" },
-        { id: "riskTitle", component: "Text", text: "风险巡检", usageHint: "h4" },
-        { id: "riskHint", component: "Text", text: { script: { code: "const risk = Number(dataModel.get('/metrics/risk') || 0); return risk <= 2 ? '当前风险较低' : '存在待处理风险';", deps: ["/metrics/risk"], fallback: "暂无风险数据" } }, usageHint: "caption", tone: "neutral" },
-        { id: "riskButtonText", component: "Text", text: "查看", style: { color: "#ffffff", fontWeight: 700 } },
-        { id: "riskButton", component: "Button", child: "riskButtonText", variant: "primary", action: { event: { name: "openRiskDetail", context: { risk: { path: "/metrics/risk" } } } } },
+        { id: "root", component: "Container", child: "metricsStack", width: "content", padding: "none" },
+        { id: "metricsStack", component: "Column", children: ["metricsHeader", "metricsGrid", "riskCard"], gap: "14px" },
+        { id: "metricsHeader", component: "Card", child: "metricsHeaderBody", role: "summary", density: "compact", header: "今日经营概览", subtitle: "关键指标根据 dataModel 派生展示状态。" },
+        { id: "metricsHeaderBody", component: "Text", text: "属性脚本、metric 卡片和事件回传都集中在这个示例。", usageHint: "caption", emphasis: "muted" },
+        { id: "metricsGrid", component: "Grid", columns: 2, gap: "10px", children: ["conversionCard", "ordersCard"] },
+        { id: "conversionCard", component: "Card", child: "conversionBody", role: "metric", density: "compact", variant: "filled", header: "转化率" },
+        { id: "conversionBody", component: "Column", children: ["conversionValue", "conversionHint"], gap: "5px" },
+        { id: "conversionValue", component: "Text", text: { script: { code: "return `${Math.round(Number(dataModel.get('/metrics/conversion') || 0) * 1000) / 10}%`;", deps: ["/metrics/conversion"], fallback: "0%" } }, role: "price", variant: "metric", tone: "brand" },
+        { id: "conversionHint", component: "Text", text: { script: { code: "return Number(dataModel.get('/metrics/conversion') || 0) >= 0.18 ? '表现良好' : '需要关注';", deps: ["/metrics/conversion"], fallback: "暂无状态" } }, role: "status", emphasis: "success", usageHint: "caption" },
+        { id: "ordersCard", component: "Card", child: "ordersBody", role: "metric", density: "compact", variant: "filled", header: "订单数" },
+        { id: "ordersBody", component: "Column", children: ["ordersValue", "revenue"], gap: "5px" },
+        { id: "ordersValue", component: "Text", text: { script: { code: "return String(dataModel.get('/metrics/orders') || 0);", deps: ["/metrics/orders"], fallback: "0" } }, role: "price", variant: "metric" },
+        { id: "revenue", component: "Text", text: { path: "/metrics/revenue" }, usageHint: "caption", emphasis: "muted" },
+        { id: "riskCard", component: "Card", child: "riskBody", role: "interactive", density: "comfortable", variant: "elevated", clickable: true, header: "风险巡检" },
+        { id: "riskBody", component: "Row", children: ["riskCopy", "riskButton"], role: "actions", alignment: "center", distribution: "spaceBetween", wrap: false },
+        { id: "riskCopy", component: "Text", text: { script: { code: "const risk = Number(dataModel.get('/metrics/risk') || 0); return risk <= 2 ? '当前风险较低' : '存在待处理风险';", deps: ["/metrics/risk"], fallback: "暂无风险数据" } }, role: "status", emphasis: "success", usageHint: "caption" },
+        { id: "riskButton", component: "Button", label: "查看", icon: "search", intent: "primary", shape: "pill", action: { event: { name: "openRiskDetail", context: { risk: { path: "/metrics/risk" } } } } },
       ],
     ),
   },

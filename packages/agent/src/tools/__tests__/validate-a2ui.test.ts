@@ -84,4 +84,72 @@ describe("validateA2UI catalog properties", () => {
       ]),
     );
   });
+
+  it("accepts semantic component fields and layout components", () => {
+    const messages: A2UIServerMessage[] = [
+      {
+        version: "v0.9",
+        createSurface: {
+          surfaceId: "main",
+          catalogId,
+        },
+      },
+      {
+        version: "v0.9",
+        updateComponents: {
+          surfaceId: "main",
+          components: [
+            {
+              id: "root",
+              component: "Container",
+              child: "grid",
+              width: "content",
+              padding: "md",
+              align: "center",
+            },
+            {
+              id: "grid",
+              component: "Grid",
+              children: ["card", "spacer"],
+              columns: "auto",
+              minItemWidth: "180px",
+              density: "compact",
+            },
+            {
+              id: "card",
+              component: "Card",
+              child: "price",
+              header: "原价",
+              subtitle: "促销前价格",
+              role: "metric",
+              density: "compact",
+              selected: true,
+            },
+            {
+              id: "price",
+              component: "Text",
+              text: "¥199",
+              role: "previousPrice",
+              emphasis: "muted",
+              decoration: "lineThrough",
+            },
+            {
+              id: "spacer",
+              component: "Spacer",
+              size: "sm",
+              axis: "vertical",
+            },
+          ],
+        },
+      },
+    ];
+
+    const result = validateA2UI({
+      messages,
+      catalogId,
+      currentSnapshot: null,
+    });
+
+    expect(result.valid).toBe(true);
+  });
 });

@@ -557,14 +557,26 @@ button {
     padding: 14px;
   }
 
+  .preview-zone {
+    order: 1;
+  }
+
   .sidebar {
+    order: 2;
     border-right: 0;
     border-bottom: 1px solid #e5e7eb;
   }
 
-  .preview-zone {
-    padding: 12px;
-    border-right: 0;
+  .inspector {
+    order: 3;
+  }
+
+  .case-list {
+    gap: 8px;
+  }
+
+  .case-card {
+    padding: 10px;
   }
 
   .phone-frame {

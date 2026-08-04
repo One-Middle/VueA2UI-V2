@@ -49,7 +49,21 @@ const currentValue = computed({
 
 const showValue = computed(() => resolveBooleanProp(ctx, "showValue", true));
 
+const label = computed(() => resolveStringProp(ctx, "label"));
+
+const helpText = computed(() => resolveStringProp(ctx, "helpText"));
+
+const errorText = computed(() => resolveStringProp(ctx, "errorText"));
+
+const validationState = computed(() => resolveStringProp(ctx, "validationState") || (errorText.value ? "error" : "default"));
+
+const density = computed(() => resolveStringProp(ctx, "density") || "comfortable");
+
+const valueDisplay = computed(() => resolveStringProp(ctx, "valueDisplay") || (showValue.value ? "inline" : "none"));
+
 const isDisabled = computed(() => resolveBooleanProp(ctx, "disabled"));
+
+const isRequired = computed(() => resolveBooleanProp(ctx, "required"));
 
 const valuePrefix = computed(() => resolveStringProp(ctx, "valuePrefix"));
 
@@ -58,6 +72,8 @@ const valueSuffix = computed(() => resolveStringProp(ctx, "valueSuffix"));
 const sliderClasses = computed(() => [
   "a2ui-slider",
   ...resolveVisualClasses(ctx, "a2ui-slider"),
+  `a2ui-field--validation-${validationState.value}`,
+  `a2ui-field--density-${density.value}`,
 ]);
 
 const sliderStyle = computed(() => resolveVisualStyle(ctx));
@@ -70,6 +86,10 @@ const sliderStyle = computed(() => resolveVisualStyle(ctx));
     :style="sliderStyle"
     :data-component-id="componentId"
   >
+    <div v-if="label" class="a2ui-slider-label">
+      {{ label }}<span v-if="isRequired" class="a2ui-field-required">*</span>
+    </div>
+    <div class="a2ui-slider-control">
     <input
       class="a2ui-slider-input"
       type="range"
@@ -80,8 +100,11 @@ const sliderStyle = computed(() => resolveVisualStyle(ctx));
       :disabled="isDisabled"
       @input="currentValue = Number(($event.target as HTMLInputElement).value)"
     />
-    <span v-if="showValue" class="a2ui-slider-value">
+    <span v-if="valueDisplay !== 'none'" class="a2ui-slider-value">
       {{ valuePrefix }}{{ currentValue }}{{ valueSuffix }}
     </span>
+    </div>
+    <span v-if="errorText" class="a2ui-field-error">{{ errorText }}</span>
+    <span v-else-if="helpText" class="a2ui-field-help">{{ helpText }}</span>
   </div>
 </template>

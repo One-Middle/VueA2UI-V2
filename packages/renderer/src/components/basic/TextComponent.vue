@@ -5,6 +5,7 @@
 import { computed, inject } from "vue";
 import { type ComponentContext, componentContextKey } from "../../vue/context";
 import {
+  resolveStringProp,
   resolveVisualClasses,
   resolveVisualStyle,
 } from "./visual-props";
@@ -38,9 +39,26 @@ const maxLines = computed(() => {
   return Number.isFinite(value) && value > 0 ? value : undefined;
 });
 
+const decoration = computed(() => resolveStringProp(ctx, "decoration") || "none");
+
+const role = computed(() => resolveStringProp(ctx, "role") || "default");
+
+const emphasis = computed(() => resolveStringProp(ctx, "emphasis") || "default");
+
+const shouldTruncate = computed(() => {
+  const raw = ctx.componentModel.getProperty("truncate");
+  return ctx.resolveValue(raw) === true;
+});
+
 const textClasses = computed(() => [
   `a2ui-text-${usageHint.value}`,
   ...resolveVisualClasses(ctx, "a2ui-text"),
+  `a2ui-text--decoration-${decoration.value}`,
+  `a2ui-text--role-${role.value}`,
+  `a2ui-text--emphasis-${emphasis.value}`,
+  {
+    "a2ui-text--truncate": shouldTruncate.value,
+  },
 ]);
 
 const textStyle = computed(() => ({
@@ -51,6 +69,13 @@ const textStyle = computed(() => ({
         WebkitLineClamp: maxLines.value,
         WebkitBoxOrient: "vertical",
         overflow: "hidden",
+      }
+    : {}),
+  ...(shouldTruncate.value && !maxLines.value
+    ? {
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap",
       }
     : {}),
 }));

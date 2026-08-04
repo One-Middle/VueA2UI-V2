@@ -48,6 +48,12 @@ const alignment = computed(() => {
 /** 静态 + 动态 children */
 const childIds = computed(() => ctx.componentModel.getChildIds());
 
+const role = computed(() => resolveStringProp(ctx, "role") || "default");
+
+const density = computed(() => resolveStringProp(ctx, "density") || "comfortable");
+
+const divider = computed(() => resolveStringProp(ctx, "divider") || "none");
+
 const columnStyle = computed<CSSProperties>(() => ({
   ...resolveVisualStyle(ctx),
   justifyContent: justifyContentMap[distribution.value] ?? "flex-start",
@@ -59,6 +65,9 @@ const columnStyle = computed<CSSProperties>(() => ({
 const columnClasses = computed(() => [
   "a2ui-column",
   ...resolveVisualClasses(ctx, "a2ui-column"),
+  `a2ui-column--role-${role.value}`,
+  `a2ui-column--density-${density.value}`,
+  `a2ui-column--divider-${divider.value}`,
 ]);
 </script>
 

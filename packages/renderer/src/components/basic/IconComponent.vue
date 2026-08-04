@@ -4,7 +4,11 @@
  */
 import { computed, inject } from "vue";
 import { type ComponentContext, componentContextKey } from "../../vue/context";
-import { resolveVisualClasses, resolveVisualStyle } from "./visual-props";
+import {
+  resolveStringProp,
+  resolveVisualClasses,
+  resolveVisualStyle,
+} from "./visual-props";
 
 const props = defineProps<{ surfaceId: string; componentId: string }>();
 
@@ -26,6 +30,7 @@ const iconFallbackMap: Record<string, string> = {
   menu: "☰",
   arrowLeft: "←",
   arrowRight: "→",
+  chevron_right: "›",
   arrowUp: "↑",
   arrowDown: "↓",
   check: "✓",
@@ -38,6 +43,7 @@ const iconFallbackMap: Record<string, string> = {
   error: "✕",
   star: "★",
   heart: "♥",
+  chat_bubble: "○",
   favorite: "♥",
   favorite_border: "♡",
   play_arrow: "▶",
@@ -54,9 +60,17 @@ const fallbackIcon = computed(() => {
   return iconFallbackMap[name] ?? name;
 });
 
+const semantic = computed(() => resolveStringProp(ctx, "semantic") || "decorative");
+
+const label = computed(() => resolveStringProp(ctx, "label"));
+
+const status = computed(() => resolveStringProp(ctx, "status") || "neutral");
+
 const iconClasses = computed(() => [
   "a2ui-icon",
   ...resolveVisualClasses(ctx, "a2ui-icon"),
+  `a2ui-icon--semantic-${semantic.value}`,
+  `a2ui-icon--status-${status.value}`,
 ]);
 
 const iconStyle = computed(() => resolveVisualStyle(ctx));
@@ -69,6 +83,8 @@ const iconStyle = computed(() => resolveVisualStyle(ctx));
     :style="iconStyle"
     :data-component-id="componentId"
     :title="String(iconName)"
+    :aria-hidden="semantic === 'decorative' ? 'true' : undefined"
+    :aria-label="semantic === 'decorative' ? undefined : label || String(iconName)"
   >
     {{ fallbackIcon }}
   </span>

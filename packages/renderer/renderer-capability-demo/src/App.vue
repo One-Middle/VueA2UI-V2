@@ -51,11 +51,12 @@ const currentMessages = computed(() =>
 
 const capabilityGrid = computed(() => [
   { label: "Components", ready: true },
-  { label: "Layouts", ready: true },
+  { label: "Semantic Props", ready: true },
+  { label: "Layout Catalog", ready: true },
   { label: "Bindings", ready: true },
   { label: "Events", ready: true },
   { label: "JSRuntime", ready: true },
-  { label: "Dynamic List", ready: true },
+  { label: "Dynamic Templates", ready: true },
   { label: "Theme State", ready: false },
   { label: "FunctionCall", ready: false },
 ]);

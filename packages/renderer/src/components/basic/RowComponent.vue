@@ -48,6 +48,12 @@ const alignment = computed(() => {
 /** 静态 + 动态 children */
 const childIds = computed(() => ctx.componentModel.getChildIds());
 
+const role = computed(() => resolveStringProp(ctx, "role") || "default");
+
+const density = computed(() => resolveStringProp(ctx, "density") || "comfortable");
+
+const divider = computed(() => resolveStringProp(ctx, "divider") || "none");
+
 const rowStyle = computed<CSSProperties>(() => ({
   ...resolveVisualStyle(ctx),
   justifyContent: justifyContentMap[distribution.value] ?? "flex-start",
@@ -59,6 +65,9 @@ const rowStyle = computed<CSSProperties>(() => ({
 const rowClasses = computed(() => [
   "a2ui-row",
   ...resolveVisualClasses(ctx, "a2ui-row"),
+  `a2ui-row--role-${role.value}`,
+  `a2ui-row--density-${density.value}`,
+  `a2ui-row--divider-${divider.value}`,
 ]);
 </script>
 

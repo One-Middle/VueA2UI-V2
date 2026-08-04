@@ -78,6 +78,11 @@ const VISUAL_PROPERTIES: InternalPropertyDef[] = [
 
 const FORM_PROPERTIES: InternalPropertyDef[] = [
   {
+    name: "description",
+    type: "string",
+    description: "字段补充说明，显示在 label 下方",
+  },
+  {
     name: "placeholder",
     type: "string",
     description: "输入占位提示",
@@ -93,6 +98,17 @@ const FORM_PROPERTIES: InternalPropertyDef[] = [
     description: "是否必填",
   },
   {
+    name: "readonly",
+    type: "boolean",
+    description: "是否只读",
+  },
+  {
+    name: "validationState",
+    type: "string",
+    description: "字段校验状态",
+    values: ["default", "success", "warning", "error"],
+  },
+  {
     name: "helpText",
     type: "string",
     description: "辅助说明文案",
@@ -101,6 +117,33 @@ const FORM_PROPERTIES: InternalPropertyDef[] = [
     name: "errorText",
     type: "string",
     description: "错误状态文案",
+  },
+  {
+    name: "density",
+    type: "string",
+    description: "字段密度",
+    values: ["compact", "comfortable"],
+  },
+];
+
+const LAYOUT_SEMANTIC_PROPERTIES: InternalPropertyDef[] = [
+  {
+    name: "role",
+    type: "string",
+    description: "布局语义角色",
+    values: ["default", "toolbar", "formRow", "actions", "metadata", "mediaObject", "centered"],
+  },
+  {
+    name: "density",
+    type: "string",
+    description: "布局密度",
+    values: ["compact", "comfortable", "spacious"],
+  },
+  {
+    name: "divider",
+    type: "string",
+    description: "子项之间的分隔策略",
+    values: ["none", "between", "after"],
   },
 ];
 
@@ -125,6 +168,29 @@ const COMPONENT_DEFS: InternalComponentDef[] = [
         name: "maxLines",
         type: "number",
         description: "最大显示行数，用于多行截断",
+      },
+      {
+        name: "decoration",
+        type: "string",
+        description: "文本装饰语义，例如删除线或下划线",
+        values: ["none", "underline", "lineThrough", "overline"],
+      },
+      {
+        name: "emphasis",
+        type: "string",
+        description: "文本强调语义",
+        values: ["default", "muted", "strong", "danger", "success", "warning"],
+      },
+      {
+        name: "role",
+        type: "string",
+        description: "文本业务角色，例如价格、旧价格、状态或时间",
+        values: ["default", "price", "previousPrice", "discount", "status", "timestamp", "emptyState"],
+      },
+      {
+        name: "truncate",
+        type: "boolean",
+        description: "是否单行截断",
       },
       ...VISUAL_PROPERTIES,
     ],
@@ -161,6 +227,28 @@ const COMPONENT_DEFS: InternalComponentDef[] = [
         description: "图片加载策略",
         values: ["lazy", "eager"],
       },
+      {
+        name: "role",
+        type: "string",
+        description: "图片内容角色",
+        values: ["image", "avatar", "thumbnail", "cover", "logo", "hero"],
+      },
+      {
+        name: "shape",
+        type: "string",
+        description: "图片形状",
+        values: ["square", "rounded", "circle"],
+      },
+      {
+        name: "fallbackText",
+        type: "string",
+        description: "图片加载失败时显示的兜底文本",
+      },
+      {
+        name: "caption",
+        type: "string",
+        description: "图片说明文案",
+      },
       ...VISUAL_PROPERTIES,
     ],
   },
@@ -178,6 +266,23 @@ const COMPONENT_DEFS: InternalComponentDef[] = [
         name: "icon",
         type: "string",
         description: "兼容旧字段，建议改用 name",
+      },
+      {
+        name: "semantic",
+        type: "string",
+        description: "图标语义，用于可访问性和状态表达",
+        values: ["decorative", "status", "action", "navigation"],
+      },
+      {
+        name: "label",
+        type: "string",
+        description: "非装饰图标的可访问标签",
+      },
+      {
+        name: "status",
+        type: "string",
+        description: "状态图标语义",
+        values: ["info", "success", "warning", "danger", "neutral"],
       },
       ...VISUAL_PROPERTIES,
     ],
@@ -354,6 +459,7 @@ const COMPONENT_DEFS: InternalComponentDef[] = [
         type: "boolean",
         description: "是否允许换行",
       },
+      ...LAYOUT_SEMANTIC_PROPERTIES,
       ...VISUAL_PROPERTIES,
     ],
   },
@@ -396,7 +502,97 @@ const COMPONENT_DEFS: InternalComponentDef[] = [
         type: "boolean",
         description: "是否允许换行或未来扩展换列",
       },
+      ...LAYOUT_SEMANTIC_PROPERTIES,
       ...VISUAL_PROPERTIES,
+    ],
+  },
+  {
+    component: "Grid",
+    description: "二维网格布局容器，适合卡片墙、表单栅格和仪表盘区域",
+    properties: [
+      {
+        name: "children",
+        type: "string[]",
+        required: true,
+        description: "子组件 ID 列表",
+      },
+      {
+        name: "columns",
+        type: "string",
+        description: "列数，使用数字或 auto",
+        values: ["auto"],
+      },
+      {
+        name: "minItemWidth",
+        type: "string",
+        description: "auto 列布局时的最小单项宽度，如 220px",
+      },
+      {
+        name: "gap",
+        type: "string",
+        description: "网格间距",
+      },
+      {
+        name: "density",
+        type: "string",
+        description: "网格密度",
+        values: ["compact", "comfortable", "spacious"],
+      },
+      ...VISUAL_PROPERTIES,
+    ],
+  },
+  {
+    component: "Container",
+    description: "页面区块容器，提供受控宽度、内边距和水平对齐",
+    properties: [
+      {
+        name: "child",
+        type: "string",
+        required: true,
+        description: "容器内的子组件 ID",
+      },
+      {
+        name: "width",
+        type: "string",
+        description: "容器宽度语义",
+        values: ["narrow", "content", "wide", "full"],
+      },
+      {
+        name: "padding",
+        type: "string",
+        description: "容器内边距语义",
+        values: ["none", "sm", "md", "lg"],
+      },
+      {
+        name: "align",
+        type: "string",
+        description: "容器水平对齐",
+        values: ["start", "center"],
+      },
+      ...VISUAL_PROPERTIES,
+    ],
+  },
+  {
+    component: "Spacer",
+    description: "受控空隙或弹性占位组件",
+    properties: [
+      {
+        name: "size",
+        type: "string",
+        description: "空隙尺寸",
+        values: ["xs", "sm", "md", "lg", "xl"],
+      },
+      {
+        name: "axis",
+        type: "string",
+        description: "空隙方向",
+        values: ["horizontal", "vertical"],
+      },
+      {
+        name: "flex",
+        type: "boolean",
+        description: "是否作为弹性占位撑开空间",
+      },
     ],
   },
   {
@@ -437,6 +633,33 @@ const COMPONENT_DEFS: InternalComponentDef[] = [
         type: "boolean",
         description: "横向列表是否换行",
       },
+      {
+        name: "emptyText",
+        type: "string",
+        description: "空列表提示文案",
+      },
+      {
+        name: "loading",
+        type: "boolean",
+        description: "是否显示加载状态",
+      },
+      {
+        name: "itemRole",
+        type: "string",
+        description: "列表项语义角色",
+        values: ["default", "menuItem", "option", "article", "media", "card"],
+      },
+      {
+        name: "selection",
+        type: "string",
+        description: "选择模式声明",
+        values: ["none", "single", "multiple"],
+      },
+      {
+        name: "dividers",
+        type: "boolean",
+        description: "是否显示列表项分隔线",
+      },
       ...VISUAL_PROPERTIES,
     ],
   },
@@ -454,6 +677,43 @@ const COMPONENT_DEFS: InternalComponentDef[] = [
         name: "title",
         type: "string",
         description: "简单卡片标题；复杂标题建议使用 child 内部 Text 组件",
+      },
+      {
+        name: "header",
+        type: "string",
+        description: "卡片头部标题，优先于 title",
+      },
+      {
+        name: "subtitle",
+        type: "string",
+        description: "卡片副标题",
+      },
+      {
+        name: "footer",
+        type: "string",
+        description: "卡片底部说明文案",
+      },
+      {
+        name: "role",
+        type: "string",
+        description: "卡片语义角色",
+        values: ["default", "summary", "metric", "media", "form", "interactive", "emptyState"],
+      },
+      {
+        name: "density",
+        type: "string",
+        description: "卡片内容密度",
+        values: ["compact", "comfortable", "spacious"],
+      },
+      {
+        name: "selected",
+        type: "boolean",
+        description: "是否处于选中状态",
+      },
+      {
+        name: "clickable",
+        type: "boolean",
+        description: "是否表现为可点击卡片",
       },
       ...VISUAL_PROPERTIES,
     ],
@@ -550,8 +810,18 @@ const COMPONENT_DEFS: InternalComponentDef[] = [
       {
         name: "child",
         type: "string",
-        required: true,
+        required: false,
         description: "按钮内容的子组件 ID 或内联对象",
+      },
+      {
+        name: "label",
+        type: "string",
+        description: "按钮文本；无 child 时可直接使用",
+      },
+      {
+        name: "icon",
+        type: "string",
+        description: "按钮图标名称；无 child 时可直接使用",
       },
       {
         name: "action",
@@ -578,7 +848,25 @@ const COMPONENT_DEFS: InternalComponentDef[] = [
         name: "iconPosition",
         type: "string",
         description: "图标位置",
-        values: ["left", "right"],
+        values: ["left", "right", "only"],
+      },
+      {
+        name: "intent",
+        type: "string",
+        description: "按钮业务意图",
+        values: ["default", "primary", "secondary", "danger", "success", "warning"],
+      },
+      {
+        name: "shape",
+        type: "string",
+        description: "按钮形状",
+        values: ["rounded", "pill", "square", "circle"],
+      },
+      {
+        name: "importance",
+        type: "string",
+        description: "按钮视觉重要程度",
+        values: ["normal", "quiet", "prominent"],
       },
       ...VISUAL_PROPERTIES,
     ],
@@ -592,6 +880,11 @@ const COMPONENT_DEFS: InternalComponentDef[] = [
         type: "string",
         required: true,
         description: "输入框标签",
+      },
+      {
+        name: "name",
+        type: "string",
+        description: "字段名称，用于表单语义",
       },
       {
         name: "text",
@@ -615,6 +908,27 @@ const COMPONENT_DEFS: InternalComponentDef[] = [
         type: "number",
         description: "多行输入最小行数",
       },
+      {
+        name: "inputMode",
+        type: "string",
+        description: "输入键盘和数据类型提示",
+        values: ["text", "email", "url", "tel", "numeric", "decimal"],
+      },
+      {
+        name: "prefix",
+        type: "string",
+        description: "输入前缀",
+      },
+      {
+        name: "suffix",
+        type: "string",
+        description: "输入后缀",
+      },
+      {
+        name: "clearable",
+        type: "boolean",
+        description: "是否声明为可清空输入",
+      },
       ...FORM_PROPERTIES,
       ...VISUAL_PROPERTIES,
     ],
@@ -628,6 +942,11 @@ const COMPONENT_DEFS: InternalComponentDef[] = [
         type: "string",
         required: true,
         description: "复选框标签",
+      },
+      {
+        name: "name",
+        type: "string",
+        description: "字段名称，用于表单语义",
       },
       {
         name: "value",
@@ -661,6 +980,11 @@ const COMPONENT_DEFS: InternalComponentDef[] = [
         description: "选择器标签",
       },
       {
+        name: "name",
+        type: "string",
+        description: "字段名称，用于表单语义",
+      },
+      {
         name: "options",
         type: "array",
         required: true,
@@ -671,6 +995,17 @@ const COMPONENT_DEFS: InternalComponentDef[] = [
         type: "string",
         required: true,
         description: "当前选中值，支持字符串或 { path } 数据绑定",
+      },
+      {
+        name: "mode",
+        type: "string",
+        description: "选择器展示模式",
+        values: ["select", "radio", "segmented"],
+      },
+      {
+        name: "multiple",
+        type: "boolean",
+        description: "是否声明为多选",
       },
       ...FORM_PROPERTIES,
       ...VISUAL_PROPERTIES,
@@ -685,6 +1020,11 @@ const COMPONENT_DEFS: InternalComponentDef[] = [
         type: "string",
         required: true,
         description: "滑块标签",
+      },
+      {
+        name: "name",
+        type: "string",
+        description: "字段名称，用于表单语义",
       },
       {
         name: "min",
@@ -724,6 +1064,12 @@ const COMPONENT_DEFS: InternalComponentDef[] = [
         type: "string",
         description: "数值后缀",
       },
+      {
+        name: "valueDisplay",
+        type: "string",
+        description: "数值展示方式",
+        values: ["none", "inline", "tooltip"],
+      },
       ...FORM_PROPERTIES,
       ...VISUAL_PROPERTIES,
     ],
@@ -737,6 +1083,11 @@ const COMPONENT_DEFS: InternalComponentDef[] = [
         type: "string",
         required: true,
         description: "日期时间选择器标签",
+      },
+      {
+        name: "name",
+        type: "string",
+        description: "字段名称，用于表单语义",
       },
       {
         name: "value",

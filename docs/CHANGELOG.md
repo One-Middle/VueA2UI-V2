@@ -1,5 +1,36 @@
 # 更新日志
 
+## 2026-08-04
+
+### 文档
+
+- 更新 `docs/99-archive/renderer/implementation-details.md`，同步当前 Renderer 消息处理、状态模型、动态绑定、脚本、action、受控视觉、Basic Catalog 组件矩阵和能力缺陷。
+
+## 2026-08-03
+
+### Shared
+
+- Basic Catalog 组件集合新增 `Grid`、`Container`、`Spacer`，用于以语义化组件表达二维网格、页面容器和受控空隙。
+
+### Agent
+
+- `basic-catalog-schema.json` 放行新增布局组件和组件语义字段，覆盖 `Text.decoration/role/emphasis`、`Button.label/icon/intent/shape/importance`、`Card.role/density/selected`、`Image.role/shape/fallbackText`、表单 `validationState/helpText/errorText/readonly/density` 等能力。
+- 同步更新 Agent Basic Catalog 渐进披露定义，使模型可按需获取新增组件和语义字段说明，而不是只依赖校验 schema。
+
+### Renderer
+
+- 新增 `GridComponent`、`ContainerComponent`、`SpacerComponent`，并注册到 Basic Catalog Renderer。
+- 扩展现有 Basic 组件的语义字段消费：文本删除线/旧价格/强调、按钮标签与图标、卡片头部与密度、图片角色与加载失败兜底、图标语义、列表空状态/加载态、Row/Column 布局角色与分隔、表单校验状态与辅助说明。
+- 优化 `renderer-capability-demo` 示例集，使用商品、课程、音乐、待办和指标看板覆盖新增语义字段，并改用内置图片资产避免示例依赖外部网络。
+- 将 `renderer-capability-demo` 商品示例调整为直播电商卡片，覆盖直播封面、商品货架、互动计数、加购和立即购买事件。
+- `GridComponent` 支持动态模板 children，使网格组件也能像 `List` 一样基于数据集合重复渲染模板组件。
+- 补充 `styles.css` 中的语义样式类，使新增字段通过受控 class 产生稳定视觉效果，避免继续扩大通用 CSS 白名单。
+
+### 测试
+
+- 新增 Renderer 回归测试，覆盖新增布局组件和语义字段渲染。
+- 新增 Agent 校验测试，确认新增语义字段和布局组件可通过 `validateA2UI`。
+
 ## 2026-08-02
 
 ### Renderer

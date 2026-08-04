@@ -451,4 +451,62 @@ describe("Basic Catalog 视觉属性", () => {
     expect(input?.step).toBe("1");
     expect(container.querySelector(".a2ui-slider-value")).toBeNull();
   });
+
+  it("渲染语义字段和新增布局组件", async () => {
+    const container = mountSurface([
+      {
+        id: "root",
+        component: "Container",
+        child: "grid",
+        width: "narrow",
+        padding: "sm",
+      },
+      {
+        id: "grid",
+        component: "Grid",
+        columns: "auto",
+        minItemWidth: "180px",
+        gap: "10px",
+        children: ["card", "spacer"],
+      },
+      {
+        id: "card",
+        component: "Card",
+        role: "metric",
+        density: "compact",
+        header: "原价",
+        subtitle: "促销前价格",
+        selected: true,
+        child: "price",
+      },
+      {
+        id: "price",
+        component: "Text",
+        text: "¥199",
+        role: "previousPrice",
+        emphasis: "muted",
+      },
+      {
+        id: "spacer",
+        component: "Spacer",
+        size: "sm",
+      },
+    ]);
+
+    await nextTick();
+
+    const containerEl = container.querySelector(".a2ui-container") as HTMLElement | null;
+    const grid = container.querySelector(".a2ui-grid") as HTMLElement | null;
+    const card = container.querySelector(".a2ui-card") as HTMLElement | null;
+    const text = container.querySelector(".a2ui-text-body") as HTMLElement | null;
+    const spacer = container.querySelector(".a2ui-spacer") as HTMLElement | null;
+
+    expect(containerEl?.classList.contains("a2ui-container--width-narrow")).toBe(true);
+    expect(grid?.style.gridTemplateColumns).toContain("minmax(180px, 1fr)");
+    expect(card?.classList.contains("a2ui-card--role-metric")).toBe(true);
+    expect(card?.classList.contains("a2ui-card--selected")).toBe(true);
+    expect(text?.classList.contains("a2ui-text--role-previousPrice")).toBe(true);
+    expect(text?.classList.contains("a2ui-text--emphasis-muted")).toBe(true);
+    expect(spacer?.style.minHeight).toBe("8px");
+  });
 });
