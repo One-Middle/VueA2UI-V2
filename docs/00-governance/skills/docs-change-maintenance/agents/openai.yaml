@@ -1,0 +1,4 @@
+interface:
+  display_name: "Docs Change Maintenance"
+  short_description: "功能改造时同步维护项目文档真相源"
+  default_prompt: "Use $docs-change-maintenance to maintain docs while adding or changing a feature."

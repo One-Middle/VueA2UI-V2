@@ -1,0 +1,4 @@
+interface:
+  display_name: "Docs System Init"
+  short_description: "初始化 AI Coding 项目文档治理结构"
+  default_prompt: "Use $docs-system-init to initialize a project documentation system."
