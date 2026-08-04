@@ -1,4 +1,13 @@
-# 更新日志
+﻿# 更新日志
+
+## 2026-08-04
+
+### 文档治理
+
+- 将文档系统升级为面向 AI Coding 的六层模型：`00-governance`、`10-product`、`20-design`、`30-contracts`、`40-implementation`、`50-delivery`、`90-notes`。
+- 将旧产品、架构、契约、模块、运维、计划和历史归档目录迁移到新分层结构，并更新文档入口、阅读路径和治理规则。
+- 更新 `.codex/AGENTS.md`，明确 `30-contracts/` 是跨模块数据交互最高真相源，`40-implementation/` 必须基于源码维护，`90-notes/` 不作为开发或验收依据。
+- 新增项目级 Skill 源文件：`docs-system-init` 用于初始化或迁移项目文档系统，`docs-change-maintenance` 用于功能新增、修改、重构或修复时同步维护文档。
 
 ## 2026-08-04
 
@@ -44,8 +53,8 @@
 
 ### 文档
 
-- 将 `docs/04-modules/` 下的模块文档从平铺 Markdown 调整为独立子目录入口：`docs/04-modules/<module>/README.md`。
-- 将 Renderer Basic Catalog 能力矩阵迁移到 `docs/04-modules/renderer/basic-catalog-capabilities.md`，并同步更新文档索引和相对链接。
+- 将 `docs/40-implementation/modules/` 下的模块文档从平铺 Markdown 调整为独立子目录入口：`docs/40-implementation/modules/<module>/README.md`。
+- 将 Renderer Basic Catalog 能力矩阵迁移到 `docs/40-implementation/modules/renderer/basic-catalog-capabilities.md`，并同步更新文档索引和相对链接。
 
 ## 2026-07-21
 
@@ -61,7 +70,7 @@
 
 - Shared A2UI 类型新增属性脚本和 `action.script` 声明。
 - Basic Catalog schema 放行属性脚本、样式字段脚本和 `action.script`。
-- 新增 `docs/06-planning/2026-07-renderer-js-runtime/` 平台改造计划，并同步 A2UI 契约和 Renderer 模块文档。
+- 新增 `docs/50-delivery/planning/2026-07-renderer-js-runtime/` 平台改造计划，并同步 A2UI 契约和 Renderer 模块文档。
 
 ## 2026-07-20
 
@@ -86,10 +95,10 @@
 ### 文档治理
 
 - 将 `docs/` 调整为编号化分层：`00-meta`、`01-product`、`02-architecture`、`03-contracts`、`04-modules`、`05-operations`、`06-planning`、`90-notes`、`99-archive`。
-- 新增 `docs/00-meta/taxonomy.md`、`maintenance.md` 和 `reading-paths.md`，明确文档分类、权威等级、事实归属、冲突规则和阅读路径。
+- 新增 `docs/00-governance/taxonomy.md`、`maintenance.md` 和 `reading-paths.md`，明确文档分类、权威等级、事实归属、冲突规则和阅读路径。
 - 将 `06-planning/` 从单一当前任务清单升级为平台改造计划区；每次较大改造使用独立子目录记录背景、计划、清单、进展、决策和结果。
 - 新增 `docs/90-notes/README.md`，规定 AI/人工阅读笔记默认非权威，并提供笔记元信息模板。
-- 将 Renderer Basic Catalog 当前能力矩阵从历史归档移动到 `docs/04-modules/renderer/basic-catalog-capabilities.md`。
+- 将 Renderer Basic Catalog 当前能力矩阵从历史归档移动到 `docs/40-implementation/modules/renderer/basic-catalog-capabilities.md`。
 - 更新模块文档，补充关键类、核心对象和关键文件说明。
 - 更新 `docs/README.md`，明确新的文档结构、权威来源规则和维护约定。
 
@@ -196,3 +205,4 @@
 - Renderer store 新增快照恢复用的消息替换入口，避免恢复当前快照时重复累积历史消息。
 - 修复 `Card.children` 非法字段漏过 Agent 校验导致卡片内容不渲染的问题；未来输出会被 `validateA2UI` 拦截并进入修复循环。
 - Renderer 的 Card 增加历史数据兼容：当旧事件使用 `children` 且没有 `child` 时，仍可渲染其子组件内容。
+

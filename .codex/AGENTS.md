@@ -10,18 +10,39 @@
 
 开始任务前按需阅读：
 
-- `docs/README.md`：文档入口与权威来源规则。
-- `docs/00-meta/`：文档分类、维护规则和阅读路径。
-- `docs/02-architecture/overview.md`：项目概览和 MVP 边界。
-- `docs/05-operations/development.md`：开发命令、工程结构和通用约定。
-- `docs/02-architecture/system-design.md`：系统架构、模块边界和端到端链路。
-- `docs/03-contracts/`：API、DB、A2UI、shared 类型契约。
-- `docs/04-modules/`：各模块功能定位、关键类、核心链路和文件职责。
-- `docs/06-planning/current.md`：当前活跃平台改造计划索引。
+- `docs/README.md`：文档入口与真相源规则。
+- `docs/00-governance/`：文档分类、维护规则、阅读路径和写作规则。
+- `docs/10-product/`：产品需求、路线图和能力范围。
+- `docs/20-design/`：项目概览、系统设计、模块目标设计和架构决策。
+- `docs/30-contracts/`：API、DB、A2UI、SSE、Shared Types 等跨模块契约。
+- `docs/40-implementation/`：当前源码真实实现镜像。
+- `docs/50-delivery/planning/current.md`：当前活跃交付任务索引。
+- `docs/50-delivery/operations/development.md`：开发命令、工程结构和通用约定。
 
-`docs/90-notes/` 默认保存 AI/人工阅读辅助材料，不作为权威事实来源。`docs/99-archive/` 仅为历史归档，不作为当前实现契约。
+`docs/90-notes/` 默认保存 AI/人工阅读辅助材料和历史归档，不作为当前实现、契约或验收依据。
 
-## 3. 项目结构
+## 3. 文档治理规则
+
+项目文档按用途分层维护：
+
+- `docs/00-governance/`：文档系统治理真相源。
+- `docs/10-product/`：产品真相源。可以描述未来能力，但必须标注状态。
+- `docs/20-design/`：设计真相源。可以描述目标架构，但必须标注实现状态。
+- `docs/30-contracts/`：跨模块数据交互最高真相源。API、DB、事件、A2UI、Shared Types 以这里为准。
+- `docs/40-implementation/`：当前真实实现真相源。必须严格基于源码，不写推测或未落地能力。
+- `docs/50-delivery/`：功能新增、功能修改、重构、修复的任务期工作区。
+- `docs/90-notes/`：学习、解释、调研、AI 生成辅助材料和历史归档，不作为开发或验收依据。
+
+修改代码时：
+
+- 改变真实实现，必须同步 `docs/40-implementation/`。
+- 改变跨模块字段、接口、事件、消息或数据结构，必须同步 `docs/30-contracts/`。
+- 改变长期产品目标或用户能力，才同步 `docs/10-product/`。
+- 改变长期架构或模块目标职责，才同步 `docs/20-design/`。
+- 较大的功能新增、功能修改、重构或修复，应在 `docs/50-delivery/planning/` 下创建或更新任务目录。
+- 不以 `docs/90-notes/` 判断当前行为。
+
+## 4. 项目结构
 
 ```text
 packages/
@@ -41,9 +62,9 @@ packages/
 - `packages/backend/uploads/`
 - `tmp-dev-*.log`
 
-## 4. 开发原则
+## 5. 开发原则
 
-- 先共享类型，后模块实现；跨模块契约优先放入 `packages/shared`。
+- 先共享类型，后模块实现；跨模块契约优先放入 `packages/shared` 和 `docs/30-contracts/`。
 - 后端只提交通过 `validateA2UI` 的 A2UI 消息。
 - Renderer 不接收未通过后端校验的消息作为正式状态。
 - Renderer 内部状态不得放入 Pinia。
@@ -51,14 +72,6 @@ packages/
 - Agent 不得读取任意本地路径，不得直接写数据库，不得开放 HTTP API。
 - 不得把 API key 写入数据库或前端环境变量。
 - 不得把未通过校验的 A2UI 草稿写入 `a2ui_events`。
-
-## 5. 文档维护
-
-- 新增或修改产品能力：更新 `docs/01-product/prd.md`、相关架构/契约/模块文档和 `docs/CHANGELOG.md`。
-- 修改 API、DB、A2UI 或 shared 类型：更新 `docs/03-contracts/` 对应文档。
-- 修改模块功能逻辑或代码结构：更新 `docs/04-modules/` 对应文档，并维护关键类或核心链路说明。
-- 较大的平台改造：在 `docs/06-planning/` 下创建独立计划目录，`current.md` 只维护活跃计划索引。
-- AI 生成的阅读辅助材料默认放入 `docs/90-notes/`，不要直接作为权威契约。
 
 ## 6. 命令约定
 
@@ -78,9 +91,9 @@ pnpm lint
 
 - 使用 TypeScript。
 - 优先复用 `packages/shared` 类型。
-- API 请求/响应遵守 `docs/03-contracts/api.md`。
-- Prisma schema 遵守 `docs/03-contracts/db-schema.md`。
-- A2UI 协议遵守 `docs/03-contracts/a2ui-v0.9.md`。
+- API 请求/响应遵守 `docs/30-contracts/api.md`。
+- Prisma schema 遵守 `docs/30-contracts/db-schema.md`。
+- A2UI 协议遵守 `docs/30-contracts/a2ui-v0.9.md`。
 - API DTO 校验使用 Zod。
 - A2UI JSON Schema 校验使用 Ajv。
 - 后端日志使用 pino，避免散落 `console.log`。
@@ -88,4 +101,4 @@ pnpm lint
 
 ### 文档同步
 
-当注释对应的 API、DB、A2UI、shared 类型、模块职责或产品能力发生变化时，必须同步更新 `docs/03-contracts/`、`docs/04-modules/`、`docs/01-product/prd.md` 或 `docs/CHANGELOG.md` 中的相关内容。
+当注释对应的 API、DB、A2UI、Shared Types、模块职责或产品能力发生变化时，必须同步更新 `docs/30-contracts/`、`docs/40-implementation/`、`docs/10-product/`、`docs/20-design/` 或 `docs/CHANGELOG.md` 中的相关内容。
