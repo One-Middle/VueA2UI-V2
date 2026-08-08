@@ -59,6 +59,6 @@
 
 - 产品需求：[../10-product/prd.md](../10-product/prd.md)
 - 系统设计：[./system-design.md](./system-design.md)
-- 开发说明：[../50-delivery/operations/development.md](../50-delivery/operations/development.md)
-- 当前活跃计划：[../50-delivery/planning/current.md](../50-delivery/planning/current.md)
+- Matt-first 工作系统：[../matt_docs/README.md](../matt_docs/README.md)
+- 历史交付归档：[../90-notes/archive/delivery/](../90-notes/archive/delivery/)
 

@@ -2,47 +2,63 @@
 
 ## 1. 项目定位
 
-本项目是一个全栈 Agent 无代码 A2UI 创作平台。用户通过对话或上传 `.txt` 文件描述 UI 需求，后端 Agent Runtime 生成 A2UI v0.9 消息，经 `validateA2UI` 校验通过后提交，前端 Vue3 Renderer 渲染 UI。
+本项目是全栈 Agent 无代码 A2UI 创作平台。用户通过对话或上传 `.txt` 文件描述 UI 需求，后端编排 Agent Runtime 生成 A2UI v0.9 消息；消息经 `validateA2UI` 校验通过后提交，前端 Vue3 Renderer 渲染为可交互 UI。
 
-所有项目文档、代码注释、错误消息和日志输出默认使用中文。
+所有面向用户的说明、项目文档、代码注释、错误消息和日志默认使用中文；代码标识符、类型名、命令、协议字段和文件路径保留英文原文。
 
-## 2. 必读文档
+## 2. 工作流入口
+
+本仓库采用 Matt-first 工作系统，优先使用 `cyz-*` skills：
+
+- `cyz-grill-with-docs`：澄清想法，并按需维护 glossary / ADR。
+- `cyz-to-spec`：把已澄清的讨论发布为 `docs/matt_docs/scratch/<feature-slug>/spec.md`。
+- `cyz-to-tickets`：把 spec 或计划拆成 blocker-first tickets。
+- `cyz-domain-modeling`：维护 `docs/matt_docs/CONTEXT.md` 和 `docs/matt_docs/adr/`。
+- `cyz-handoff`：按 Matt 原版行为写临时 handoff，不写入仓库。
+
+不要使用旧的 `docs/00-governance/`、`docs/50-delivery/`、根目录 `.scratch/` 或根目录 `CONTEXT.md`。
+
+## 3. 必读文档
 
 开始任务前按需阅读：
 
-- `docs/README.md`：文档入口与真相源规则。
-- `docs/00-governance/`：文档分类、维护规则、阅读路径和写作规则。
+- `docs/matt_docs/README.md`：Matt-first 工作系统入口。
+- `docs/matt_docs/agents/issue-tracker.md`：本地 issue tracker 规则。
+- `docs/matt_docs/agents/domain.md`：domain docs 消费规则。
+- `docs/matt_docs/CONTEXT.md`：领域词汇表，只作为 glossary。
 - `docs/10-product/`：产品需求、路线图和能力范围。
-- `docs/20-design/`：项目概览、系统设计、模块目标设计和架构决策。
-- `docs/30-contracts/`：API、DB、A2UI、SSE、Shared Types 等跨模块契约。
-- `docs/40-implementation/`：当前源码真实实现镜像。
-- `docs/50-delivery/planning/current.md`：当前活跃交付任务索引。
-- `docs/50-delivery/operations/development.md`：开发命令、工程结构和通用约定。
+- `docs/20-design/module-boundaries.md`：模块功能、定位和边界。
+- `docs/30-contracts/`：API、DB、A2UI、Shared Types 等跨模块契约。
+- `docs/40-implementation/modules/<module>/README.md`：当前源码真实实现。
 
-`docs/90-notes/` 默认保存 AI/人工阅读辅助材料和历史归档，不作为当前实现、契约或验收依据。
+`docs/90-notes/` 只保存历史、调研和阅读辅助材料，不作为当前实现、契约或验收依据。
 
-## 3. 文档治理规则
+## 4. 文档写入规则
 
-项目文档按用途分层维护：
+- Agent 任务推进、spec、issues、blocking edges 和验收标准写入 `docs/matt_docs/scratch/<feature-slug>/`。
+- 领域词汇只写入 `docs/matt_docs/CONTEXT.md`，不要把它当作 spec、草稿或实现说明。
+- 新 ADR 只写入 `docs/matt_docs/adr/`，采用 Matt 轻量格式。
+- 产品能力、用户场景、非目标或路线图变化写入 `docs/10-product/`。
+- 模块长期功能、定位和边界变化写入 `docs/20-design/module-boundaries.md`。
+- API、DB、A2UI、Shared Types 等跨模块数据变化写入 `docs/30-contracts/`。
+- 当前代码结构、入口、运行链路、状态模型和测试方式变化写入 `docs/40-implementation/`。
+- 历史材料、调研和学习笔记写入 `docs/90-notes/`。
 
-- `docs/00-governance/`：文档系统治理真相源。
-- `docs/10-product/`：产品真相源。可以描述未来能力，但必须标注状态。
-- `docs/20-design/`：设计真相源。可以描述目标架构，但必须标注实现状态。
-- `docs/30-contracts/`：跨模块数据交互最高真相源。API、DB、事件、A2UI、Shared Types 以这里为准。
-- `docs/40-implementation/`：当前真实实现真相源。必须严格基于源码，不写推测或未落地能力。
-- `docs/50-delivery/`：功能新增、功能修改、重构、修复的任务期工作区。
-- `docs/90-notes/`：学习、解释、调研、AI 生成辅助材料和历史归档，不作为开发或验收依据。
+任务完成前，必须把 `docs/matt_docs/scratch/` 中产生的稳定事实回填到对应长期文档。
 
-修改代码时：
+## 5. 任务关闭检查
 
-- 改变真实实现，必须同步 `docs/40-implementation/`。
-- 改变跨模块字段、接口、事件、消息或数据结构，必须同步 `docs/30-contracts/`。
-- 改变长期产品目标或用户能力，才同步 `docs/10-product/`。
-- 改变长期架构或模块目标职责，才同步 `docs/20-design/`。
-- 较大的功能新增、功能修改、重构或修复，应在 `docs/50-delivery/planning/` 下创建或更新任务目录。
-- 不以 `docs/90-notes/` 判断当前行为。
+完成代码或文档任务前检查：
 
-## 4. 项目结构
+1. 是否运行了相关测试；如果没有，说明原因。
+2. 是否检查了 `git status --short`。
+3. 跨模块契约变化是否同步到 `docs/30-contracts/`。
+4. 当前实现变化是否同步到 `docs/40-implementation/`。
+5. 产品或模块边界变化是否同步到 `docs/10-product/` 或 `docs/20-design/module-boundaries.md`。
+6. 如果存在相关 Matt issue，是否更新其状态、结果或遗留问题。
+7. 重要用户可见、契约、架构或文档系统变化是否更新 `docs/CHANGELOG.md`。
+
+## 6. 项目结构
 
 ```text
 packages/
@@ -53,7 +69,7 @@ packages/
   agent/      # Agent Runtime、Prompt、ModelClient、validateA2UI
 ```
 
-不要优先修改生成物或依赖目录：
+不要优先修改生成物、依赖目录或运行期上传文件：
 
 - `node_modules/`
 - `.pnpm-store/`
@@ -62,7 +78,7 @@ packages/
 - `packages/backend/uploads/`
 - `tmp-dev-*.log`
 
-## 5. 开发原则
+## 7. 开发原则
 
 - 先共享类型，后模块实现；跨模块契约优先放入 `packages/shared` 和 `docs/30-contracts/`。
 - 后端只提交通过 `validateA2UI` 的 A2UI 消息。
@@ -73,7 +89,7 @@ packages/
 - 不得把 API key 写入数据库或前端环境变量。
 - 不得把未通过校验的 A2UI 草稿写入 `a2ui_events`。
 
-## 6. 命令约定
+## 8. 命令约定
 
 依赖安装后可使用：
 
@@ -85,20 +101,4 @@ pnpm typecheck
 pnpm lint
 ```
 
-当前环境可能尚未安装 pnpm 或依赖；如果命令不可用，应说明原因，不要假装已验证。
-
-## 7. 代码规范
-
-- 使用 TypeScript。
-- 优先复用 `packages/shared` 类型。
-- API 请求/响应遵守 `docs/30-contracts/api.md`。
-- Prisma schema 遵守 `docs/30-contracts/db-schema.md`。
-- A2UI 协议遵守 `docs/30-contracts/a2ui-v0.9.md`。
-- API DTO 校验使用 Zod。
-- A2UI JSON Schema 校验使用 Ajv。
-- 后端日志使用 pino，避免散落 `console.log`。
-- 文件上传使用 multer。
-
-### 文档同步
-
-当注释对应的 API、DB、A2UI、Shared Types、模块职责或产品能力发生变化时，必须同步更新 `docs/30-contracts/`、`docs/40-implementation/`、`docs/10-product/`、`docs/20-design/` 或 `docs/CHANGELOG.md` 中的相关内容。
+如果命令不可用，应说明原因，不要假装已验证。

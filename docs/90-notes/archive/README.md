@@ -10,12 +10,14 @@
 | --- | --- |
 | `project/` | 工程结构、旧文档合并稿和冲突裁决。 |
 | `product/` | 旧 PRD、设计稿、API/DB 草案和模块规格。 |
+| `design/` | 旧项目概览和系统设计说明。 |
 | `agent/` | Agent Runtime 详细设计、Prompt/A2UI 生成指南和上下文编排。 |
 | `backend/` | Backend 实施说明和实现细节。 |
 | `frontend/` | Frontend 工作台实施说明和实现细节。 |
 | `renderer/` | Renderer、A2UI 协议和 Basic Catalog 详细资料。 |
 | `shared/` | Shared 类型旧规格。 |
 | `integration/` | 端到端集成细节。 |
+| `delivery/` | 旧 `50-delivery/` 交付任务、计划和运行材料。 |
 
 ## 2. 使用规则
 
@@ -23,5 +25,5 @@
 - 需要查详细历史设计或迁移依据时，再进入本目录对应模块文件夹。
 - 发现归档内容与当前契约冲突时，优先更新 `project/conflicts.md`，再由维护者决定是否迁移到权威文档。
 - 归档路径按模块编排，不再按日期批次编排。
-- 已过时的旧任务清单不进入归档；平台改造计划维护在 `docs/50-delivery/planning/`。
+- 旧交付任务和运行材料已归档到 `delivery/`；新任务推进使用 `docs/matt_docs/scratch/`。
 

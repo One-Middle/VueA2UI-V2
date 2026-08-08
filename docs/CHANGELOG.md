@@ -2,6 +2,14 @@
 
 ## 2026-08-08
 
+### 文档治理
+
+- 建立 Matt-first 文档系统：新增 `docs/matt_docs/`，将 Agent 任务工作流、CONTEXT、ADR、spec 和本地 issues 迁入 Matt 路径迁移版。
+- 将旧 `docs/50-delivery/` 完全迁移到 `docs/90-notes/archive/delivery/`，新任务推进改由 `docs/matt_docs/scratch/` 承担。
+- 将旧 `docs/20-design/decisions/` 迁移到 `docs/matt_docs/adr/`，后续新 ADR 采用 Matt 轻量格式。
+- 将 `docs/20-design/` 瘦身为模块功能、定位和边界文档，旧项目概览和系统设计说明迁入 `docs/90-notes/archive/design/`。
+- 移除 `docs/00-governance/`，将精简文档治理和 Agent 行为规则收敛到 `.codex/AGENTS.md`。
+
 ### Agent
 
 - 重构 `builtin:a2ui-v0.9-generation` 平台 Skill：主 Skill 删除旧示例片段，改为要求 UI 生成前请求 `a2ui-generation-standards`，复杂 UI 再请求 `high-quality-a2ui-good-cases`。
