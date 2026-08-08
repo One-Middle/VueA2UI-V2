@@ -98,8 +98,13 @@ describe("Agent 渐进式组件披露", () => {
     expect(userPrompt).toContain("builtin:a2ui-v0.9-generation");
     expect(userPrompt).toContain("A2UI v0.9 组件消息生成");
     expect(userPrompt).toContain("当用户要求创建或修改 UI 时必须使用");
-    expect(userPrompt).not.toContain("## 4. 消息类型");
-    expect(userPrompt).not.toContain("生成新 UI 时必须先 createSurface");
+    expect(userPrompt).toContain("a2ui-generation-standards");
+    expect(userPrompt).toContain("high-quality-a2ui-good-cases");
+    expect(userPrompt).not.toContain("# A2UI 标准生成规则");
+    expect(userPrompt).not.toContain("Good Case 1: Music Player");
+    expect(userPrompt).not.toContain("basic-catalog-quality-patterns");
+    expect(userPrompt).not.toContain("jsruntime-usage-patterns");
+    expect(userPrompt).not.toContain("a2ui-message-checklist");
   });
 
   it("Runtime 不会自行注入平台 Skill", () => {
@@ -341,13 +346,85 @@ describe("Agent 渐进式组件披露", () => {
 
     expect(result.status).toBe("COMMITTED");
     expect(fakeModel.prompts).toHaveLength(2);
-    expect(fakeModel.prompts[0]!.user).not.toContain("## 4. 消息类型");
+    expect(fakeModel.prompts[0]!.user).not.toContain("## 2. 必须先请求的 Reference");
     expect(fakeModel.prompts[1]!.system).toContain("# A2UI v0.9 组件消息生成");
-    expect(fakeModel.prompts[1]!.system).toContain("## 4. 消息类型");
+    expect(fakeModel.prompts[1]!.system).toContain("## 2. 必须先请求的 Reference");
+    expect(fakeModel.prompts[1]!.system).not.toContain("## 10. 高质量 few-shot 示例");
     expect(
       toolCalls.some(
         (record) =>
           record.toolName === "getSkillContent" &&
+          record.status === "succeeded",
+      ),
+    ).toBe(true);
+  });
+
+  it("Runtime 可披露平台 A2UI 标准 Reference，但初始 Prompt 不注入正文", async () => {
+    const finalOutput = {
+      assistantMessage: "我理解你需要一个课程表页面，已生成基础课程表 UI。",
+      a2uiMessages: [
+        {
+          version: "v0.9",
+          createSurface: {
+            surfaceId: "main",
+            catalogId:
+              "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json",
+          },
+        },
+        {
+          version: "v0.9",
+          updateComponents: {
+            surfaceId: "main",
+            components: [
+              {
+                id: "root",
+                component: "Column",
+                children: ["title"],
+              },
+              {
+                id: "title",
+                component: "Text",
+                text: "我的课程表",
+                usageHint: "h1",
+              },
+            ],
+          },
+        },
+      ],
+    };
+
+    const fakeModel = new FakeModelClient([
+      JSON.stringify({
+        assistantMessage: "需要查看 A2UI 标准规则后再生成。",
+        skillReferenceRequest: {
+          skill: "builtin:a2ui-v0.9-generation",
+          references: ["a2ui-generation-standards"],
+          reason: "需要遵循标准生成规则",
+        },
+      }),
+      JSON.stringify(finalOutput),
+    ]);
+    const runtime = new AgentRuntime(
+      fakeModel as unknown as ModelClient,
+      new PromptComposer(),
+      new AgentContextBuilder(),
+    );
+    const toolCalls: ToolCallRecord[] = [];
+
+    const result = await runtime.run(createInput(), (record) => {
+      toolCalls.push(record);
+    });
+
+    expect(result.status).toBe("COMMITTED");
+    expect(fakeModel.prompts).toHaveLength(2);
+    expect(fakeModel.prompts[0]!.user).toContain("a2ui-generation-standards");
+    expect(fakeModel.prompts[0]!.user).not.toContain("# A2UI 标准生成规则");
+    expect(fakeModel.prompts[1]!.system).toContain("# A2UI 标准生成规则");
+    expect(fakeModel.prompts[1]!.system).toContain("常见 bad case");
+    expect(
+      toolCalls.some(
+        (record) =>
+          record.toolName === "getSkillReferenceContent" &&
           record.status === "succeeded",
       ),
     ).toBe(true);

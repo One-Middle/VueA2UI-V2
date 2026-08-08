@@ -1,8 +1,28 @@
+/**
+ * 模型最终输出解析器。
+ *
+ * 职责：
+ * - 从模型返回文本中提取 JSON 对象。
+ * - 校验 assistantMessage 与 a2uiMessages 的基础结构。
+ * - 将合法输出转换为 Runtime 可继续校验的结构化数据。
+ *
+ * 引用：
+ * - @a2ui-platform/shared 中的 A2UIServerMessage 类型。
+ * 被引用：
+ * - AgentRuntime 用于解析模型最终输出。
+ * 注意：
+ * - 这里只做轻量结构校验，不负责 A2UI 协议语义校验；语义校验交给 validateA2UI。
+ */
+
 import type { A2UIServerMessage } from "@a2ui-platform/shared";
 
 // ─── 类型定义 ──────────────────────────────────────────────
 
-/** 解析结果 */
+/**
+ * 模型最终输出解析结果。
+ *
+ * 注意：失败分支只返回可读错误信息，不抛异常，便于 Runtime 进入修复流程。
+ */
 export type ParseResult =
   | {
       ok: true;
@@ -20,7 +40,12 @@ export type ParseResult =
 
 /**
  * 解析模型原始输出为结构化数据。
- * 处理 Markdown 代码块包裹、JSON 解析、字段验证等。
+ *
+ * 会兼容 Markdown 代码块包裹、正文夹杂 JSON 的输出，并验证返回值是否包含
+ * assistantMessage 与 a2uiMessages。
+ *
+ * @param raw - 模型返回的原始文本。
+ * @returns 解析成功时返回 assistant 文本和 A2UI 消息数组；失败时返回错误原因。
  */
 export function parseModelOutput(raw: string): ParseResult {
   if (!raw || raw.trim().length === 0) {

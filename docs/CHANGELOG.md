@@ -1,5 +1,12 @@
 ﻿# 更新日志
 
+## 2026-08-08
+
+### Agent
+
+- 重构 `builtin:a2ui-v0.9-generation` 平台 Skill：主 Skill 删除旧示例片段，改为要求 UI 生成前请求 `a2ui-generation-standards`，复杂 UI 再请求 `high-quality-a2ui-good-cases`。
+- 将旧的三个碎片化 A2UI Reference 替换为 `a2ui-generation-standards` 和 `high-quality-a2ui-good-cases`；前者包含标准生成规则、bad case 和输出检查，后者包含 Music Player、Finance Brief、Work Board 三个完整 good case。
+
 ## 2026-08-04
 
 ### 文档治理

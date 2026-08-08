@@ -6,17 +6,17 @@
 
 ---
 name: "A2UI v0.9 组件消息生成"
-description: "用于生成、修改或修复合法 A2UI v0.9 server-to-client 组件消息；包含 Basic Catalog、受控样式、数据绑定与 JSRuntime 受限脚本规则；当用户要求创建或修改 UI 时必须使用。"
+description: "用于生成、修改或修复合法 A2UI v0.9 server-to-client 组件消息；包含标准生成规则和高质量 good case references；当用户要求创建或修改 UI 时必须使用。"
 sourceType: "platform"
 ---
 
 # A2UI v0.9 组件消息生成
 
-当用户要求创建、修改或修复 UI/A2UI 组件消息时，必须遵循本 Skill。除非用户只是纯文字聊天，否则生成前应先掌握本 Skill 的完整规则。
+当用户要求创建、修改或修复 UI/A2UI 组件消息时，必须遵循本 Skill。除非用户只是纯文字聊天，否则生成前必须先掌握本 Skill 的完整规则。
 
 ## 1. 最终输出结构
 
-当你已经掌握所需组件字段时，必须只输出严格 JSON 对象，不要使用 Markdown 代码块，不要输出 JSON 之外的解释文字。
+当你已经掌握所需 Skill Reference 和组件字段后，必须只输出严格 JSON 对象，不要使用 Markdown 代码块，不要输出 JSON 之外的解释文字。
 
 {
   "assistantMessage": "先简要复述你对用户需求的理解，再说明生成或修改了什么",
@@ -25,23 +25,28 @@ sourceType: "platform"
 
 如果用户只是聊天、解释或询问，并没有要求创建或修改 UI，则 a2uiMessages 必须是空数组 []。
 
-## 2. 组件详情请求结构
+## 2. 必须先请求的 Reference
 
-如果你还不知道某些组件的可用字段、必填项或枚举值，先输出组件详情请求，不要猜字段。
+当用户要求创建、修改或修复 UI 时，生成前必须先请求本 Skill 下的 a2ui-generation-standards，不要只凭摘要生成 A2UI。
+
+如果用户需求涉及复杂 UI、列表/表单/媒体卡、业务面板、本地状态、筛选、收藏、播放、批量操作、强视觉主题或你需要质量标杆，继续请求 high-quality-a2ui-good-cases。
+
+## 3. Skill Reference 请求结构
 
 {
-  "assistantMessage": "需要查看组件详情后再生成。",
-  "componentInfoRequest": {
-    "components": ["Column", "Text", "Card"],
-    "reason": "需要布局、文本和卡片容器字段"
+  "assistantMessage": "需要查看相关参考资料后再生成。",
+  "skillReferenceRequest": {
+    "skill": "builtin:a2ui-v0.9-generation",
+    "references": ["a2ui-generation-standards"],
+    "reason": "需要遵循 A2UI 标准生成规则"
   }
 }
 
-componentInfoRequest.components 只能填写 Basic Catalog 中存在的组件名称。
+references 只能填写已启用 Skill 摘要中的 reference id 或 title，也可以填写 "*" 请求本 Skill 下全部 references。
 
-## 3. Skill 内容请求结构
+## 4. Skill 内容请求结构
 
-如果你需要遵循某个已启用 Skill 的完整规则，先输出 Skill 内容请求，不要凭摘要猜测完整规则。
+如果你需要遵循其他已启用 Skill 的完整规则，先输出 Skill 内容请求，不要凭摘要猜测完整规则。
 
 {
   "assistantMessage": "需要查看相关 Skill 后再生成。",
@@ -53,187 +58,34 @@ componentInfoRequest.components 只能填写 Basic Catalog 中存在的组件名
 
 skillInfoRequest.skills 只能填写已启用 Skill 摘要中的 id 或 name。优先使用 id。
 
-## 4. 消息类型
+## 5. 组件详情请求结构
 
-a2uiMessages 是 A2UI v0.9 server-to-client 消息数组，每条消息只能是下面四种之一：
-
-1. createSurface: { "version": "v0.9", "createSurface": { "surfaceId": "main", "catalogId": "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json" } }
-2. updateDataModel: { "version": "v0.9", "updateDataModel": { "surfaceId": "main", "path": "/", "value": { ... } } }
-3. updateComponents: { "version": "v0.9", "updateComponents": { "surfaceId": "main", "components": [ ... ] } }
-4. deleteSurface: { "version": "v0.9", "deleteSurface": { "surfaceId": "main" } }
-
-生成新 UI 时必须先 createSurface，再 updateDataModel（如需要），最后 updateComponents。surfaceId 固定使用 "main"。
-
-## 5. 组件树规则
-
-每个组件对象必须包含 { "id": "唯一组件ID", "component": "组件类型名称" }。
-必须存在一个 id 为 "root" 的组件作为 UI 树根节点。
-A2UI 使用邻接表，不使用嵌套 children 对象。容器通过字符串 id 引用子组件。
-同一 surface 内所有组件 id 必须唯一，所有 child/children/tabItems.child 引用的 id 必须真实存在。
-
-## 6. 数据绑定
-
-动态数据使用 JSON Pointer：{ "path": "/some/data/path" }。
-固定文案直接写字符串，不必放入 dataModel。
-
-## 7. JSRuntime 受限脚本
-
-Renderer 支持受限 JSRuntime，用于少量声明式绑定难以表达的同步逻辑。它不是浏览器 JavaScript 环境，不能访问 DOM、window、document、fetch、网络、定时器、import、async/await、eval 或任意外部 API。
-
-优先级：能用静态值时用静态值；能用 { path } 绑定时用数据绑定；只有需要简单派生值、条件展示、格式化、点击后改写 dataModel 或派发事件时，才使用受限 script。
-
-### 7.1 属性脚本
-
-属性脚本用于组件属性值或 style 白名单字段，格式为 { "script": { "code": "const done = dataModel.get('/done'); return done ? '已完成' : '待处理';", "deps": ["/done"], "fallback": "待处理" } }。
-属性脚本必须显式 return；deps 必须包含 1 到 32 个 JSON Pointer 路径；只能读取 dataModel.get(path)，不能写入 dataModel；返回值和 fallback 必须是 JSON-compatible。
-适合用于 Text.text、Image.url、Icon.name、表单 value、style.color、style.opacity 等 schema 明确允许脚本的字段。
-
-### 7.2 Button.action.script
-
-按钮可以使用 action.script 在点击时执行受限同步脚本，格式为 { "action": { "script": { "code": "const count = Number(dataModel.get('/count') ?? 0); dataModel.set('/count', count + 1); actions.emit('counterChanged', { count: count + 1 });", "deps": ["/count"], "context": { "source": "incrementButton" } } } }。
-action.script 只在用户触发动作时执行，不参与响应式订阅；可以读取 dataModel.get(path)，也可以用 dataModel.set(path, value) 写入 JSON-compatible 值。
-如需通知后端或宿主，使用 actions.emit(name, context)；不要直接调用后端 API。context 是注入脚本的静态或动态上下文，可在脚本中通过 context 读取。
-如果只是提交一个业务事件，优先使用 Button.action.event；只有需要先读写 dataModel 或做简单计算时才用 Button.action.script。
-
-### 7.3 脚本安全边界
-
-只写短小、同步、确定性的函数体，code 最长 2000 字符。
-不要使用 import、async、await、eval、Function、setTimeout、Promise、DOM、window、document、fetch、localStorage 或网络能力。
-不要生成 <script>、javascript:、HTML 字符串或事件处理器属性。
-
-## 8. 页面组织方法
-
-不要把页面生成成一串孤立 Text，也不要只输出 Card + Row + Text 的平铺清单。
-优先用 Column 作为 root，用 Row、Card、List、Tabs 等容器组织层级；分区使用 Card 包裹，重复内容优先使用 dataModel 数组 + List 模板。
-生成卡片、日程、商品、资料、看板等常见 UI 时，必须显式使用 gap、padding、borderRadius、variant、tone、size、preset 等受控视觉字段提升层次。
-需要条件文案、格式化、状态派生、点击后本地状态变化时，应使用 JSRuntime：属性脚本用于派生显示，Button.action.script 用于读写 dataModel 并 actions.emit。
-没有请求到组件详情前，不要臆造该组件字段。
-
-## 9. 高质量生成策略
-
-- 信息架构：先拆出标题区、摘要区、内容区、操作区；不要把所有信息压成同级 Row。
-- 数据建模：只要内容是列表、状态、筛选、进度或可交互数据，就优先放入 dataModel 并用 { path } 或 List 模板读取。
-- 视觉层次：卡片用 padding、shadow、borderRadius；次要信息用 tone=neutral 和 usageHint=caption；重要数值用 variant=metric 或 tone=brand。
-- 交互反馈：能本地计算的状态不要假装只能静态展示；使用属性脚本从 dataModel 派生文案、颜色、图标名或数值。
-- 事件提交：普通业务事件用 action.event；需要点击后先更新本地 dataModel 或派生事件上下文时用 action.script。
-
-## 10. 高质量 few-shot 示例
-
-以下示例是组件组织模式片段。最终输出仍必须补齐 createSurface、必要的 updateDataModel 和 updateComponents。
-
-### 10.1 课表卡片：dataModel 数组 + List 模板 + 顶部状态派生
-
-适合课程表、会议日程、排班。不要生成 row1、row2、row3 这类静态重复行；优先把课程放入 dataModel，并用 List 模板渲染。
+如果你还不知道某些组件的可用字段、必填项或枚举值，先输出组件详情请求，不要猜字段。
 
 {
-  "dataModel": {
-    "today": "周三",
-    "courses": [
-      { "day": "周一", "time": "08:00-09:30", "name": "高等数学", "room": "明理楼 A201", "teacher": "王老师" },
-      { "day": "周三", "time": "14:00-15:30", "name": "C++ 程序设计", "room": "实验楼 305", "teacher": "李老师" }
-    ]
-  },
-  "components": [
-    { "id": "root", "component": "Column", "children": ["scheduleHeader", "courseList"], "gap": "16px", "style": { "padding": "20px", "maxWidth": "560px" } },
-    { "id": "scheduleHeader", "component": "Card", "child": "scheduleHeaderBody", "variant": "elevated", "style": { "padding": "18px", "borderRadius": "16px", "shadow": "md" } },
-    { "id": "scheduleHeaderBody", "component": "Column", "children": ["scheduleTitle", "scheduleSummary"], "gap": "6px" },
-    { "id": "scheduleTitle", "component": "Text", "text": "本周课表", "usageHint": "h2", "tone": "brand" },
-    { "id": "scheduleSummary", "component": "Text", "text": { "script": { "code": "const courses = dataModel.get('/courses') ?? []; const today = dataModel.get('/today') ?? '今天'; return `${today} · 共 ${courses.length} 节课`; ", "deps": ["/courses", "/today"], "fallback": "课程概览" } }, "usageHint": "caption", "tone": "neutral" },
-    { "id": "courseList", "component": "List", "children": [{ "path": "/courses", "componentId": "courseCard" }], "gap": "12px", "preset": "cardList" },
-    { "id": "courseCard", "component": "Card", "child": "courseBody", "variant": "filled", "style": { "padding": "14px", "borderRadius": "14px", "backgroundColor": "#F8FAFC" } },
-    { "id": "courseBody", "component": "Row", "children": ["courseTime", "courseInfo"], "gap": "12px", "alignment": "center", "distribution": "spaceBetween" },
-    { "id": "courseTime", "component": "Column", "children": ["courseDay", "courseSlot"], "gap": "2px" },
-    { "id": "courseDay", "component": "Text", "text": { "path": "day" }, "usageHint": "caption", "tone": "brand", "style": { "fontWeight": 600 } },
-    { "id": "courseSlot", "component": "Text", "text": { "path": "time" }, "usageHint": "caption", "tone": "neutral" },
-    { "id": "courseInfo", "component": "Column", "children": ["courseName", "courseRoom", "courseTeacher"], "gap": "4px" },
-    { "id": "courseName", "component": "Text", "text": { "path": "name" }, "usageHint": "h4" },
-    { "id": "courseRoom", "component": "Text", "text": { "path": "room" }, "usageHint": "caption", "tone": "neutral" },
-    { "id": "courseTeacher", "component": "Text", "text": { "path": "teacher" }, "usageHint": "caption", "tone": "neutral" }
-  ]
+  "assistantMessage": "需要查看组件详情后再生成。",
+  "componentInfoRequest": {
+    "components": ["Container", "Column", "Text", "Card"],
+    "reason": "需要布局、文本和卡片容器字段"
+  }
 }
 
-### 10.2 音乐播放卡片：媒体层次 + 图标按钮 + 本地播放状态
+componentInfoRequest.components 只能填写 Basic Catalog 中存在的组件名称。
 
-{
-  "dataModel": { "player": { "isPlaying": false, "progress": 32, "isFavorite": false }, "song": { "title": "起风了", "artist": "买辣椒也用券", "coverUrl": "https://picsum.photos/320/320?text=Cover" } },
-  "components": [
-    { "id": "root", "component": "Card", "child": "musicBody", "preset": "media", "variant": "elevated", "style": { "maxWidth": "360px", "padding": "12px", "borderRadius": "18px", "shadow": "md" } },
-    { "id": "musicBody", "component": "Column", "children": ["cover", "infoRow", "progress", "controlRow"], "gap": "12px" },
-    { "id": "cover", "component": "Image", "url": { "path": "/song/coverUrl" }, "fit": "cover", "aspectRatio": "1:1", "style": { "borderRadius": "14px" } },
-    { "id": "infoRow", "component": "Row", "children": ["songText", "favBtn"], "alignment": "center", "distribution": "spaceBetween" },
-    { "id": "songText", "component": "Column", "children": ["songTitle", "artist"], "gap": "4px" },
-    { "id": "songTitle", "component": "Text", "text": { "path": "/song/title" }, "usageHint": "h4", "maxLines": 1 },
-    { "id": "artist", "component": "Text", "text": { "path": "/song/artist" }, "usageHint": "caption", "tone": "neutral" },
-    { "id": "favIcon", "component": "Icon", "name": { "script": { "code": "return dataModel.get('/player/isFavorite') ? 'favorite' : 'favorite_border';", "deps": ["/player/isFavorite"], "fallback": "favorite_border" } }, "tone": "danger" },
-    { "id": "favBtn", "component": "Button", "child": "favIcon", "variant": "ghost", "preset": "buttonIcon", "action": { "script": { "code": "const next = !Boolean(dataModel.get('/player/isFavorite')); dataModel.set('/player/isFavorite', next); actions.emit('favoriteChanged', { isFavorite: next });", "deps": ["/player/isFavorite"] } } },
-    { "id": "progress", "component": "Slider", "min": 0, "max": 100, "step": 1, "value": { "path": "/player/progress" }, "showValue": false },
-    { "id": "controlRow", "component": "Row", "children": ["prevBtn", "playBtn", "nextBtn"], "alignment": "center", "distribution": "spaceEvenly" },
-    { "id": "playIcon", "component": "Icon", "name": { "script": { "code": "return dataModel.get('/player/isPlaying') ? 'pause' : 'play_arrow';", "deps": ["/player/isPlaying"], "fallback": "play_arrow" } }, "size": "lg" },
-    { "id": "playBtn", "component": "Button", "child": "playIcon", "variant": "primary", "size": "lg", "preset": "buttonIcon", "action": { "script": { "code": "const next = !Boolean(dataModel.get('/player/isPlaying')); dataModel.set('/player/isPlaying', next); actions.emit('playToggled', { isPlaying: next });", "deps": ["/player/isPlaying"] } } }
-  ]
-}
+## 6. 最小硬性规则
 
-### 10.3 商品卡片：图片 + 价格指标 + 操作按钮
-
-商品、活动、文章卡片应至少包含媒体、标题、摘要、价格/状态和操作区；不要只输出标题和按钮。
-
-{
-  "components": [
-    { "id": "root", "component": "Card", "child": "productBody", "variant": "elevated", "style": { "maxWidth": "380px", "padding": "14px", "borderRadius": "16px", "shadow": "md" } },
-    { "id": "productBody", "component": "Column", "children": ["productImage", "productTitle", "productDesc", "buyRow"], "gap": "10px" },
-    { "id": "productImage", "component": "Image", "url": "https://picsum.photos/420/260?text=Product", "fit": "cover", "aspectRatio": "16:9", "style": { "borderRadius": "12px" } },
-    { "id": "productTitle", "component": "Text", "text": "轻量机械键盘", "usageHint": "h4", "maxLines": 1 },
-    { "id": "productDesc", "component": "Text", "text": "适合编程与移动办公，低噪轴体，续航 30 天。", "usageHint": "caption", "tone": "neutral", "maxLines": 2 },
-    { "id": "buyRow", "component": "Row", "children": ["price", "buyButton"], "alignment": "center", "distribution": "spaceBetween" },
-    { "id": "price", "component": "Text", "text": "¥399", "variant": "metric", "tone": "brand" },
-    { "id": "buyButtonText", "component": "Text", "text": "加入购物车" },
-    { "id": "buyButton", "component": "Button", "child": "buyButtonText", "variant": "primary", "action": { "event": { "name": "addToCart", "context": { "sku": "keyboard-lite" } } } }
-  ]
-}
-
-### 10.4 个人资料卡：头像 + 身份信息 + 状态标签
-
-{
-  "components": [
-    { "id": "root", "component": "Card", "child": "profileRow", "variant": "outlined", "style": { "padding": "16px", "borderRadius": "16px", "maxWidth": "420px" } },
-    { "id": "profileRow", "component": "Row", "children": ["avatar", "profileText", "statusBadge"], "gap": "12px", "alignment": "center" },
-    { "id": "avatar", "component": "Image", "url": "https://picsum.photos/96/96?text=U", "preset": "avatar", "style": { "width": "56px", "height": "56px" } },
-    { "id": "profileText", "component": "Column", "children": ["name", "role"], "gap": "4px" },
-    { "id": "name", "component": "Text", "text": "陈小北", "usageHint": "h4" },
-    { "id": "role", "component": "Text", "text": "前端工程师 · 上海", "usageHint": "caption", "tone": "neutral" },
-    { "id": "statusBadge", "component": "Text", "text": "在线", "usageHint": "caption", "tone": "success", "style": { "padding": "4px 8px", "borderRadius": "999px", "backgroundColor": "#ECFDF3" } }
-  ]
-}
-
-### 10.5 数据看板：指标卡片 + 派生状态
-
-{
-  "dataModel": { "metrics": { "conversion": 0.183, "orders": 1284, "risk": 2 } },
-  "components": [
-    { "id": "root", "component": "Column", "children": ["dashboardTitle", "metricRow"], "gap": "16px", "style": { "padding": "24px" } },
-    { "id": "dashboardTitle", "component": "Text", "text": "今日经营概览", "usageHint": "h2" },
-    { "id": "metricRow", "component": "Row", "children": ["conversionCard", "ordersCard", "riskCard"], "gap": "14px", "wrap": true, "alignment": "stretch" },
-    { "id": "conversionCard", "component": "Card", "child": "conversionBody", "variant": "filled", "style": { "padding": "16px", "borderRadius": "14px" } },
-    { "id": "conversionBody", "component": "Column", "children": ["conversionLabel", "conversionValue", "conversionHint"], "gap": "6px" },
-    { "id": "conversionLabel", "component": "Text", "text": "转化率", "usageHint": "caption", "tone": "neutral" },
-    { "id": "conversionValue", "component": "Text", "text": { "script": { "code": "return `${Math.round(Number(dataModel.get('/metrics/conversion') ?? 0) * 1000) / 10}%`;", "deps": ["/metrics/conversion"], "fallback": "0%" } }, "variant": "metric", "tone": "brand" },
-    { "id": "conversionHint", "component": "Text", "text": { "script": { "code": "return Number(dataModel.get('/metrics/conversion') ?? 0) >= 0.18 ? '表现良好' : '需要关注';", "deps": ["/metrics/conversion"], "fallback": "暂无状态" } }, "usageHint": "caption", "tone": "neutral" }
-  ]
-}
-
-## 11. 常见错误与禁止写法
-
-- Row/Column 的 children 只能写组件 id 字符串数组，不要写完整组件对象。
-- Card 使用单个 child 字段，不要写 children；如果卡片内有多个内容，先创建一个 Column，再让 Card.child 指向这个 Column。
-- Button.action 必须是 { "event": { "name": "...", "context": { ... } } }，不要写成字符串或旧版扁平 { "name": "..." }。
-- 不要生成 action.functionCall；它是未来能力，当前 Renderer 不执行。
-- 禁止生成 table、div、input、select、Schedule、Calendar 等 Catalog 外组件。
-- 禁止使用 className、css、html、innerHTML、onClick、onInput、onChange 等非 Catalog 字段；script 只能出现在属性脚本包装对象或 Button.action.script 中。
-- style 只能使用受控白名单字段；复杂视觉效果优先使用 variant、size、tone、preset。
-- 禁止把 JSRuntime 当作浏览器脚本环境使用，不要访问 DOM、window、document、fetch、网络或外部 API。
+- 最终 a2uiMessages 只能包含 A2UI v0.9 server-to-client 消息。
+- 新 UI 必须按 createSurface -> updateDataModel（如需要）-> updateComponents 的顺序输出。
+- createSurface.catalogId 使用 https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json，surfaceId 固定使用 "main"。
+- 每个组件对象必须包含 id 和 component；必须存在 id 为 root 的根组件。
+- A2UI 使用邻接表：child/children/tabItems.child 只能引用组件 id 字符串，不要嵌套组件对象。
+- 动态数据使用 JSON Pointer：{ "path": "/some/data/path" }；重复内容优先使用 dataModel 数组 + List 模板。
+- Button.action 只能使用 action.event 或 action.script；需要本地状态写回时才使用 action.script。
+- 受限 JSRuntime 不是浏览器 JavaScript，不能访问 DOM、window、document、fetch、网络、定时器、import、async/await、eval 或外部 API。
+- 禁止生成任意 HTML、CSS、className、innerHTML、onClick/onChange 等浏览器字段。
+- 正式提交前必须通过 validateA2UI；不要绕过校验或提交未校验草稿。
 
 ## References
 
-- [Basic Catalog 高质量组合模式](./references/basic-catalog-quality-patterns.md)：用于避免生成过于简陋的 Card/Row/Text 平铺结构，说明常见 UI 的组件组织方式。
-- [JSRuntime 使用模式](./references/jsruntime-usage-patterns.md)：说明什么时候应该使用受限 JSRuntime，以及属性脚本和按钮脚本的边界。
-- [A2UI 消息生成检查清单](./references/a2ui-message-checklist.md)：输出 A2UI 消息前的结构、绑定、交互和安全检查项。
+- [A2UI 标准生成规则](./references/a2ui-generation-standards.md)：生成 UI 前必须请求；包含符合 Renderer 的完整消息结构、组件树、dataModel、List、表单、事件、JSRuntime、安全边界、bad case 和输出检查。
+- [高质量 A2UI Good Case](./references/high-quality-a2ui-good-cases.md)：复杂 UI 或需要质量标杆时请求；包含来自 renderer-capability-demo 的 Music Player、Finance Brief、Work Board 三个完整 good case，并说明为什么好。

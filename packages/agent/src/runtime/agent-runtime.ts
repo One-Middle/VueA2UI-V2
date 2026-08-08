@@ -40,6 +40,11 @@ const MAX_ATTEMPTS = 3;
 /** 渐进式信息披露的最大轮数 */
 const MAX_DISCLOSURE_ROUNDS = 3;
 
+/**
+ * Agent 运行时实现。
+ *
+ * 负责串联上下文构建、Prompt 生成、模型调用、渐进式信息披露、A2UI 校验和失败修复。
+ */
 export class AgentRuntime implements IAgentRuntime {
   private modelClient: ModelClient;
   private promptComposer: PromptComposer;
@@ -284,7 +289,21 @@ export class AgentRuntime implements IAgentRuntime {
 
   /**
    * 执行带渐进式信息披露的初始生成流程。
+   *
    * 模型可按需请求 Skill 内容或组件详情，Runtime 披露后进入下一轮生成。
+   * 达到披露轮数上限后会强制要求模型输出最终结果，避免一直停留在请求信息阶段。
+   *
+   * @param context - 当前 Agent 运行上下文，包含用户输入、已启用 Skill 与组件目录信息。
+   * @param attempt - 外层生成/修复尝试序号，用于日志与工具调用记录。
+   * @param disclosedComponents - 已披露组件集合，用于避免重复注入组件详情。
+   * @param disclosedSkills - 已披露 Skill 集合，用于避免重复注入 Skill 正文。
+   * @param disclosedSkillReferences - 已披露 Skill Reference 集合，用于避免重复注入参考资料。
+   * @param initialComponentDetails - 进入本流程前已累积的组件详情文本。
+   * @param initialSkillDetails - 进入本流程前已累积的 Skill 正文文本。
+   * @param initialSkillReferenceDetails - 进入本流程前已累积的 Skill Reference 文本。
+   * @param addUsage - Token 用量累加回调。
+   * @param onToolCall - 工具调用记录回调。
+   * @returns 最后一轮模型响应，以及本轮累积后的披露文本。
    */
   private async generateWithProgressiveDisclosure(
     context: AgentContext,
@@ -422,7 +441,17 @@ export class AgentRuntime implements IAgentRuntime {
     };
   }
 
-  /** 按需披露 Skill 完整内容。 */
+  /**
+   * 按需披露 Skill 完整内容。
+   *
+   * 会按 Skill id 或 name 匹配启用列表，并把本次新增披露内容格式化为可追加到 Prompt 的反馈文本。
+   *
+   * @param context - 当前 Agent 运行上下文。
+   * @param skills - 模型请求披露的 Skill id 或 name 列表。
+   * @param disclosedSkills - 已披露 Skill id 集合，调用成功后由外层更新。
+   * @param reason - 模型说明的请求原因，用于工具调用记录。
+   * @returns 披露结果、反馈文本和可延迟生成的工具调用记录。
+   */
   private discloseSkills(
     context: AgentContext,
     skills: string[],
@@ -522,7 +551,18 @@ export class AgentRuntime implements IAgentRuntime {
     };
   }
 
-  /** 按需披露 Skill Reference 完整内容。 */
+  /**
+   * 按需披露 Skill Reference 完整内容。
+   *
+   * 支持按 Skill id 或 name 定位 Skill，并按 Reference id、title 或 "*" 匹配参考资料。
+   *
+   * @param context - 当前 Agent 运行上下文。
+   * @param skillIdOrName - 模型请求的 Skill id 或 name。
+   * @param references - 模型请求披露的 Reference id、title 或 "*"。
+   * @param disclosedSkillReferences - 已披露 Reference 集合，键格式为 "skillId:referenceId"。
+   * @param reason - 模型说明的请求原因，用于工具调用记录。
+   * @returns 披露结果、反馈文本和可延迟生成的工具调用记录。
+   */
   private discloseSkillReferences(
     context: AgentContext,
     skillIdOrName: string,
@@ -666,7 +706,15 @@ export class AgentRuntime implements IAgentRuntime {
     };
   }
 
-  /** 按需披露 Basic Catalog 组件详情。 */
+  /**
+   * 按需披露 Basic Catalog 组件详情。
+   *
+   * 会先过滤已披露或不存在的组件，只把本次新增组件详情注入后续 Prompt。
+   *
+   * @param components - 模型请求披露的组件名称列表。
+   * @param disclosedComponents - 已披露组件名称集合，调用成功后由外层更新。
+   * @returns 披露结果、反馈文本和可延迟生成的工具调用记录。
+   */
   private discloseComponents(
     components: string[],
     disclosedComponents: Set<string>,

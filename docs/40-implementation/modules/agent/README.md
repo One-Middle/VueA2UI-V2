@@ -110,7 +110,7 @@ packages/agent/src/
 ## 7. 核心流程
 
 1. 后端调用 `createAgentRuntime(config).run(input, onToolCall)`。
-2. `AgentContextBuilder` 生成上下文，并注入运行时默认启用的 `builtin:a2ui-v0.9-generation`。
+2. `AgentContextBuilder` 根据后端传入的 `AgentRunInput.enabledSkills` 生成上下文；平台默认 Skill 由后端 Skill Resolver 放入输入。
 3. `PromptComposer` 生成初始 prompt，只放入摘要信息，不直接塞满所有组件和 Skill 正文。
 4. `AgentRuntime` 调用模型；模型可先请求组件详情、Skill 内容或 Skill Reference。
 5. Runtime 最多进行 3 轮渐进式披露，工具调用结果通过 `onToolCall` 回传给后端记录。
@@ -126,6 +126,11 @@ packages/agent/src/
 - 模型需要组件字段详情时输出 `componentInfoRequest`，Runtime 从 Basic Catalog 中匹配并注入详情。
 - 已披露过的 Skill、Reference 或组件不会重复注入。
 - 达到披露轮次上限后，Runtime 会强制要求模型输出最终 `{ assistantMessage, a2uiMessages }`。
+
+`builtin:a2ui-v0.9-generation` 的平台 Reference 当前采用两段式结构：
+
+- `a2ui-generation-standards`：生成 UI 前必须请求，包含符合 Renderer 的 A2UI 消息结构、组件树、dataModel、交互、JSRuntime、安全边界、bad case 和输出检查。
+- `high-quality-a2ui-good-cases`：复杂 UI 或需要质量标杆时请求，包含来自 Renderer 能力 demo 的 Music Player、Finance Brief 和 Work Board 三个完整 good case。
 
 ## 9. 测试与验收
 

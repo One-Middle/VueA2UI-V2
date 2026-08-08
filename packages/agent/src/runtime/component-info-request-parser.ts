@@ -1,3 +1,24 @@
+/**
+ * 组件详情请求解析器。
+ *
+ * 职责：
+ * - 从模型 JSON 输出中解析 componentInfoRequest。
+ * - 校验请求中的组件名称列表。
+ * - 保留模型给出的 assistantMessage 与可选 reason，供 Runtime 记录上下文。
+ *
+ * 引用：
+ * - 无外部运行时依赖。
+ * 被引用：
+ * - AgentRuntime 的渐进式信息披露流程。
+ * 注意：
+ * - 本文件只负责解析和基础字段校验，不负责判断组件是否存在于 Basic Catalog。
+ */
+
+/**
+ * 组件详情请求解析结果。
+ *
+ * 注意：失败结果用于表示“当前模型输出不是有效组件详情请求”，不一定代表 Agent 运行失败。
+ */
 export type ComponentInfoRequestParseResult =
   | {
       ok: true;
@@ -12,6 +33,12 @@ export type ComponentInfoRequestParseResult =
       error: string;
     };
 
+/**
+ * 解析模型输出中的 componentInfoRequest。
+ *
+ * @param raw - 模型返回的原始文本，允许带 Markdown JSON 代码块。
+ * @returns 成功时返回去空白后的组件名称列表；失败时返回解析或字段校验错误。
+ */
 export function parseComponentInfoRequest(
   raw: string,
 ): ComponentInfoRequestParseResult {
@@ -62,6 +89,14 @@ export function parseComponentInfoRequest(
   };
 }
 
+/**
+ * 将模型文本宽松解析为 JSON 对象。
+ *
+ * 注意：为了兼容模型输出，会尝试剥离 Markdown 代码块并截取首尾花括号之间的内容。
+ *
+ * @param raw - 待解析的模型原始文本。
+ * @returns JSON 对象或解析错误。
+ */
 function parseJsonObject(
   raw: string,
 ): { ok: true; value: Record<string, unknown> } | { ok: false; error: string } {

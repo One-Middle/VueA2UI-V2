@@ -209,7 +209,12 @@ Agent 只能输出：
 }
 ```
 
-Agent 的身份 Prompt 只注入工作流、输出通道和安全边界；A2UI 生成规则通过 `builtin:a2ui-v0.9-generation` 基础 Skill 渐进披露。该 Skill 始终由 Runtime 内建可用，但最终提交仍必须通过 `validateA2UI`。
+Agent 的身份 Prompt 只注入工作流、输出通道和安全边界；A2UI 生成规则通过 `builtin:a2ui-v0.9-generation` 基础 Skill 渐进披露。该 Skill 由后端 Skill Resolver 放入 `AgentRunInput.enabledSkills` 后供 Runtime 消费，最终提交仍必须通过 `validateA2UI`。
+
+`builtin:a2ui-v0.9-generation` 的 Reference 是 A2UI 生成约束的一部分：
+
+- `a2ui-generation-standards`：生成 UI 前必须请求，定义符合 Renderer 的消息结构、组件树、dataModel、交互脚本、安全边界、bad case 和输出检查。
+- `high-quality-a2ui-good-cases`：复杂 UI 或需要质量标杆时请求，提供 Music Player、Finance Brief 和 Work Board 三个完整 good case。
 
 禁止：
 
