@@ -1,40 +1,39 @@
-# Issue tracker: CYZ Local Markdown
+# Issue tracker：CYZ 本地 Markdown
 
-Issues and specs for this repo live as Markdown files in `docs/matt_docs/scratch/`.
+本仓库的 issues 和 specs 以 Markdown 文件形式存放在 `docs/matt_docs/scratch/`。
 
-This is the Matt local markdown tracker with only the root path changed:
+这是 Matt 本地 Markdown tracker，只改变了根路径：
 
 ```text
 .scratch/ -> docs/matt_docs/scratch/
 ```
 
-## Conventions
+## 约定
 
-- One feature per directory: `docs/matt_docs/scratch/<feature-slug>/`.
-- The spec is `docs/matt_docs/scratch/<feature-slug>/spec.md`.
-- Implementation issues are one file per ticket at `docs/matt_docs/scratch/<feature-slug>/issues/<NN>-<slug>.md`, numbered from `01`.
-- Never publish a single combined tickets file.
-- Triage state is recorded as a `Status:` line near the top of each issue file.
-- Comments and conversation history append to the bottom of the file under a `## Comments` heading.
+- 每个 feature 一个目录：`docs/matt_docs/scratch/<feature-slug>/`。
+- Spec 文件为 `docs/matt_docs/scratch/<feature-slug>/spec.md`。
+- Implementation issues 每个 ticket 一个文件：`docs/matt_docs/scratch/<feature-slug>/issues/<NN>-<slug>.md`，从 `01` 开始编号。
+- 不要发布单一合并版 tickets 文件。
+- Triage 状态记录在每个 issue 文件顶部附近的 `Status:` 行。
+- 评论和对话历史追加到文件底部的 `## Comments` 标题下。
 
-## When a skill says "publish to the issue tracker"
+## 当 skill 说“publish to the issue tracker”
 
-Create a new file under `docs/matt_docs/scratch/<feature-slug>/`, creating the directory if needed.
+在 `docs/matt_docs/scratch/<feature-slug>/` 下创建新文件；目录不存在时创建目录。
 
-## When a skill says "fetch the relevant ticket"
+## 当 skill 说“fetch the relevant ticket”
 
-Read the file at the referenced path. The user will normally pass the path or the issue number directly.
+读取被引用路径的文件。用户通常会直接传路径或 issue 编号。
 
-## Wayfinding operations
+## Wayfinding 操作
 
-Used by a future CYZ fork of `/wayfinder`. The map is a file with one child file per ticket.
+供未来 CYZ fork 的 `/wayfinder` 使用。Map 是一个文件，每个 child ticket 是一个独立文件。
 
-- **Map**: `docs/matt_docs/scratch/<effort>/map.md` - the Notes / Decisions-so-far / Fog body.
-- **Child ticket**: `docs/matt_docs/scratch/<effort>/issues/NN-<slug>.md`, numbered from `01`, with the question in the body.
-- **Type**: a `Type:` line records `research`, `prototype`, `grilling`, or `task`.
-- **Status**: a `Status:` line records `claimed` or `resolved`.
-- **Blocking**: a `Blocked by: NN, NN` line near the top.
-- **Frontier**: scan `docs/matt_docs/scratch/<effort>/issues/` for files that are open, unblocked, and unclaimed; first by number wins.
-- **Claim**: set `Status: claimed` and save before any work.
-- **Resolve**: append the answer under an `## Answer` heading, set `Status: resolved`, then append a context pointer to `map.md`.
-
+- **Map**: `docs/matt_docs/scratch/<effort>/map.md`，正文包含 Notes / Decisions-so-far / Fog。
+- **Child ticket**: `docs/matt_docs/scratch/<effort>/issues/NN-<slug>.md`，从 `01` 编号，正文写问题。
+- **Type**: 用 `Type:` 行记录 `research`、`prototype`、`grilling` 或 `task`。
+- **Status**: 用 `Status:` 行记录 `claimed` 或 `resolved`。
+- **Blocking**: 在顶部附近用 `Blocked by: NN, NN` 记录依赖。
+- **Frontier**: 扫描 `docs/matt_docs/scratch/<effort>/issues/`，寻找 open、unblocked、unclaimed 的文件；编号最小者优先。
+- **Claim**: 开始工作前，把 `Status:` 设置为 `claimed` 并保存。
+- **Resolve**: 在 `## Answer` 标题下追加答案，把 `Status:` 设置为 `resolved`，再向 `map.md` 追加 context pointer。

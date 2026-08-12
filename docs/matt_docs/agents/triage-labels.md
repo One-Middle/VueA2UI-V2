@@ -1,16 +1,15 @@
-# Triage Labels
+# Triage Labels（分流标签）
 
-The CYZ Matt skills speak in terms of five canonical triage roles. This file maps those roles to the actual label strings used in this repo's local markdown tracker.
+CYZ Matt skills 使用五个规范 triage roles。本文件把这些 role 映射到本仓库本地 Markdown tracker 中实际使用的 label 字符串。
 
-| Label in Matt skills | Label in our tracker | Meaning |
+| Matt skills 中的 Label | 本 tracker 中的 Label | 含义 |
 | --- | --- | --- |
-| `needs-triage` | `needs-triage` | Maintainer needs to evaluate this issue |
-| `needs-info` | `needs-info` | Waiting on the reporter or maintainer for more information |
-| `ready-for-agent` | `ready-for-agent` | Fully specified, ready for an agent |
-| `ready-for-human` | `ready-for-human` | Requires human implementation or decision |
-| `wontfix` | `wontfix` | Will not be actioned |
+| `needs-triage` | `needs-triage` | Maintainer 需要评估这个 issue |
+| `needs-info` | `needs-info` | 等待 reporter 或 maintainer 提供更多信息 |
+| `ready-for-agent` | `ready-for-agent` | 已充分说明，可以交给 agent 执行 |
+| `ready-for-human` | `ready-for-human` | 需要人类实现或决策 |
+| `wontfix` | `wontfix` | 不会处理 |
 
-When a skill mentions a role, use the corresponding label string from this table.
+当 skill 提到某个 role 时，使用表中对应的 label 字符串。
 
-Edit the right-hand column only if this repo intentionally changes label vocabulary.
-
+只有当本仓库明确改变 label 词汇时，才编辑右侧列。

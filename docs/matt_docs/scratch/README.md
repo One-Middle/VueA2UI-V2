@@ -1,12 +1,12 @@
 # Scratch
 
-This directory is the CYZ path-mapped version of Matt's local markdown tracker.
+本目录是 Matt 本地 Markdown tracker 在 CYZ 路径下的映射版本。
 
 ```text
 .scratch/<feature-slug>/ -> docs/matt_docs/scratch/<feature-slug>/
 ```
 
-## Layout
+## 布局
 
 ```text
 scratch/
@@ -17,11 +17,10 @@ scratch/
       02-<slug>.md
 ```
 
-## Rules
+## 规则
 
-- One feature per directory.
-- `spec.md` stores the `cyz-to-spec` output.
-- `issues/` stores the `cyz-to-tickets` output.
-- Tickets must be numbered in blocker-first order.
-- Do not duplicate product, contract, design, or implementation truth here; link to the relevant docs instead.
-
+- 每个 feature 一个目录。
+- `spec.md` 保存 `cyz-to-spec` 的输出。
+- `issues/` 保存 `cyz-to-tickets` 的输出。
+- Tickets 必须按阻塞优先顺序编号。
+- 不要在这里复制产品、契约、设计或实现事实；链接到相关 docs 即可。
