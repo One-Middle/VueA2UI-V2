@@ -1,3 +1,22 @@
+/**
+ * Skill 业务服务。
+ *
+ * 职责：
+ * - Skill 的 CRUD（创建、列表、更新）
+ * - Session 级 Skill 启用/禁用管理
+ * - 内置 Skill（builtin）的自动同步（由 sync-builtin-skills 脚本调用）
+ * - Skill metadata 中的 references 格式化和安全提取
+ *
+ * 引用：
+ * - skill / sessionSkill 两个 repository
+ * - utils/errors / utils/pagination
+ * 被引用：
+ * - skills 路由、sync-builtin-skills 脚本
+ * 注意：
+ * - builtin Skill 按 name + sourceType="builtin" 匹配后 upsert，避免重复创建
+ * - references 存储在 metadata JSON 字段中，提取时做类型守卫校验
+ */
+
 import type {
   JsonObject,
   SkillDto,
@@ -11,6 +30,12 @@ import { sessionSkillRepository } from "../repositories/session-skill.repository
 import { notFound } from "../utils/errors.js";
 import { parsePagination, buildPageResult } from "../utils/pagination.js";
 
+/**
+ * 将 Prisma Skill 实体转换为 SkillDto。
+ *
+ * @param s - Prisma 查询返回的 Skill 实体（可能为 null）
+ * @returns 转换后的 DTO，实体不存在时返回 null
+ */
 function toSkillDto(s: Awaited<ReturnType<typeof skillRepository.findById>>): SkillDto | null {
   if (!s) return null;
   return {
@@ -27,6 +52,15 @@ function toSkillDto(s: Awaited<ReturnType<typeof skillRepository.findById>>): Sk
   };
 }
 
+/**
+ * 从 Skill 的 metadata JSON 字段中安全提取并校验 references 列表。
+ *
+ * 对每个 reference 做严格的类型守卫：必须包含非空字符串的 id、title、content 字段。
+ * 使用 Array.isArray + filter 类型谓词，过滤掉不符合格式的条目。
+ *
+ * @param metadata - Skill.metadata 原始 JSON 字段
+ * @returns 校验通过的 SkillReference 列表
+ */
 function normalizeSkillReferences(metadata: unknown): SkillReference[] {
   if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
     return [];
@@ -56,6 +90,12 @@ function normalizeSkillReferences(metadata: unknown): SkillReference[] {
     }));
 }
 
+/**
+ * 将 SkillReference 列表序列化为 metadata JSON 格式。
+ *
+ * @param references - Skill 引用资料列表
+ * @returns 包含 references 数组的 JSON 对象
+ */
 function buildSkillMetadata(references?: SkillReference[]): JsonObject {
   return {
     references: (references ?? []).map((ref) => ({
@@ -67,6 +107,16 @@ function buildSkillMetadata(references?: SkillReference[]): JsonObject {
   };
 }
 
+/**
+ * 将新的 references 合并到现有 metadata 中。
+ *
+ * 保留原 metadata 中的其他字段（如 platformSkillSource），仅覆盖 references 部分。
+ * 用于更新 Skill 时避免覆盖非 references 相关的元数据。
+ *
+ * @param metadata - 现有的 Skill.metadata JSON 字段
+ * @param references - 要替换的 SkillReference 列表
+ * @returns 合并后的 JSON 对象
+ */
 function mergeSkillReferencesMetadata(
   metadata: unknown,
   references: SkillReference[],

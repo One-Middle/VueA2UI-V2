@@ -100,6 +100,8 @@ export const exportService = {
         id: m.id,
         sessionId: m.sessionId,
         agentRunId: m.agentRunId,
+        workflowId: m.workflowId,
+        workflowStepId: m.workflowStepId,
         role: m.role as "user" | "assistant" | "system" | "tool",
         kind: m.kind as "chat",
         content: m.content,
@@ -128,6 +130,8 @@ export const exportService = {
       agentRuns: agentRuns.map((r) => ({
         id: r.id,
         sessionId: r.sessionId,
+        workflowId: r.workflowId,
+        workflowStepId: r.workflowStepId,
         triggerMessageId: r.triggerMessageId,
         status: r.status as "pending" | "running" | "committed" | "failed" | "cancelled",
         intent: r.intent,
@@ -213,6 +217,15 @@ export const exportService = {
   },
 };
 
+/**
+ * 从 Skill metadata 中安全提取并校验 references 列表。
+ *
+ * 执行严格的类型守卫：每个 reference 必须为非空对象，且 id、title、content 均为非空字符串。
+ * 过滤掉不符合格式的条目，确保导出的数据结构完整。
+ *
+ * @param metadata - Skill.metadata 原始 JSON 字段
+ * @returns 校验通过的 references 列表
+ */
 function extractSkillReferences(metadata: unknown): ExportSessionDto["skills"][number]["references"] {
   if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
     return [];

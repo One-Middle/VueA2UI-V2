@@ -1,3 +1,23 @@
+/**
+ * Agent Run 编排服务。
+ *
+ * 职责：
+ * - 接收用户消息后启动 Agent Run，调用 Agent Runtime 执行生成/校验循环
+ * - 将 Run 结果（COMMITTED / TEXT_ONLY / FAILED）持久化到数据库并推送 SSE 事件
+ * - 管理 Run 生命周期中的 tool call 记录和流式进度推送
+ * - 提供 Run 列表查询和详情查询
+ *
+ * 引用：
+ * - agent-run / a2ui-event / message / file / surface-snapshot / tool-call 各 repository
+ * - snapshot.service / skill-resolver.service / stream.service
+ * - @a2ui-platform/agent（createAgentRuntime）
+ * 被引用：
+ * - message.service（sendMessage 触发 Run）、routes/agent-runs（HTTP 路由）
+ * 注意：
+ * - commitRun 必须在 Prisma 事务中执行，确保 a2uiEvent → snapshot → session 更新的原子性
+ * - executeRun 使用 setImmediate 异步执行，不阻塞消息发送的 HTTP 响应
+ */
+
 import type {
   A2UIEventDto,
   A2UIServerMessage,
@@ -27,13 +47,29 @@ import { snapshotService } from "./snapshot.service.js";
 import { skillResolverService } from "./skill-resolver.service.js";
 import { streamService } from "./stream.service.js";
 
+/**
+ * 截取 ID 前 8 位用于日志展示，避免完整 UUID 占满日志宽度。
+ *
+ * @param id - 完整实体 ID（UUID）
+ * @returns 前 8 位字符
+ */
 const SID = (id: string) => id.slice(0, 8);
 
+/**
+ * 将 Prisma AgentRun 实体转换为 AgentRunDto。
+ *
+ * 注意：所有 Date 字段转换为 ISO 8601 字符串，枚举字段通过类型断言保持与 DTO 一致。
+ *
+ * @param r - Prisma 查询返回的 AgentRun 实体（可能为 null）
+ * @returns 转换后的 DTO，实体不存在时返回 null
+ */
 function toAgentRunDto(r: Awaited<ReturnType<typeof agentRunRepository.findById>>): AgentRunDto | null {
   if (!r) return null;
   return {
     id: r.id,
     sessionId: r.sessionId,
+    workflowId: r.workflowId,
+    workflowStepId: r.workflowStepId,
     triggerMessageId: r.triggerMessageId,
     status: r.status as AgentRunDto["status"],
     intent: r.intent,
@@ -53,11 +89,24 @@ function toAgentRunDto(r: Awaited<ReturnType<typeof agentRunRepository.findById>
   };
 }
 
+/**
+ * 将未知错误标准化为可读的错误消息字符串。
+ *
+ * @param err - catch 块捕获的未知错误
+ * @returns 标准化后的错误文字描述
+ */
 function toAgentRunError(err: unknown): string {
   if (err instanceof Error) return err.message;
   return String(err);
 }
 
+/**
+ * 通过工厂函数创建 Agent Runtime 实例。
+ *
+ * 各连接参数从 config.openai 读取，与具体模型客户端解耦。
+ *
+ * @returns 已创建的 IAgentRuntime 实例
+ */
 function buildAgentRuntime(): IAgentRuntime {
   return createAgentRuntime({
     baseUrl: config.openai.baseUrl,
@@ -69,6 +118,16 @@ function buildAgentRuntime(): IAgentRuntime {
   });
 }
 
+/**
+ * 记录 Agent Runtime 中单次工具调用的执行结果并推送到 SSE。
+ *
+ * 每次工具调用（如 validateA2UI）完成后调用，将记录持久化到 tool_call 表，
+ * 同时通过 SSE 将工具调用进度推送给前端展示。
+ *
+ * @param agentRunId - 当前 Agent Run ID
+ * @param sessionId - 当前会话 ID
+ * @param record - Agent Runtime 回调传入的工具调用记录
+ */
 async function recordRuntimeToolCall(
   agentRunId: string,
   sessionId: string,
@@ -502,6 +561,15 @@ export const agentRunService = {
   },
 };
 
+/**
+ * 从一组 A2UI 服务端消息中提取所有涉及的 surfaceId。
+ *
+ * 遍历 createSurface / updateComponents / updateDataModel / deleteSurface 四类消息，
+ * 通过 Set 去重后返回唯一 surfaceId 列表。
+ *
+ * @param messages - A2UI 服务端消息数组
+ * @returns 去重后的 surfaceId 列表
+ */
 function extractSurfaceIds(messages: A2UIServerMessage[]): string[] {
   const surfaceIds = new Set<string>();
   for (const msg of messages) {
@@ -521,10 +589,20 @@ function extractSurfaceIds(messages: A2UIServerMessage[]): string[] {
   return Array.from(surfaceIds);
 }
 
+/**
+ * 将 Prisma Message 实体（含扩展字段）转换为 MessageDto。
+ *
+ * Date 字段转为 ISO 字符串，枚举字段通过类型断言保持类型安全。
+ *
+ * @param m - Prisma 查询返回的 Message 实体
+ * @returns 转换后的 MessageDto
+ */
 function buildMessageDto(m: {
   id: string;
   sessionId: string;
   agentRunId: string | null;
+  workflowId?: string | null;
+  workflowStepId?: string | null;
   role: string;
   kind: string;
   content: string;
@@ -537,6 +615,8 @@ function buildMessageDto(m: {
     id: m.id,
     sessionId: m.sessionId,
     agentRunId: m.agentRunId,
+    workflowId: m.workflowId ?? null,
+    workflowStepId: m.workflowStepId ?? null,
     role: m.role as MessageDto["role"],
     kind: m.kind as MessageDto["kind"],
     content: m.content,
@@ -547,6 +627,13 @@ function buildMessageDto(m: {
   };
 }
 
+/**
+ * 将 Prisma A2UIEvent 实体转换为 A2UIEventDto。
+ *
+ * @param e - Prisma 查询返回的 A2UIEvent 实体
+ * @param sessionId - 关联的会话 ID（传入但未在 DTO 中重复设置，仅在调用方传入以区分上下文）
+ * @returns 转换后的 A2UIEventDto
+ */
 function buildA2UIEventDto(
   e: {
     id: string;
@@ -582,6 +669,13 @@ function buildA2UIEventDto(
   };
 }
 
+/**
+ * 将 Prisma SurfaceSnapshot 实体转换为 SurfaceSnapshotDto。
+ *
+ * @param s - Prisma 查询返回的 SurfaceSnapshot 实体
+ * @param sessionId - 关联的会话 ID
+ * @returns 转换后的 SurfaceSnapshotDto
+ */
 function buildSnapshotDto(
   s: {
     id: string;
