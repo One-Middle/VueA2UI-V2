@@ -33,7 +33,7 @@ import {
   formatCatalogComponentDetails,
   getComponentDef,
 } from "../tools/catalog-schema.js";
-import { logger, shortId } from "../logger.js";
+import { logger, shortId, truncate } from "../logger.js";
 
 /** 最大生成 + 修复尝试次数 */
 const MAX_ATTEMPTS = 3;
@@ -74,6 +74,9 @@ export class AgentRuntime implements IAgentRuntime {
     const sid = shortId(input.sessionId);
     const context = this.contextBuilder.buildContext(input);
     logger.info(`准备上下文 → session=${sid}, model=${input.model.name}`);
+    logger.info(
+      `用户输入 → session=${sid}, 长度=${input.userMessage.length}\n${input.userMessage}`,
+    );
 
     let lastAssistantMessage = "";
     let lastA2uiMessages: A2UIServerMessage[] = [];
@@ -127,6 +130,9 @@ export class AgentRuntime implements IAgentRuntime {
             { role: "user", content: userPrompt },
           ]);
           addUsage(modelResponse.usage);
+          logger.debug(
+            `模型回复 → attempt=${attempt}/${MAX_ATTEMPTS}, 长度=${modelResponse.content.length}\n${truncate(modelResponse.content, 2000)}`,
+          );
         } else {
           // 初始模式：带渐进式组件披露的生成流程
           const disclosureResult =
@@ -350,6 +356,9 @@ export class AgentRuntime implements IAgentRuntime {
         { role: "user", content: userPrompt },
       ]);
       addUsage(lastResponse.usage);
+      logger.debug(
+        `模型回复 → attempt=${attempt}/${MAX_ATTEMPTS}, round=${round}, 长度=${lastResponse.content.length}\n${truncate(lastResponse.content, 2000)}`,
+      );
 
       if (forceFinalOutput) {
         break;
@@ -383,7 +392,7 @@ export class AgentRuntime implements IAgentRuntime {
         }
         onToolCall?.(result.toolCall(attempt));
         logger.info(
-          `Skill 内容披露 → requested=${result.requestedSkills.length}, disclosed=${result.disclosedSkills.length}, skipped=${result.skippedSkills.length}, already=${result.alreadyDisclosedSkills.length}`,
+          `Skill 内容披露 → disclosed=[${result.disclosedSkills.map((s) => s.name).join(", ")}], skipped=[${result.skippedSkills.join(", ")}]`,
         );
       }
 
@@ -405,7 +414,7 @@ export class AgentRuntime implements IAgentRuntime {
         }
         onToolCall?.(result.toolCall(attempt));
         logger.info(
-          `Skill Reference 内容披露 → requested=${result.requestedReferences.length}, disclosed=${result.disclosedReferences.length}, skipped=${result.skippedReferences.length}, already=${result.alreadyDisclosedReferences.length}`,
+          `Skill Reference 内容披露 → disclosed=[${result.disclosedReferences.map((r) => `${r.skillName}/${r.title}`).join(", ")}], skipped=[${result.skippedReferences.join(", ")}]`,
         );
       }
 
@@ -424,7 +433,7 @@ export class AgentRuntime implements IAgentRuntime {
         }
         onToolCall?.(result.toolCall(attempt));
         logger.info(
-          `组件详情披露 → requested=${result.requestedComponents.length}, disclosed=${result.disclosedComponents.length}, skipped=${result.skippedComponents.length}, already=${result.alreadyDisclosedComponents.length}`,
+          `组件详情披露 → disclosed=[${result.disclosedComponents.join(", ")}], skipped=[${result.skippedComponents.join(", ")}]`,
         );
       }
     }

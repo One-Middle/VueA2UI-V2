@@ -72,3 +72,15 @@ export const logger: Logger = {
 };
 
 export { shortId };
+
+/**
+ * 截断长文本到指定长度，超长时在末尾追加截断标记。
+ *
+ * @param text - 原始文本
+ * @param maxLen - 最大保留字符数
+ * @returns 截断后的文本；未超长时原样返回
+ */
+export function truncate(text: string, maxLen: number): string {
+  if (text.length <= maxLen) return text;
+  return `${text.slice(0, maxLen)}…（截断，原长 ${text.length}）`;
+}
