@@ -28,6 +28,7 @@ model Session {
   messages          Message[]
   uploadedFiles     UploadedFile[]
   skills            SessionSkill[]
+  workflows         AgentWorkflow[]
   agentRuns         AgentRun[]
   a2uiEvents        A2UIEvent[]
   surfaceSnapshots  SurfaceSnapshot[]
@@ -42,6 +43,8 @@ model Message {
   id            String    @id @default(uuid()) @db.Uuid
   sessionId     String    @map("session_id") @db.Uuid
   agentRunId    String?   @map("agent_run_id") @db.Uuid
+  workflowId    String?   @map("workflow_id") @db.Uuid
+  workflowStepId String?  @map("workflow_step_id") @db.Uuid
   role          String
   kind          String    @default("chat")
   content       String    @default("")
@@ -53,9 +56,13 @@ model Message {
   deletedAt     DateTime? @map("deleted_at") @db.Timestamptz
 
   session       Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  workflow      AgentWorkflow? @relation(fields: [workflowId], references: [id], onDelete: SetNull)
+  workflowStep  WorkflowStep?  @relation(fields: [workflowStepId], references: [id], onDelete: SetNull)
 
   @@index([sessionId, createdAt])
   @@index([agentRunId])
+  @@index([workflowId])
+  @@index([workflowStepId])
   @@map("messages")
 }
 
@@ -124,6 +131,8 @@ model SessionSkill {
 model AgentRun {
   id                 String    @id @default(uuid()) @db.Uuid
   sessionId          String    @map("session_id") @db.Uuid
+  workflowId         String?   @map("workflow_id") @db.Uuid
+  workflowStepId     String?   @map("workflow_step_id") @db.Uuid
   triggerMessageId   String?   @map("trigger_message_id") @db.Uuid
   status             String    @default("pending")
   intent             String?
@@ -147,13 +156,102 @@ model AgentRun {
   deletedAt          DateTime? @map("deleted_at") @db.Timestamptz
 
   session            Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  workflow           AgentWorkflow? @relation(fields: [workflowId], references: [id], onDelete: SetNull)
+  workflowStep       WorkflowStep?  @relation(fields: [workflowStepId], references: [id], onDelete: SetNull)
   toolCalls          ToolCall[]
   a2uiEvents         A2UIEvent[]
   snapshots          SurfaceSnapshot[]
 
   @@index([sessionId, createdAt])
+  @@index([workflowId])
+  @@index([workflowStepId])
   @@index([status])
   @@map("agent_runs")
+}
+
+model AgentWorkflow {
+  id                 String    @id @default(uuid()) @db.Uuid
+  sessionId          String    @map("session_id") @db.Uuid
+  status             String    @default("active")
+  currentStepType    String?   @map("current_step_type")
+  title              String?
+  intent             String?
+  completedReason    String?   @map("completed_reason")
+  failureReason      String?   @map("failure_reason")
+  metadata           Json      @default("{}")
+  startedAt          DateTime? @map("started_at") @db.Timestamptz
+  completedAt        DateTime? @map("completed_at") @db.Timestamptz
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt          DateTime? @map("deleted_at") @db.Timestamptz
+
+  session            Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  steps              WorkflowStep[]
+  artifacts          WorkflowArtifact[]
+  agentRuns          AgentRun[]
+  messages           Message[]
+
+  @@index([sessionId, createdAt])
+  @@index([sessionId, status])
+  @@index([status])
+  @@map("agent_workflows")
+}
+
+model WorkflowStep {
+  id                   String    @id @default(uuid()) @db.Uuid
+  workflowId           String    @map("workflow_id") @db.Uuid
+  sessionId            String    @map("session_id") @db.Uuid
+  type                 String
+  status               String    @default("pending")
+  sequence             Int
+  attemptCount         Int       @default(0) @map("attempt_count")
+  maxAttempts          Int       @default(3) @map("max_attempts")
+  failureReason        String?   @map("failure_reason")
+  failureMetadata      Json      @default("{}") @map("failure_metadata")
+  confirmedAt          DateTime? @map("confirmed_at") @db.Timestamptz
+  confirmedByMessageId String?   @map("confirmed_by_message_id") @db.Uuid
+  startedAt            DateTime? @map("started_at") @db.Timestamptz
+  completedAt          DateTime? @map("completed_at") @db.Timestamptz
+  metadata             Json      @default("{}")
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt            DateTime? @map("deleted_at") @db.Timestamptz
+
+  workflow             AgentWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  artifacts            WorkflowArtifact[]
+  agentRuns            AgentRun[]
+  messages             Message[]
+
+  @@unique([workflowId, sequence])
+  @@index([workflowId, status])
+  @@index([sessionId, createdAt])
+  @@index([type])
+  @@map("workflow_steps")
+}
+
+model WorkflowArtifact {
+  id          String    @id @default(uuid()) @db.Uuid
+  workflowId  String    @map("workflow_id") @db.Uuid
+  workflowStepId String? @map("workflow_step_id") @db.Uuid
+  sessionId   String    @map("session_id") @db.Uuid
+  kind        String
+  version     Int       @default(1)
+  contentText String?   @map("content_text")
+  contentJson Json      @default("{}") @map("content_json")
+  createdBy   String    @default("agent") @map("created_by")
+  metadata    Json      @default("{}")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+
+  workflow    AgentWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  workflowStep WorkflowStep? @relation(fields: [workflowStepId], references: [id], onDelete: SetNull)
+
+  @@unique([workflowId, kind, version])
+  @@index([workflowId, kind])
+  @@index([workflowStepId])
+  @@index([sessionId, createdAt])
+  @@map("workflow_artifacts")
 }
 
 model ToolCall {

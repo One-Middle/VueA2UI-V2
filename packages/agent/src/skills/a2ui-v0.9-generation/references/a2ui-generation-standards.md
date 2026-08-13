@@ -65,15 +65,136 @@ description: "生成 UI 前必须请求；包含符合 Renderer 的完整消息�
 - Button.action.script 可以读取和写入 dataModel，但仍然不能访问 DOM、window、document、fetch、网络、定时器、import、async/await、eval、Function、Promise 或外部 API。
 - 不要生成 <script>、javascript:、HTML 字符串、onClick、onInput、onChange、innerHTML、className 或 css 字段。
 
-## 6. 视觉质量标准
+## 6. 语义优先，style 覆盖
 
-- 常见 UI 必须主动使用 Renderer 支持的语义和视觉字段，例如 role、density、variant、preset、intent、importance、shape、size、gap、padding、borderRadius、shadow、emphasis、usageHint、truncate。
-- 重要数值或行情使用 metric/role/status 等语义；次级信息使用 caption/muted；操作区使用 role=actions。
-- 媒体类 UI 要有 Image、标题、说明、进度或状态、主次操作。
-- 业务面板要有明确主题、摘要、指标或列表、筛选/操作、事件回传。
-- 工具类 UI 要有输入、列表状态、局部写回、批量操作和空状态。
+Renderer 有两套方式控制组件视觉，必须区分使用：
 
-## 7. 常见 bad case
+### 6.1 组件顶层语义字段（优先使用）
+
+这些字段直接放在组件对象上，Renderer 根据它们应用预设样式。优先使用语义字段可以保证视觉一致性：
+
+| 字段 | 类型 | 说明 | 常用值 |
+|------|------|------|--------|
+| role | string | 组件语义角色 | default, summary, metric, media, form, interactive, actions, metadata, mediaObject, emptyState |
+| density | string | 内容密度 | compact, comfortable, spacious |
+| variant | string | 视觉变体 | elevated, filled, plain, outline, ghost |
+| preset | string | 复杂样式预设 | media, metric, title, subtitle, body, caption, summary, formPanel |
+| intent | string | 按钮业务意图 | primary, secondary, danger, success, warning |
+| importance | string | 按钮视觉重要程度 | normal, quiet, prominent |
+| shape | string | 形状 | rounded, pill, square, circle |
+| size | string | 尺寸密度 | sm, md, lg |
+| emphasis | string | 文本强调语义 | default, muted, strong, danger, success, warning |
+| usageHint | string | 文本样式提示 | h1, h2, h3, h4, h5, body, caption |
+| truncate | boolean | 是否单行截断 | true, false |
+| tone | string | 语义色调 | neutral, brand, success, warning, danger |
+| icon | string | 按钮图标名称（直接字符串，不是 style） | "plus", "search", "calendar_today" |
+| iconPosition | string | 图标位置 | left, right, only |
+| fullWidth | boolean | 是否撑满父容器宽度 | true, false |
+
+### 6.2 style 对象（精准覆盖）
+
+当语义字段不足以表达需求时，在组件上添加 `"style": { ... }` 对象。**以下字段只能放在 style 对象内，不能放在组件顶层**：
+
+| 字段 | 类型 | 说明 | 示例 |
+|------|------|------|------|
+| width | string | 宽度 | "100%", "200px" |
+| height | string | 高度 | "auto", "48px" |
+| minWidth | string | 最小宽度 | "0", "120px" |
+| maxWidth | string | 最大宽度 | "600px" |
+| minHeight | string | 最小高度 | |
+| maxHeight | string | 最大高度 | |
+| padding | string | 四向内边距 | "16px", "12px 16px" |
+| paddingX | string | 水平内边距（展开为 paddingLeft+paddingRight） | "16px" |
+| paddingY | string | 垂直内边距（展开为 paddingTop+paddingBottom） | "8px" |
+| margin | string | 四向外边距 | "0 auto" |
+| marginX | string | 水平外边距（展开为 marginLeft+marginRight） | |
+| marginY | string | 垂直外边距（展开为 marginTop+marginBottom） | |
+| gap | string | 子元素间距（Column/Row/Grid 也可作顶层字段） | "8px", "14px" |
+| color | string | 文字颜色 | "#ffffff", "#1a1a2e" |
+| backgroundColor | string | 背景颜色 | "#f8fafc", "#0F2A2E" |
+| borderColor | string | 边框颜色 | "#e5e7eb", "#3c2d18" |
+| borderWidth | string | 边框宽度 | "1px", "2px" |
+| borderRadius | string | 圆角 | "8px", "12px", "24px" |
+| fontSize | string | 字号 | "14px", "22px" |
+| fontWeight | number|string | 字重 | "400", "700", "900" |
+| lineHeight | number|string | 行高 | "1.5", "1.7" |
+| textAlign | string | 文字对齐 | "center", "right" |
+| alignSelf | string | 自身交叉轴对齐 | "center" |
+| justifySelf | string | 自身主轴对齐 | |
+| shadow | string | 阴影（映射到 boxShadow），允许值 none|xs|sm|md|lg | "sm", "md" |
+| opacity | number|string | 透明度 | "0.8", "0.5" |
+| overflow | string | 溢出行为 | "hidden" |
+| flex | number|string | 弹性伸缩 | "1", "0" |
+
+### 6.3 常见混淆
+
+**style 子字段，不能放在组件顶层：** padding, borderRadius, shadow, backgroundColor, color, fontWeight, fontSize, lineHeight, borderColor, borderWidth, opacity, overflow, flex, width, height, minWidth, maxWidth, textAlign（gap 在 Column/Row/Grid 上也可作为顶层字段）。
+
+**组件顶层字段，不能放在 style 内：** role, density, variant, preset, intent, importance, shape, size, emphasis, usageHint, truncate, tone, icon, iconPosition, fullWidth, child, children, action。
+
+## 7. style 白名单与视觉设计指南
+
+以下 5 个设计模式覆盖了 90% 的视觉需求。每个模式给出核心 style 字段和参考实例。
+
+### 模式 1：暗色主题卡片
+
+适用场景：媒体播放、金融资讯、夜间模式面板。
+
+核心字段组合：
+- backgroundColor：深色背景（如 #080807, #0F2A2E）
+- color：浅色文字（如 #ffffff, #f8edcf）
+- borderColor：比背景稍亮的边框（如 #2f2415），拉开层次
+- 子元素用 color/fontWeight 微调区分重要性
+
+参考实例：Finance Brief（黑金金融卡）——外围 Card 使用 backgroundColor: "#080807" + color: "#f8edcf" + borderRadius: "24px" + shadow: "lg"，内部 hero 区块用稍亮的 backgroundColor: "#14100a" 做层次。
+
+### 模式 2：圆角 + 阴影层次
+
+适用场景：商品卡、仪表盘、信息流卡片。
+
+核心字段组合：
+- borderRadius：外层主卡片 16-24px（如 "20px", "24px"），内层区块 8-18px，标签 4px 或 999px（pill 形状）
+- shadow：外层卡片用 sm 或 md，内层区块通常不设阴影
+- overflow：配合 borderRadius 做圆角裁剪时设为 "hidden"
+
+参考实例：Live Commerce——外层 liveCard 使用 borderRadius: "20px" + shadow: "md" + overflow: "hidden"，内层标签 liveBadge 使用 borderRadius: "4px"。
+
+### 模式 3：色彩层次
+
+适用场景：卡片式布局、数据看板。
+
+三层配色方法：
+1. 页面/外层背景：浅灰（#f8fafc）或深色（#080807）
+2. 卡片背景：白色（#ffffff）或比外层稍亮的颜色
+3. 强调色点缀：品牌色用于关键指标、主按钮、状态标签，不要滥用
+
+参考实例：Work Board——主卡片白色背景 + sm 阴影；统计区三张指标卡分别用紫色（#f5f3ff）、琥珀色（#fffbeb）、绿色（#f0fdf4）做语义区分；添加按钮用 backgroundColor: "#7c3aed" 品牌色。
+
+### 模式 4：字重节奏
+
+适用场景：任何有信息层级的 UI。
+
+字重层级：
+- 标题/关键数值：fontWeight: "800" 或 "900"，配合 usageHint: "h2"-"h4"
+- 正文：默认 fontWeight（400），需要强调时用 emphasis: "strong"，弱化时用 emphasis: "muted"
+- 辅助信息（时间、来源、标签）：usageHint: "caption" + emphasis: "muted"
+- 价格/指标数据：role: "price" + variant: "metric" + fontWeight: "800"
+
+参考实例：Live Commerce 价格使用 fontSize: "22px" 放大；Finance Brief 标题用 fontWeight: "900" + usageHint: "h2"；Work Board 指标数值使用 fontWeight: "800" + usageHint: "h4"。
+
+### 模式 5：间距系统
+
+适用场景：所有布局。
+
+常用取值约定：
+- gap：紧凑 3-5px、标准 8-10px、宽松 14px
+- padding：卡片内边距 12-18px（如 "16px", "18px"），标签内边距 2-6px + 6-10px（如 "3px 8px"）
+- borderRadius：标签 4px、卡片 8-12px、主卡片 16-24px、pill 999px
+- fontWeight：辅助 400、标题 700-800、强调数值 800-900
+
+参考实例：Work Board 主卡片 style: { padding: "16px" }，子区域 gap: "14px"，标签 style: { padding: "3px 8px", borderRadius: "999px" }。
+
+## 8. 常见 bad case
 
 ### Bad Case A：平铺文本，没有结构
 
@@ -122,7 +243,30 @@ description: "生成 UI 前必须请求；包含符合 Renderer 的完整消息�
 
 问题：Card 应使用 child，不应使用 children；children 也不能嵌套完整组件对象。必须使用邻接表引用组件 id。
 
-## 8. 输出前检查
+### Bad Case F：style 字段误放在组件顶层
+
+```json
+{
+  "id": "card",
+  "component": "Card",
+  "child": "body",
+  "padding": "10px",
+  "borderRadius": "12px"
+}
+```
+
+问题：padding 和 borderRadius 是 style 子字段，必须嵌套在 `"style": {}` 内。上面写法即使校验通过，渲染器也会忽略这些字段。正确写法：
+
+```json
+{
+  "id": "card",
+  "component": "Card",
+  "child": "body",
+  "style": { "padding": "10px", "borderRadius": "12px" }
+}
+```
+
+## 9. 输出前检查
 
 - 是否已经请求并遵循 a2ui-generation-standards？
 - 复杂 UI 是否请求 high-quality-a2ui-good-cases 作为质量标杆？
@@ -134,3 +278,5 @@ description: "生成 UI 前必须请求；包含符合 Renderer 的完整消息�
 - action.script 是否只做同步本地读写和 actions.emit？
 - 是否避免 Catalog 外组件和浏览器字段？
 - 是否使用足够的语义、密度、视觉和状态字段，让 UI 不只是默认 Card/Row/Text？
+- style 对象内的字段是否都在白名单内？padding、borderRadius、shadow 等是否误放在组件顶层？
+- 是否合理使用 dark 主题 / 圆角阴影 / 色彩层次 / 字重 / 间距等设计模式？

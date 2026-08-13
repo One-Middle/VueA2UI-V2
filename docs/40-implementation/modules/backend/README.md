@@ -109,7 +109,9 @@ packages/backend/
 | `src/db.ts` | Prisma Client 初始化。 |
 | `src/routes/*.ts` | 参数和 body 校验层，转发到 service。 |
 | `src/services/agent-run.service.ts` | Agent run 核心编排，负责调用 Agent、提交结果、失败处理和 SSE 推送。 |
-| `src/services/message.service.ts` | 保存用户消息并触发 Agent run。 |
+| `src/services/message.service.ts` | 保存用户消息，并根据消息意图触发 Agent run 或推进 Agent Workflow。 |
+| `src/services/workflow.service.ts` | 编排 Agent Workflow、WorkflowStageGate、step 状态和 artifact 版本。 |
+| `src/routes/workflows.ts` | 查询 workflow timeline，并接收 `confirm_plan` 等 workflow action。 |
 | `src/services/snapshot.service.ts` | 从 committed A2UI events 回放生成 surface snapshot。 |
 | `src/services/skill-resolver.service.ts` | 合并 session 启用 Skill 和平台默认 Skill，供 Agent 输入使用。 |
 | `src/services/skill.service.ts` | Skill CRUD、Reference metadata、会话启用关系和内置 Skill upsert。 |
@@ -145,15 +147,26 @@ packages/backend/
 ## 7. Agent run 提交流程
 
 1. `messages` 路由接收用户消息。
-2. `MessageService` 保存 user message，并创建 pending Agent run。
-3. `AgentRunService.executeRun()` 将 run 标记为 running，并推送 `agent_run_started`。
-4. 后端读取 current snapshot、最近 20 条消息、ready 文件内容和已解析 Skill。
-5. 后端调用 `createAgentRuntime(config).run(input, onToolCall)`。
-6. Runtime 回传工具调用时，后端写入 `toolCall` 并推送 `agent_run_attempt`。
-7. `COMMITTED` 结果进入同一个 Prisma transaction，创建 assistant message、A2UI event、current snapshot，并更新 run/session。
-8. 在 `commitRun()` 的 Prisma transaction callback 内完成写入、DTO 组装和 `assistant_message`、`a2ui_messages`、`surface_snapshot`、`agent_run_completed` 推送。
-9. `TEXT_ONLY` 只创建 assistant message 和 committed run，不创建 A2UI event 或 snapshot。
-10. `FAILED` 创建 `validation_error` assistant message，标记 run failed，并推送 `agent_run_failed`。
+2. `MessageService` 保存 user message，并先检查当前 session 是否存在 active Agent Workflow。
+3. 如果存在 active Agent Workflow，消息会关联到该 workflow，暂不创建新的 Agent run。
+4. 如果 active workflow 当前停在 `confirm_plan`，用户自然语言消息会作为 `requestPlanRevision()` 进入 WorkflowStageGate：旧 plan 保留，新 revision 生成新版 plan 或 clarification form。
+5. 如果不存在 active Agent Workflow，`MessageService` 根据 intent 和消息内容判断是否启动新的 Agent Workflow。
+6. 新 workflow 会立即进入 `startInitialPlanning()`：先创建 `understand` step，再按需求完整度进入 `clarify` 或 `propose` + `confirm_plan`。
+7. `confirm_plan` action 会创建用户可见确认 message，确认 plan，并创建 `generate_a2ui` step。
+8. `AgentRunService.startWorkflowCandidateRun()` 创建 workflow-scoped Agent run，异步调用 Runtime 生成 Candidate A2UI。
+9. Candidate run 成功时只保存 `candidate_a2ui_messages` artifact 并进入 `preview`，失败时保存 `validation_report` artifact。
+10. Candidate run 不调用 `commitRun()`，因此不会创建正式 A2UI event 或 current snapshot。
+11. `confirm_commit` action 会校验当前 `preview` step 和已验证 candidate artifact，然后把 exact stored candidate messages 提交为正式 A2UI event 和 current snapshot。
+12. 提交完成后，workflow 以 `completed` + `committed` 结束，并在 metadata 中记录确认 message、candidate artifact、A2UI event、snapshot 和 assistant message。
+13. 普通非 workflow 消息沿用旧路径，创建 pending Agent run。
+14. `AgentRunService.executeRun()` 将 run 标记为 running，并推送 `agent_run_started`。
+15. 后端读取 current snapshot、最近 20 条消息、ready 文件内容和已解析 Skill。
+16. 后端调用 `createAgentRuntime(config).run(input, onToolCall)`。
+17. Runtime 回传工具调用时，后端写入 `toolCall` 并推送 `agent_run_attempt`。
+18. `COMMITTED` 结果进入同一个 Prisma transaction，创建 assistant message、A2UI event、current snapshot，并更新 run/session。
+19. 在 `commitRun()` 的 Prisma transaction callback 内完成写入、DTO 组装和 `assistant_message`、`a2ui_messages`、`surface_snapshot`、`agent_run_completed` 推送。
+20. `TEXT_ONLY` 只创建 assistant message 和 committed run，不创建 A2UI event 或 snapshot。
+21. `FAILED` 创建 `validation_error` assistant message，标记 run failed，并推送 `agent_run_failed`。
 
 ## 8. 事务与一致性约束
 

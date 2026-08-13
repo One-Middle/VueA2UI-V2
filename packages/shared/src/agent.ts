@@ -10,7 +10,7 @@
  */
 
 import type { A2UIServerMessage, JsonObject, SurfaceSnapshotData } from "./a2ui";
-import type { SkillReference } from "./api";
+import type { SkillReference, WorkflowStepType } from "./api";
 import type { AgentRunPhase } from "./sse";
 
 /** A2UI 校验过程中发现的单个问题。 */
@@ -79,6 +79,85 @@ export interface AgentRunInput {
     name: string;
     config: JsonObject;
   };
+}
+
+/** Workflow task 执行入口的上下文快照。 */
+export interface AgentWorkflowTaskInput extends AgentRunInput {
+  /** 当前 Workflow 所处 gate。 */
+  gate: WorkflowStepType;
+  /** Workflow ID，用于 debug metadata 和审计关联。 */
+  workflowId: string;
+  /** Workflow step ID，用于 debug metadata 和审计关联。 */
+  workflowStepId: string;
+  /** 当前 task 的类型。 */
+  task: "initial_planning" | "revise_plan" | "generate_candidate";
+  /** 用户提交的澄清答案。 */
+  clarificationAnswers?: JsonObject;
+  /** 已确认或最近生成的 Markdown plan。 */
+  previousPlanMarkdown?: string | null;
+  /** 用户针对上一版 plan 的修改意见。 */
+  revisionText?: string | null;
+  /** 历史 candidate 或额外 workflow artifact 摘要。 */
+  workflowContext?: JsonObject;
+}
+
+/** Clarification Form 支持的问题类型。 */
+export type ClarificationQuestionType = "select" | "radio" | "checkbox" | "text" | "textarea";
+
+/** Clarification Form 选项。 */
+export interface ClarificationOption {
+  label: string;
+  value: string;
+}
+
+/** Runtime 解析后的澄清问题。 */
+export interface ClarificationQuestion {
+  id: string;
+  label: string;
+  type: ClarificationQuestionType;
+  required: boolean;
+  reason: string;
+  options?: ClarificationOption[];
+  placeholder?: string;
+}
+
+/** Runtime 解析后的澄清表单。 */
+export interface ClarificationForm {
+  title?: string;
+  description?: string;
+  fields: ClarificationQuestion[];
+}
+
+/** Agent Runtime 解析、归一化、校验后的 workflow 结果。 */
+export type ParsedAgentResult =
+  | {
+      kind: "clarification_request";
+      form: ClarificationForm;
+    }
+  | {
+      kind: "plan_markdown";
+      markdown: string;
+    }
+  | {
+      kind: "candidate_a2ui_messages";
+      assistantMessage: string;
+      a2uiMessages: A2UIServerMessage[];
+      validation: ValidateA2UIResult;
+    }
+  | {
+      kind: "failure";
+      reason: string;
+      details?: JsonObject;
+    };
+
+/** Workflow task 执行结果，raw output 只能作为 debug 摘要出现。 */
+export interface AgentWorkflowTaskResult {
+  parsedResult: ParsedAgentResult;
+  debugMetadata: JsonObject;
+  toolCalls: ToolCallRecord[];
+  rawOutputPreview: string;
+  attemptCount: number;
+  tokenUsage?: JsonObject;
 }
 
 /** Agent 运行结果，包含三种状态：已提交、纯文本、失败。 */
@@ -151,6 +230,11 @@ export interface IAgentRuntime {
     input: AgentRunInput,
     onToolCall?: (record: ToolCallRecord) => void,
   ): Promise<AgentRunResult>;
+
+  runWorkflowTask(
+    input: AgentWorkflowTaskInput,
+    onToolCall?: (record: ToolCallRecord) => void,
+  ): Promise<AgentWorkflowTaskResult>;
 }
 
 /**

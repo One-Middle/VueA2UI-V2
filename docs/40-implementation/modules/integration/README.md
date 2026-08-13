@@ -34,7 +34,17 @@ Backend
 MessageInput
   -> workspace.sendMessage()
   -> POST /api/sessions/:sessionId/messages
-  -> MessageService 创建 user message + agent run
+  -> MessageService 创建 user message
+  -> 如果命中 active workflow 或 A2UI workflow intent，则关联或创建 Agent Workflow
+  -> 新 workflow 进入 understand，再进入 clarify 或 propose + confirm_plan
+  -> confirm_plan 阶段的自然语言消息作为 request_revision，保留旧 plan 并生成新版 plan 或 clarification form
+  -> confirm_plan action 创建确认 message，并启动 workflow-scoped Agent run
+  -> Runtime 使用已确认 plan、current snapshot、enabled Skills、ready files 和最近消息生成 Candidate A2UI
+  -> Candidate 校验通过后保存 candidate_a2ui_messages artifact，并进入 preview
+  -> Candidate 校验失败后保存 validation_report artifact，不创建正式 A2UI event/snapshot
+  -> confirm_commit action 提交 exact stored candidate artifact
+  -> Backend 创建正式 A2UI event + current surface snapshot，并完成 workflow
+  -> 如果是普通非 workflow 消息，则创建 agent run
   -> AgentRunService.executeRun()
   -> createAgentRuntime().run()
   -> getSkillContent / getSkillReferenceContent / getCatalogComponentDetails
@@ -95,8 +105,9 @@ Agent 返回 TEXT_ONLY
 ### Backend -> Frontend
 
 - SSE 事件类型由 `packages/shared/src/sse.ts` 定义。
-- 当前事件包括 `heartbeat`、`agent_run_started`、`agent_run_attempt`、`agent_run_completed`、`assistant_message`、`a2ui_messages`、`surface_snapshot`、`agent_run_failed`。
+- 当前事件包括 `heartbeat`、`agent_run_started`、`agent_run_attempt`、`agent_run_completed`、`assistant_message`、`a2ui_messages`、`surface_snapshot`、`agent_run_failed`、`workflow_started`、`workflow_step_updated`、`workflow_artifact_created`、`workflow_completed` 和 `workflow_failed`。
 - `a2ui_messages` 和 `surface_snapshot` 只在 committed A2UI run 中出现。
+- Workflow artifact 当前用于恢复 clarification forms 和 Markdown plans；正式 preview 和 snapshot 仍等待后续 candidate/commit 阶段接入。
 
 ### Frontend -> Renderer
 
@@ -131,6 +142,11 @@ Renderer 收到 `replace` 变更时会销毁旧 `SurfaceGroupModel` 状态并全
 ## 8. 验收场景
 
 - 首次输入自然语言后生成可渲染 UI。
+- A2UI workflow intent 首次输入后，会生成 clarification form 或等待确认的 Markdown plan。
+- `confirm_plan` 阶段输入自然语言修改意见，不会启动新 workflow，而是创建新版 plan 或新的 clarification form。
+- `confirm_plan` action 会启动 candidate run；成功时 workflow 进入 `preview`，并且 current snapshot 不变化。
+- candidate generation 失败时会产生 `validation_report` artifact，不提交正式 A2UI event。
+- `confirm_commit` action 会提交已存 candidate artifact，而不是重新生成结果；提交后 current snapshot 才会变化。
 - Agent 请求 Skill、Skill Reference 或组件详情时，Runtime 面板能看到 tool calls。
 - Agent 返回 TEXT_ONLY 时，只出现文本回复，预览不变化。
 - Agent 校验失败后不提交 events 和 snapshot。

@@ -6,16 +6,17 @@ import { connectStream, type StreamHandlers } from "../../services/stream";
 import { useRendererStore } from "../renderer";
 import { useWorkspaceStore } from "../workspace";
 
-vi.mock("../services/api", () => ({
+vi.mock("../../services/api", () => ({
   getSession: vi.fn(),
   listMessages: vi.fn(() => Promise.resolve({ items: [], pageInfo: { nextCursor: null, hasMore: false } })),
   listFiles: vi.fn(() => Promise.resolve({ items: [] })),
   listAgentRuns: vi.fn(() => Promise.resolve({ items: [], pageInfo: { nextCursor: null, hasMore: false } })),
+  listWorkflows: vi.fn(() => Promise.resolve({ items: [] })),
   listA2UIEvents: vi.fn(() => Promise.resolve({ items: [], pageInfo: { nextCursor: null, hasMore: false } })),
   listSnapshots: vi.fn(() => Promise.resolve({ items: [], pageInfo: { nextCursor: null, hasMore: false } })),
 }));
 
-vi.mock("../services/stream", () => ({
+vi.mock("../../services/stream", () => ({
   connectStream: vi.fn(() => ({ close: vi.fn() })),
 }));
 
@@ -105,6 +106,8 @@ describe("workspace store session restore", () => {
         id: "stale-message",
         sessionId: "session-a",
         agentRunId: null,
+        workflowId: null,
+        workflowStepId: null,
         role: "user",
         kind: "chat",
         content: "旧会话消息",

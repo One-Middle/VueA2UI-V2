@@ -41,6 +41,24 @@ export const sendMessageSchema = z.object({
 });
 
 /**
+ * Workflow action 校验。
+ */
+export const workflowActionSchema = z.object({
+  action: z.enum([
+    "submit_clarification",
+    "confirm_plan",
+    "request_revision",
+    "confirm_commit",
+    "retry_step",
+    "cancel",
+  ]),
+  workflowStepId: z.string().uuid().optional(),
+  artifactId: z.string().uuid().optional(),
+  message: z.string().min(1).max(10000).optional(),
+  payload: z.record(z.unknown()).optional(),
+});
+
+/**
  * 创建 Skill 校验。
  */
 export const createSkillSchema = z.object({

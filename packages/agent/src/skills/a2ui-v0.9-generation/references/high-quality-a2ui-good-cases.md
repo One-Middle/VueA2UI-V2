@@ -8,14 +8,16 @@
 skill: "A2UI v0.9 组件消息生成"
 id: "high-quality-a2ui-good-cases"
 title: "高质量 A2UI Good Case"
-description: "复杂 UI 或需要质量标杆时请求；包含来自 renderer-capability-demo 的 Music Player、Finance Brief、Work Board 三个完整 good case，并说明为什么好。"
+description: "复杂 UI 或需要质量标杆时请求；包含 Live Commerce（亮色电商）、Finance Brief（黑金金融）、Work Board（清爽工具）三个完整 good case，覆盖三种视觉范式。"
 ---
 
 # 高质量 A2UI Good Case
 
-本 Reference 收录完整、可审查的高质量 A2UI 标杆。Good Case 不是供照抄的小片段；它们用于建立质量判断：如何组织 dataModel、组件树、视觉层次、状态派生和事件回传。
+本 Reference 收录完整、可审查的高质量 A2UI 标杆。三个 case 分别展示三种视觉范式：亮色电商（Live Commerce）、黑金金融（Finance Brief）、清爽工具（Work Board）。
 
-## Good Case 1: Music Player
+## Good Case 1: Live Commerce
+
+亮色电商视觉范式：白色卡片 + 圆角阴影 + 橙色系品牌色 + 暗色操作栏对比。
 
 ```json
 [
@@ -32,15 +34,24 @@ description: "复杂 UI 或需要质量标杆时请求；包含来自 renderer-c
       "surfaceId": "main",
       "path": "/",
       "value": {
-        "player": {
-          "isPlaying": false,
-          "progress": 32,
-          "isFavorite": false
+        "live": {
+          "badge": "直播中",
+          "title": "农夫山泉 好礼相送",
+          "cta": "去逛逛",
+          "viewers": "3000+",
+          "likes": "1444",
+          "cover": "data:image/svg+xml,%0A%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20720%20520%22%3E%0A%20%20%3Cdefs%3E%3ClinearGradient%20id%3D%22w%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23dff7d4%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23f8fafc%22%2F%3E%3C%2FlinearGradient%3E%3ClinearGradient%20id%3D%22c%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%220%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23d7b47a%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23f4d99d%22%2F%3E%3C%2FlinearGradient%3E%3Cfilter%20id%3D%22b%22%3E%3CfeGaussianBlur%20stdDeviation%3D%2218%22%2F%3E%3C%2Ffilter%3E%3C%2Fdefs%3E%0A%20%20%3Crect%20width%3D%22720%22%20height%3D%22520%22%20fill%3D%22%23efe6d2%22%2F%3E%0A%20%20%3Crect%20x%3D%22420%22%20y%3D%2224%22%20width%3D%22164%22%20height%3D%22216%22%20rx%3D%228%22%20fill%3D%22url(%23w)%22%2F%3E%0A%20%20%3Cpath%20d%3D%22M444%2036v190M484%2036v190M524%2036v190M564%2036v190M430%2096h144M430%20156h144%22%20stroke%3D%22%23b7d8a9%22%20stroke-width%3D%225%22%20opacity%3D%220.55%22%2F%3E%0A%20%20%3Crect%20x%3D%2232%22%20y%3D%2270%22%20width%3D%22214%22%20height%3D%22142%22%20rx%3D%2212%22%20fill%3D%22%23baa37f%22%2F%3E%0A%20%20%3Crect%20x%3D%2252%22%20y%3D%2292%22%20width%3D%2248%22%20height%3D%2234%22%20rx%3D%224%22%20fill%3D%22%23f8fafc%22%20opacity%3D%220.65%22%2F%3E%0A%20%20%3Crect%20x%3D%22112%22%20y%3D%2292%22%20width%3D%2246%22%20height%3D%2234%22%20rx%3D%224%22%20fill%3D%22%23f8fafc%22%20opacity%3D%220.58%22%2F%3E%0A%20%20%3Crect%20x%3D%22170%22%20y%3D%2292%22%20width%3D%2242%22%20height%3D%2234%22%20rx%3D%224%22%20fill%3D%22%23f8fafc%22%20opacity%3D%220.5%22%2F%3E%0A%20%20%3Ccircle%20cx%3D%22286%22%20cy%3D%22116%22%20r%3D%2234%22%20fill%3D%22%23efe9dc%22%20stroke%3D%22%239c8b70%22%20stroke-width%3D%225%22%2F%3E%0A%20%20%3Cpath%20d%3D%22M286%2096v22l17%2012%22%20stroke%3D%22%23766853%22%20stroke-width%3D%225%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%2F%3E%0A%20%20%3Cpath%20d%3D%22M342%2076h38v92h-38z%22%20fill%3D%22%23f2f6ef%22%2F%3E%3Cpath%20d%3D%22M360%2076v-38%22%20stroke%3D%22%23415349%22%20stroke-width%3D%227%22%20stroke-linecap%3D%22round%22%2F%3E%0A%20%20%3Cpath%20d%3D%22M330%20118c28-22%2062-22%2088%200%22%20fill%3D%22%236d8472%22%2F%3E%0A%20%20%3Crect%20x%3D%220%22%20y%3D%22314%22%20width%3D%22720%22%20height%3D%22118%22%20fill%3D%22url(%23c)%22%2F%3E%0A%20%20%3Crect%20x%3D%220%22%20y%3D%22432%22%20width%3D%22720%22%20height%3D%2288%22%20fill%3D%22%237a6b54%22%20opacity%3D%220.78%22%2F%3E%0A%20%20%3Cellipse%20cx%3D%22362%22%20cy%3D%22374%22%20rx%3D%22250%22%20ry%3D%2248%22%20fill%3D%22%23efe1bd%22%20opacity%3D%220.5%22%20filter%3D%22url(%23b)%22%2F%3E%0A%20%20%3Cpath%20d%3D%22M320%20170c48-24%20104%204%20108%2062l6%20100h-158l8-102c3-27%2015-47%2036-60z%22%20fill%3D%22%23f8fafc%22%2F%3E%0A%20%20%3Cpath%20d%3D%22M300%20214c-38%2036-56%2078-50%20126%22%20stroke%3D%22%23f8fafc%22%20stroke-width%3D%2232%22%20stroke-linecap%3D%22round%22%2F%3E%0A%20%20%3Cpath%20d%3D%22M428%20224c36%2030%2052%2064%2056%20106%22%20stroke%3D%22%23f8fafc%22%20stroke-width%3D%2232%22%20stroke-linecap%3D%22round%22%2F%3E%0A%20%20%3Ccircle%20cx%3D%22356%22%20cy%3D%22142%22%20r%3D%2242%22%20fill%3D%22%23e6b28a%22%2F%3E%0A%20%20%3Cpath%20d%3D%22M318%20134c8-44%2076-52%2096-9-20%204-42%202-62-7-10%2013-21%2018-34%2016z%22%20fill%3D%22%23172121%22%2F%3E%0A%20%20%3Cpath%20d%3D%22M334%20178c18%2014%2042%2014%2058%200%22%20stroke%3D%22%23b98060%22%20stroke-width%3D%225%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%2F%3E%0A%20%20%3Cpath%20d%3D%22M224%20336c50-34%20112-36%20164%200%22%20fill%3D%22%23d4b87e%22%2F%3E%0A%20%20%3Ccircle%20cx%3D%22258%22%20cy%3D%22320%22%20r%3D%2218%22%20fill%3D%22%236aa84f%22%2F%3E%3Ccircle%20cx%3D%22290%22%20cy%3D%22312%22%20r%3D%2220%22%20fill%3D%22%239ac36b%22%2F%3E%3Ccircle%20cx%3D%22326%22%20cy%3D%22320%22%20r%3D%2218%22%20fill%3D%22%236aa84f%22%2F%3E%0A%20%20%3Crect%20x%3D%22458%22%20y%3D%22320%22%20width%3D%2278%22%20height%3D%2252%22%20rx%3D%2210%22%20fill%3D%22%23f7f7f2%22%20stroke%3D%22%23c7bfa8%22%20stroke-width%3D%224%22%2F%3E%0A%20%20%3Crect%20x%3D%22538%22%20y%3D%22322%22%20width%3D%2272%22%20height%3D%2246%22%20rx%3D%2222%22%20fill%3D%22%23f2c2b8%22%2F%3E%0A%20%20%3Crect%20x%3D%22268%22%20y%3D%22250%22%20width%3D%22124%22%20height%3D%2238%22%20rx%3D%2210%22%20transform%3D%22rotate(12%20330%20269)%22%20fill%3D%22%23ffffff%22%2F%3E%0A%20%20%3Crect%20x%3D%22276%22%20y%3D%22255%22%20width%3D%2250%22%20height%3D%2228%22%20rx%3D%225%22%20transform%3D%22rotate(12%20301%20269)%22%20fill%3D%22%23d71920%22%2F%3E%0A%20%20%3Crect%20x%3D%22332%22%20y%3D%22262%22%20width%3D%2246%22%20height%3D%2212%22%20rx%3D%223%22%20transform%3D%22rotate(12%20355%20268)%22%20fill%3D%22%2393c47d%22%2F%3E%0A%3C%2Fsvg%3E"
         },
-        "song": {
-          "title": "Midnight Drive",
-          "artist": "Synthwave Dreams",
-          "coverUrl": "data:image/svg+xml,%0A%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20640%20640%22%3E%0A%20%20%3Cdefs%3E%0A%20%20%20%20%3ClinearGradient%20id%3D%22albumBg%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%220%22%20stop-color%3D%22%230f172a%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%220.48%22%20stop-color%3D%22%230ea5e9%22%2F%3E%0A%20%20%20%20%20%20%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23f97316%22%2F%3E%0A%20%20%20%20%3C%2FlinearGradient%3E%0A%20%20%20%20%3Cfilter%20id%3D%22soft%22%20x%3D%22-20%25%22%20y%3D%22-20%25%22%20width%3D%22140%25%22%20height%3D%22140%25%22%3E%0A%20%20%20%20%20%20%3CfeGaussianBlur%20stdDeviation%3D%2218%22%2F%3E%0A%20%20%20%20%3C%2Ffilter%3E%0A%20%20%3C%2Fdefs%3E%0A%20%20%3Crect%20width%3D%22640%22%20height%3D%22640%22%20rx%3D%2248%22%20fill%3D%22url(%23albumBg)%22%2F%3E%0A%20%20%3Ccircle%20cx%3D%22214%22%20cy%3D%22206%22%20r%3D%2292%22%20fill%3D%22%23f8fafc%22%20opacity%3D%220.24%22%20filter%3D%22url(%23soft)%22%2F%3E%0A%20%20%3Ccircle%20cx%3D%22430%22%20cy%3D%22394%22%20r%3D%22148%22%20fill%3D%22%23111827%22%20opacity%3D%220.45%22%2F%3E%0A%20%20%3Ccircle%20cx%3D%22430%22%20cy%3D%22394%22%20r%3D%2242%22%20fill%3D%22%23f8fafc%22%20opacity%3D%220.92%22%2F%3E%0A%20%20%3Cpath%20d%3D%22M188%20424c92-132%20172-188%20264-168%22%20fill%3D%22none%22%20stroke%3D%22%23f8fafc%22%20stroke-width%3D%2222%22%20stroke-linecap%3D%22round%22%20opacity%3D%220.88%22%2F%3E%0A%20%20%3Ctext%20x%3D%2270%22%20y%3D%22558%22%20fill%3D%22%23f8fafc%22%20font-family%3D%22Arial%2C%20sans-serif%22%20font-size%3D%2242%22%20font-weight%3D%22700%22%3ENorthline%3C%2Ftext%3E%0A%3C%2Fsvg%3E"
+        "product": {
+          "sku": "spring-water-5l-4",
+          "brand": "天猫",
+          "title": "农夫山泉旗舰店红盖5l*4桶饮用水",
+          "detail": "详情",
+          "price": "¥31.9",
+          "subsidy": "补贴价",
+          "sales": "已售3万+",
+          "benefit": "淘宝秒杀 直降9.6元",
+          "thumbnail": "data:image/svg+xml,%0A%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20160%20160%22%3E%0A%20%20%3Crect%20width%3D%22160%22%20height%3D%22160%22%20rx%3D%2218%22%20fill%3D%22%23f8fafc%22%2F%3E%0A%20%20%3Crect%20x%3D%2226%22%20y%3D%2270%22%20width%3D%2282%22%20height%3D%2256%22%20rx%3D%228%22%20fill%3D%22%23ffffff%22%20stroke%3D%22%23e5e7eb%22%20stroke-width%3D%224%22%2F%3E%0A%20%20%3Crect%20x%3D%2230%22%20y%3D%2282%22%20width%3D%2274%22%20height%3D%2226%22%20rx%3D%224%22%20fill%3D%22%23d71920%22%2F%3E%0A%20%20%3Ctext%20x%3D%2239%22%20y%3D%22101%22%20fill%3D%22%23ffffff%22%20font-family%3D%22Arial%2C%20sans-serif%22%20font-size%3D%2216%22%20font-weight%3D%22700%22%3E%E5%B1%B1%E6%B3%89%3C%2Ftext%3E%0A%20%20%3Crect%20x%3D%2292%22%20y%3D%2234%22%20width%3D%2234%22%20height%3D%2294%22%20rx%3D%229%22%20fill%3D%22%23e0f2fe%22%20stroke%3D%22%2393c5fd%22%20stroke-width%3D%224%22%2F%3E%0A%20%20%3Crect%20x%3D%2296%22%20y%3D%2262%22%20width%3D%2226%22%20height%3D%2228%22%20rx%3D%224%22%20fill%3D%22%23d71920%22%2F%3E%0A%20%20%3Crect%20x%3D%2298%22%20y%3D%2224%22%20width%3D%2222%22%20height%3D%2214%22%20rx%3D%224%22%20fill%3D%22%23ef4444%22%2F%3E%0A%20%20%3Ccircle%20cx%3D%2242%22%20cy%3D%2255%22%20r%3D%2214%22%20fill%3D%22%2322c55e%22%2F%3E%3Ccircle%20cx%3D%2264%22%20cy%3D%2248%22%20r%3D%2218%22%20fill%3D%22%2384cc16%22%2F%3E%0A%3C%2Fsvg%3E"
         }
       }
     }
@@ -53,217 +64,419 @@ description: "复杂 UI 或需要质量标杆时请求；包含来自 renderer-c
         {
           "id": "root",
           "component": "Container",
-          "child": "musicCard",
+          "child": "liveCard",
           "width": "content",
           "padding": "none"
         },
         {
-          "id": "musicCard",
+          "id": "liveCard",
           "component": "Card",
-          "child": "musicBody",
+          "child": "liveBody",
           "role": "media",
           "density": "compact",
-          "preset": "media",
-          "variant": "elevated",
+          "variant": "plain",
           "style": {
-            "backgroundColor": "#0F2A2E",
-            "color": "#ffffff"
+            "padding": "0",
+            "borderRadius": "20px",
+            "borderColor": "transparent",
+            "shadow": "md",
+            "backgroundColor": "#ffffff",
+            "overflow": "hidden"
           }
         },
         {
-          "id": "musicBody",
+          "id": "liveBody",
           "component": "Column",
           "children": [
-            "cover",
-            "musicInfoRow",
-            "musicProgress",
-            "musicControls"
+            "heroImage",
+            "liveStrip",
+            "productShelf",
+            "commerceActions"
           ],
-          "gap": "14px"
+          "gap": "0"
         },
         {
-          "id": "cover",
+          "id": "heroImage",
           "component": "Image",
           "url": {
-            "path": "/song/coverUrl"
+            "path": "/live/cover"
           },
-          "alt": "Album cover",
-          "role": "cover",
-          "shape": "rounded",
+          "alt": "Live kitchen",
+          "role": "hero",
+          "shape": "square",
           "fit": "cover",
-          "aspectRatio": "1:1",
-          "caption": "Live renderer state"
+          "aspectRatio": "16:13"
         },
         {
-          "id": "musicInfoRow",
+          "id": "liveStrip",
           "component": "Row",
           "children": [
-            "songText",
-            "favButton"
+            "liveTitleGroup",
+            "liveVisit"
           ],
-          "role": "mediaObject",
-          "alignment": "center",
+          "role": "actions",
           "distribution": "spaceBetween",
+          "alignment": "center",
+          "wrap": false,
+          "style": {
+            "padding": "10px 12px",
+            "backgroundColor": "#3d3b36",
+            "gap": "10px"
+          }
+        },
+        {
+          "id": "liveTitleGroup",
+          "component": "Row",
+          "children": [
+            "liveBadge",
+            "liveTitle"
+          ],
+          "role": "metadata",
+          "alignment": "center",
+          "gap": "8px",
           "wrap": false
         },
         {
-          "id": "songText",
-          "component": "Column",
-          "children": [
-            "songLabel",
-            "songTitle",
-            "songArtist"
-          ],
-          "gap": "3px"
-        },
-        {
-          "id": "songLabel",
-          "component": "Text",
-          "text": "NOW PLAYING",
-          "usageHint": "caption",
-          "emphasis": "success"
-        },
-        {
-          "id": "songTitle",
+          "id": "liveBadge",
           "component": "Text",
           "text": {
-            "path": "/song/title"
+            "path": "/live/badge"
           },
-          "usageHint": "h3",
-          "truncate": true,
+          "usageHint": "caption",
+          "role": "discount",
           "style": {
-            "color": "#ffffff"
+            "padding": "2px 6px",
+            "borderRadius": "4px",
+            "backgroundColor": "#ff2f64",
+            "color": "#ffffff",
+            "fontWeight": "800"
           }
         },
         {
-          "id": "songArtist",
+          "id": "liveTitle",
           "component": "Text",
           "text": {
-            "path": "/song/artist"
+            "path": "/live/title"
+          },
+          "usageHint": "body",
+          "truncate": true,
+          "style": {
+            "color": "#ffffff",
+            "fontWeight": "700",
+            "minWidth": "0"
+          }
+        },
+        {
+          "id": "liveVisit",
+          "component": "Button",
+          "label": {
+            "path": "/live/cta"
+          },
+          "icon": "chevron_right",
+          "iconPosition": "right",
+          "importance": "quiet",
+          "shape": "pill",
+          "action": {
+            "event": {
+              "name": "openLiveRoom",
+              "context": {
+                "title": {
+                  "path": "/live/title"
+                }
+              }
+            }
+          },
+          "style": {
+            "color": "#ffffff",
+            "padding": "4px 0",
+            "minWidth": "64px"
+          }
+        },
+        {
+          "id": "productShelf",
+          "component": "Row",
+          "children": [
+            "productThumb",
+            "productInfo"
+          ],
+          "role": "mediaObject",
+          "gap": "10px",
+          "alignment": "center",
+          "wrap": false,
+          "style": {
+            "padding": "10px 12px 6px"
+          }
+        },
+        {
+          "id": "productThumb",
+          "component": "Image",
+          "url": {
+            "path": "/product/thumbnail"
+          },
+          "alt": "Product thumbnail",
+          "role": "thumbnail",
+          "shape": "rounded",
+          "fit": "cover",
+          "aspectRatio": "1:1",
+          "style": {
+            "width": "46px"
+          }
+        },
+        {
+          "id": "productInfo",
+          "component": "Column",
+          "children": [
+            "productTitleRow",
+            "priceRow",
+            "benefitRow"
+          ],
+          "gap": "4px",
+          "style": {
+            "minWidth": "0",
+            "flex": 1
+          }
+        },
+        {
+          "id": "productTitleRow",
+          "component": "Row",
+          "children": [
+            "productBrand",
+            "productTitle",
+            "productDetail"
+          ],
+          "role": "metadata",
+          "alignment": "center",
+          "gap": "4px",
+          "wrap": false
+        },
+        {
+          "id": "productBrand",
+          "component": "Text",
+          "text": {
+            "path": "/product/brand"
+          },
+          "usageHint": "body",
+          "role": "discount",
+          "style": {
+            "fontWeight": "800"
+          }
+        },
+        {
+          "id": "productTitle",
+          "component": "Text",
+          "text": {
+            "path": "/product/title"
+          },
+          "usageHint": "body",
+          "emphasis": "strong",
+          "truncate": true,
+          "style": {
+            "minWidth": "0"
+          }
+        },
+        {
+          "id": "productDetail",
+          "component": "Text",
+          "text": {
+            "script": {
+              "code": "return `${dataModel.get('/product/detail')} ›`;",
+              "deps": [
+                "/product/detail"
+              ],
+              "fallback": "详情 ›"
+            }
+          },
+          "usageHint": "caption",
+          "emphasis": "muted",
+          "style": {
+            "minWidth": "38px"
+          }
+        },
+        {
+          "id": "priceRow",
+          "component": "Row",
+          "children": [
+            "productPrice",
+            "productSubsidy",
+            "productSales"
+          ],
+          "role": "metadata",
+          "alignment": "end",
+          "gap": "4px",
+          "wrap": false
+        },
+        {
+          "id": "productPrice",
+          "component": "Text",
+          "text": {
+            "path": "/product/price"
+          },
+          "role": "price",
+          "variant": "metric",
+          "tone": "warning",
+          "style": {
+            "fontSize": "22px"
+          }
+        },
+        {
+          "id": "productSubsidy",
+          "component": "Text",
+          "text": {
+            "path": "/product/subsidy"
+          },
+          "role": "discount",
+          "usageHint": "caption"
+        },
+        {
+          "id": "productSales",
+          "component": "Text",
+          "text": {
+            "path": "/product/sales"
           },
           "usageHint": "caption",
           "emphasis": "muted"
         },
         {
-          "id": "favIcon",
-          "component": "Icon",
-          "name": {
-            "script": {
-              "code": "return dataModel.get('/player/isFavorite') ? 'favorite' : 'favorite_border';",
-              "deps": [
-                "/player/isFavorite"
-              ],
-              "fallback": "favorite_border"
-            }
+          "id": "benefitRow",
+          "component": "Text",
+          "text": {
+            "path": "/product/benefit"
           },
-          "semantic": "action",
-          "label": "收藏",
-          "status": "danger",
-          "tone": "danger"
-        },
-        {
-          "id": "favButton",
-          "component": "Button",
-          "child": "favIcon",
-          "importance": "quiet",
-          "shape": "circle",
-          "action": {
-            "script": {
-              "code": "const next = !Boolean(dataModel.get('/player/isFavorite')); dataModel.set('/player/isFavorite', next); actions.emit('favoriteChanged', { isFavorite: next });",
-              "deps": [
-                "/player/isFavorite"
-              ]
-            }
+          "usageHint": "caption",
+          "role": "discount",
+          "style": {
+            "textAlign": "right"
           }
         },
         {
-          "id": "musicProgress",
-          "component": "Slider",
-          "min": 0,
-          "max": 100,
-          "step": 1,
-          "value": {
-            "path": "/player/progress"
-          },
-          "valueDisplay": "none"
-        },
-        {
-          "id": "musicControls",
+          "id": "commerceActions",
           "component": "Row",
           "children": [
-            "prevButton",
-            "playButton",
-            "nextButton"
+            "socialStats",
+            "cartButton",
+            "buyButton"
           ],
           "role": "actions",
           "alignment": "center",
-          "distribution": "spaceEvenly",
-          "wrap": false
+          "gap": "8px",
+          "wrap": false,
+          "style": {
+            "padding": "8px 12px 12px"
+          }
         },
         {
-          "id": "prevButton",
+          "id": "socialStats",
+          "component": "Row",
+          "children": [
+            "commentMetric",
+            "starMetric"
+          ],
+          "role": "metadata",
+          "gap": "10px",
+          "wrap": false,
+          "style": {
+            "minWidth": "88px"
+          }
+        },
+        {
+          "id": "commentMetric",
+          "component": "Column",
+          "children": [
+            "commentIcon",
+            "commentCount"
+          ],
+          "gap": "2px",
+          "alignment": "center"
+        },
+        {
+          "id": "commentIcon",
+          "component": "Icon",
+          "icon": "chat_bubble",
+          "semantic": "comment",
+          "label": "comments",
+          "size": "md"
+        },
+        {
+          "id": "commentCount",
+          "component": "Text",
+          "text": {
+            "path": "/live/viewers"
+          },
+          "usageHint": "caption",
+          "emphasis": "muted"
+        },
+        {
+          "id": "starMetric",
+          "component": "Column",
+          "children": [
+            "starIcon",
+            "starCount"
+          ],
+          "gap": "2px",
+          "alignment": "center"
+        },
+        {
+          "id": "starIcon",
+          "component": "Icon",
+          "icon": "star",
+          "semantic": "favorite",
+          "label": "favorites",
+          "size": "md"
+        },
+        {
+          "id": "starCount",
+          "component": "Text",
+          "text": {
+            "path": "/live/likes"
+          },
+          "usageHint": "caption",
+          "emphasis": "muted"
+        },
+        {
+          "id": "cartButton",
           "component": "Button",
-          "icon": "skip_previous",
-          "iconPosition": "only",
-          "importance": "quiet",
-          "shape": "circle",
+          "label": "加入购物车",
+          "intent": "warning",
+          "shape": "rounded",
+          "importance": "prominent",
+          "fullWidth": true,
           "action": {
             "event": {
-              "name": "previousTrack",
+              "name": "addToCart",
               "context": {
+                "sku": {
+                  "path": "/product/sku"
+                },
                 "title": {
-                  "path": "/song/title"
+                  "path": "/product/title"
                 }
               }
             }
           }
         },
         {
-          "id": "playIcon",
-          "component": "Icon",
-          "name": {
-            "script": {
-              "code": "return dataModel.get('/player/isPlaying') ? 'pause' : 'play_arrow';",
-              "deps": [
-                "/player/isPlaying"
-              ],
-              "fallback": "play_arrow"
-            }
-          },
-          "semantic": "action",
-          "label": "播放切换",
-          "size": "lg"
-        },
-        {
-          "id": "playButton",
+          "id": "buyButton",
           "component": "Button",
-          "child": "playIcon",
-          "intent": "primary",
-          "shape": "circle",
+          "label": "立即购买",
+          "intent": "danger",
+          "shape": "rounded",
           "importance": "prominent",
-          "size": "lg",
-          "action": {
-            "script": {
-              "code": "const next = !Boolean(dataModel.get('/player/isPlaying')); dataModel.set('/player/isPlaying', next); actions.emit('playToggled', { isPlaying: next });",
-              "deps": [
-                "/player/isPlaying"
-              ]
-            }
-          }
-        },
-        {
-          "id": "nextButton",
-          "component": "Button",
-          "icon": "skip_next",
-          "iconPosition": "only",
-          "importance": "quiet",
-          "shape": "circle",
+          "fullWidth": true,
+          "style": {
+            "backgroundColor": "#ff5a1f"
+          },
           "action": {
             "event": {
-              "name": "nextTrack",
+              "name": "buyNow",
               "context": {
+                "sku": {
+                  "path": "/product/sku"
+                },
+                "price": {
+                  "path": "/product/price"
+                },
                 "title": {
-                  "path": "/song/title"
+                  "path": "/product/title"
                 }
               }
             }
@@ -275,9 +488,13 @@ description: "复杂 UI 或需要质量标杆时请求；包含来自 renderer-c
 ]
 ```
 
-为什么好：它把播放进度、播放状态和收藏状态放入 dataModel；封面、标题、作者、进度和控制区分层明确；Icon.name 和按钮 label 通过受限脚本从状态派生；收藏和播放按钮会写回本地状态并 actions.emit；上一首/下一首使用 action.event 只提交业务事件。
+为什么好——架构层面：dataModel 按 /live 和 /product 域名聚合；hero 图片 + 直播信息条 + 商品货架 + 双购买 CTA 分层明确；社交指标和价格通过 data binding 关联；购物车和立即购买使用 action.event 提交业务事件。
+
+为什么好——视觉层面：外层 Card 使用 borderRadius: "20px" + shadow: "md" + overflow: "hidden" 做圆角裁剪；暗色操作栏（backgroundColor: "#3d3b36"）与白色卡片形成层次对比；直播标签使用 backgroundColor: "#ff2f64" 红色强调；立即购买按钮用 backgroundColor: "#ff5a1f" 品牌橙；价格用 fontSize: "22px" + role: "price" + variant: "metric" 放大突出。
 
 ## Good Case 2: Finance Brief
+
+黑金金融视觉范式：深色背景 + 暖金色文字 + 多层次边框 + 大圆角阴影。
 
 ```json
 [
@@ -1033,9 +1250,13 @@ description: "复杂 UI 或需要质量标杆时请求；包含来自 renderer-c
 ]
 ```
 
-为什么好：它把金融资讯拆成 hero、指标网格、分类操作、新闻列表和页脚事件；筛选和收藏都写回 dataModel；List 模板渲染 visibleNews；列表项使用相对 path 和 context；主题视觉通过受控 style、role、density、variant、shape、intent 等字段表达。
+为什么好——架构层面：金融资讯拆成 hero、指标网格、分类操作、新闻列表和页脚事件；筛选和收藏都写回 dataModel；List 模板渲染 visibleNews；列表项使用相对 path 和 context。
+
+为什么好——视觉层面：外围 Card 使用 backgroundColor: "#080807" + color: "#f8edcf" + borderRadius: "24px" + shadow: "lg" 建立黑金基调；内部 hero 区块用 backgroundColor: "#14100a" + borderColor: "#3c2d18" + borderWidth: "1px" 拉开层次；指标卡用 backgroundColor: "#120f0a" 统一暗底；文字用三层金棕色（#fff7df / #d7b46a / #c8b98e）建立信息层级；分类标签通过 intent: "warning" vs importance: "quiet" 区分选中态。
 
 ## Good Case 3: Work Board
+
+清爽工具视觉范式：浅色背景 + 白色卡片 + 蓝紫色品牌点缀 + 彩色指标卡 + 微阴影。
 
 ```json
 [
@@ -1053,28 +1274,31 @@ description: "复杂 UI 或需要质量标杆时请求；包含来自 renderer-c
       "path": "/",
       "value": {
         "todo": {
-          "draft": "补充 Slider 视觉回归",
+          "draft": "",
           "items": [
             {
               "id": "task-1",
               "title": "整理 Basic Catalog 能力矩阵",
               "project": "Renderer",
-              "done": true,
-              "priority": "High"
+              "done": true
             },
             {
               "id": "task-2",
               "title": "补齐表单组件截图测试",
               "project": "QA",
-              "done": false,
-              "priority": "Medium"
+              "done": false
             },
             {
               "id": "task-3",
               "title": "验证 JSRuntime 安全边界",
               "project": "Runtime",
-              "done": false,
-              "priority": "High"
+              "done": false
+            },
+            {
+              "id": "task-4",
+              "title": "补充视觉设计指南 Reference",
+              "project": "Skill",
+              "done": true
             }
           ]
         }
@@ -1101,13 +1325,18 @@ description: "复杂 UI 或需要质量标杆时请求；包含来自 renderer-c
           "density": "comfortable",
           "variant": "elevated",
           "header": "Renderer 待办清单",
-          "subtitle": "复选框和按钮脚本都会改写 dataModel"
+          "subtitle": "复选框和按钮脚本都会改写 dataModel",
+          "style": {
+            "backgroundColor": "#ffffff",
+            "borderRadius": "12px",
+            "shadow": "sm"
+          }
         },
         {
           "id": "todoBody",
           "component": "Column",
           "children": [
-            "todoSummary",
+            "statsGrid",
             "todoComposer",
             "todoList",
             "todoActions"
@@ -1115,31 +1344,175 @@ description: "复杂 UI 或需要质量标杆时请求；包含来自 renderer-c
           "gap": "14px"
         },
         {
-          "id": "todoSummary",
+          "id": "statsGrid",
+          "component": "Grid",
+          "columns": 3,
+          "gap": "10px",
+          "children": [
+            "statTotal",
+            "statActive",
+            "statDone"
+          ]
+        },
+        {
+          "id": "statTotal",
+          "component": "Card",
+          "child": "statTotalBody",
+          "role": "metric",
+          "density": "compact",
+          "variant": "filled",
+          "style": {
+            "backgroundColor": "#f5f3ff",
+            "borderColor": "#ddd6fe",
+            "borderRadius": "10px"
+          }
+        },
+        {
+          "id": "statTotalBody",
+          "component": "Column",
+          "children": [
+            "statTotalLabel",
+            "statTotalValue"
+          ],
+          "gap": "4px"
+        },
+        {
+          "id": "statTotalLabel",
+          "component": "Text",
+          "text": "总计",
+          "usageHint": "caption",
+          "emphasis": "muted"
+        },
+        {
+          "id": "statTotalValue",
           "component": "Text",
           "text": {
             "script": {
-              "code": "const items = dataModel.get('/todo/items') || []; const done = items.filter((item) => item.done).length; return `${done}/${items.length} completed · ${items.length - done} open`; ",
+              "code": "const items = dataModel.get('/todo/items') || []; return String(items.length);",
               "deps": [
                 "/todo/items"
               ],
-              "fallback": "0/0 completed"
+              "fallback": "0"
             }
           },
-          "role": "status",
-          "emphasis": "success",
-          "usageHint": "caption"
+          "role": "price",
+          "variant": "metric",
+          "usageHint": "h4",
+          "style": {
+            "color": "#7c3aed",
+            "fontWeight": "800"
+          }
+        },
+        {
+          "id": "statActive",
+          "component": "Card",
+          "child": "statActiveBody",
+          "role": "metric",
+          "density": "compact",
+          "variant": "filled",
+          "style": {
+            "backgroundColor": "#fffbeb",
+            "borderColor": "#fde68a",
+            "borderRadius": "10px"
+          }
+        },
+        {
+          "id": "statActiveBody",
+          "component": "Column",
+          "children": [
+            "statActiveLabel",
+            "statActiveValue"
+          ],
+          "gap": "4px"
+        },
+        {
+          "id": "statActiveLabel",
+          "component": "Text",
+          "text": "进行中",
+          "usageHint": "caption",
+          "emphasis": "muted"
+        },
+        {
+          "id": "statActiveValue",
+          "component": "Text",
+          "text": {
+            "script": {
+              "code": "const items = dataModel.get('/todo/items') || []; return String(items.filter((item) => !item.done).length);",
+              "deps": [
+                "/todo/items"
+              ],
+              "fallback": "0"
+            }
+          },
+          "role": "price",
+          "variant": "metric",
+          "usageHint": "h4",
+          "style": {
+            "color": "#d97706",
+            "fontWeight": "800"
+          }
+        },
+        {
+          "id": "statDone",
+          "component": "Card",
+          "child": "statDoneBody",
+          "role": "metric",
+          "density": "compact",
+          "variant": "filled",
+          "style": {
+            "backgroundColor": "#f0fdf4",
+            "borderColor": "#bbf7d0",
+            "borderRadius": "10px"
+          }
+        },
+        {
+          "id": "statDoneBody",
+          "component": "Column",
+          "children": [
+            "statDoneLabel",
+            "statDoneValue"
+          ],
+          "gap": "4px"
+        },
+        {
+          "id": "statDoneLabel",
+          "component": "Text",
+          "text": "已完成",
+          "usageHint": "caption",
+          "emphasis": "muted"
+        },
+        {
+          "id": "statDoneValue",
+          "component": "Text",
+          "text": {
+            "script": {
+              "code": "const items = dataModel.get('/todo/items') || []; return String(items.filter((item) => item.done).length);",
+              "deps": [
+                "/todo/items"
+              ],
+              "fallback": "0"
+            }
+          },
+          "role": "price",
+          "variant": "metric",
+          "usageHint": "h4",
+          "style": {
+            "color": "#16a34a",
+            "fontWeight": "800"
+          }
         },
         {
           "id": "todoComposer",
-          "component": "Grid",
-          "columns": "auto",
-          "minItemWidth": "180px",
-          "gap": "8px",
+          "component": "Row",
           "children": [
             "todoDraftField",
             "todoAddButton"
-          ]
+          ],
+          "role": "actions",
+          "distribution": "spaceBetween",
+          "alignment": "center",
+          "gap": "8px",
+          "wrap": false
         },
         {
           "id": "todoDraftField",
@@ -1160,9 +1533,12 @@ description: "复杂 UI 或需要质量标杆时请求；包含来自 renderer-c
           "icon": "plus",
           "intent": "primary",
           "shape": "pill",
+          "style": {
+            "backgroundColor": "#7c3aed"
+          },
           "action": {
             "script": {
-              "code": "const title = String(dataModel.get('/todo/draft') || '').trim(); if (!title) { actions.emit('todoSkipped', { reason: 'empty' }); return; } const items = dataModel.get('/todo/items') || []; const next = [...items, { id: `task-${items.length + 1}`, title, project: 'Renderer Lab', done: false, priority: 'Normal' }]; dataModel.set('/todo/items', next); dataModel.set('/todo/draft', ''); actions.emit('todoAdded', { title, total: next.length });",
+              "code": "const title = String(dataModel.get('/todo/draft') || '').trim(); if (!title) { actions.emit('todoSkipped', { reason: 'empty' }); return; } const items = dataModel.get('/todo/items') || []; const next = [...items, { id: `task-${items.length + 1}`, title, project: 'Renderer Lab', done: false }]; dataModel.set('/todo/items', next); dataModel.set('/todo/draft', ''); actions.emit('todoAdded', { title, total: next.length });",
               "deps": [
                 "/todo/items",
                 "/todo/draft"
@@ -1179,7 +1555,7 @@ description: "复杂 UI 或需要质量标杆时请求；包含来自 renderer-c
               "componentId": "todoItem"
             }
           ],
-          "emptyText": "暂无任务",
+          "emptyText": "暂无任务，用上方输入框添加",
           "itemRole": "card",
           "dividers": true
         },
@@ -1189,7 +1565,11 @@ description: "复杂 UI 或需要质量标杆时请求；包含来自 renderer-c
           "child": "todoItemBody",
           "role": "summary",
           "density": "compact",
-          "variant": "plain"
+          "variant": "plain",
+          "style": {
+            "backgroundColor": "#ffffff",
+            "borderRadius": "8px"
+          }
         },
         {
           "id": "todoItemBody",
@@ -1198,7 +1578,7 @@ description: "复杂 UI 或需要质量标杆时请求；包含来自 renderer-c
             "todoCheck",
             "todoTitle",
             "todoMeta",
-            "todoPriority"
+            "todoToggleButton"
           ],
           "role": "mediaObject",
           "alignment": "center",
@@ -1223,7 +1603,8 @@ description: "复杂 UI 或需要质量标杆时请求；包含来自 renderer-c
           "usageHint": "body",
           "truncate": true,
           "style": {
-            "minWidth": "86px"
+            "minWidth": "0",
+            "flex": 1
           }
         },
         {
@@ -1231,9 +1612,10 @@ description: "复杂 UI 或需要质量标杆时请求；包含来自 renderer-c
           "component": "Column",
           "children": [
             "todoProject",
-            "todoState"
+            "todoStatus"
           ],
-          "gap": "3px"
+          "gap": "2px",
+          "alignment": "end"
         },
         {
           "id": "todoProject",
@@ -1245,35 +1627,66 @@ description: "复杂 UI 或需要质量标杆时请求；包含来自 renderer-c
           "emphasis": "muted"
         },
         {
-          "id": "todoState",
+          "id": "todoStatus",
           "component": "Text",
-          "text": "复选框写回",
+          "text": {
+            "script": {
+              "code": "return dataModel.get('done') ? '已完成' : '进行中';",
+              "deps": [
+                "done"
+              ],
+              "fallback": "进行中"
+            }
+          },
           "role": "status",
           "emphasis": "success",
           "usageHint": "caption"
         },
         {
-          "id": "todoPriority",
-          "component": "Text",
-          "text": {
-            "path": "priority"
+          "id": "todoToggleButton",
+          "component": "Button",
+          "label": {
+            "script": {
+              "code": "return dataModel.get('done') ? '已完成' : '完成';",
+              "deps": [
+                "done"
+              ],
+              "fallback": "完成"
+            }
           },
-          "role": "status",
-          "emphasis": "warning",
-          "usageHint": "caption",
-          "truncate": true
+          "intent": "secondary",
+          "importance": "quiet",
+          "size": "sm",
+          "shape": "rounded",
+          "action": {
+            "script": {
+              "code": "const id = String(context.itemId || ''); const items = dataModel.get('/todo/items') || []; dataModel.set('/todo/items', items.map((item) => item.id === id ? { ...item, done: !item.done } : item)); actions.emit('todoToggled', { id, done: !Boolean(items.find((item) => item.id === id)?.done) });",
+              "deps": [
+                "/todo/items"
+              ],
+              "context": {
+                "itemId": {
+                  "path": "id"
+                }
+              }
+            }
+          }
         },
         {
           "id": "todoActions",
           "component": "Row",
           "children": [
             "clearDoneButton",
-            "todoOpenCount"
+            "todoSummary"
           ],
           "role": "actions",
           "distribution": "spaceBetween",
           "alignment": "center",
-          "wrap": false
+          "wrap": false,
+          "style": {
+            "paddingTop": "8px",
+            "borderTop": "solid 1px #e5e7eb"
+          }
         },
         {
           "id": "clearDoneButton",
@@ -1281,6 +1694,7 @@ description: "复杂 UI 或需要质量标杆时请求；包含来自 renderer-c
           "label": "清理已完成",
           "intent": "secondary",
           "size": "sm",
+          "shape": "rounded",
           "action": {
             "script": {
               "code": "const items = dataModel.get('/todo/items') || []; const next = items.filter((item) => !item.done); dataModel.set('/todo/items', next); actions.emit('completedCleared', { removed: items.length - next.length, remaining: next.length });",
@@ -1291,15 +1705,15 @@ description: "复杂 UI 或需要质量标杆时请求；包含来自 renderer-c
           }
         },
         {
-          "id": "todoOpenCount",
+          "id": "todoSummary",
           "component": "Text",
           "text": {
             "script": {
-              "code": "const items = dataModel.get('/todo/items') || []; return `${items.filter((item) => !item.done).length} open`; ",
+              "code": "const items = dataModel.get('/todo/items') || []; const done = items.filter((item) => item.done).length; return `${done}/${items.length} 已完成 · ${items.length - done} 待办`;",
               "deps": [
                 "/todo/items"
               ],
-              "fallback": "0 open"
+              "fallback": "0/0 已完成"
             }
           },
           "usageHint": "caption",
@@ -1311,4 +1725,6 @@ description: "复杂 UI 或需要质量标杆时请求；包含来自 renderer-c
 ]
 ```
 
-为什么好：它把草稿输入和任务列表放入 dataModel；TextField 绑定可编辑 draft；List 模板渲染任务卡；CheckBox 写回 item 状态；新增和清理按钮使用 action.script 做本地数组更新并回传事件；顶部和底部统计通过属性 script 从列表派生。
+为什么好——架构层面：草稿输入和任务列表放入 dataModel；顶部 3 列 Grid 指标卡通过属性 script 从 /todo/items 数组派生统计值；TextField 绑定可编辑 draft；List 模板渲染任务卡；CheckBox 写回 item 状态；新增和清理按钮使用 action.script 做本地数组更新并回传事件。
+
+为什么好——视觉层面：整体浅色背景（#f8fafc）+ 白色卡片（backgroundColor: "#ffffff", borderRadius: "12px", shadow: "sm"）；顶部统计区用三色指标卡——紫色（#f5f3ff）表总数、琥珀色（#fffbeb）表进行中、绿色（#f0fdf4）表已完成；数值用对应颜色 fontWeight: "800" + usageHint: "h4"；添加按钮用 backgroundColor: "#7c3aed" 品牌紫强调主操作；底部操作区用 borderTop 分隔线区分层级；列表项用 borderRadius: "8px" 微圆角保持清爽。

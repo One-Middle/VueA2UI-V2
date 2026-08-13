@@ -103,8 +103,9 @@ export const messageService = {
     }
 
     const activeWorkflow = await workflowService.getActiveWorkflow(sessionId);
+    const isNewWorkflow = !activeWorkflow && shouldStartWorkflow(content, options?.intent);
     const workflow = activeWorkflow ?? (
-      shouldStartWorkflow(content, options?.intent)
+      isNewWorkflow
         ? await workflowService.createWorkflow({
             sessionId,
             title: content.slice(0, 60),
@@ -125,6 +126,21 @@ export const messageService = {
     if (workflow) {
       logger.info(`收到 workflow 消息 → session=${SID(sessionId)}, workflow=${SID(workflow.id)}, content=${content.length}字`);
 
+      const advancedWorkflow = isNewWorkflow
+        ? await workflowService.startInitialPlanning({
+            sessionId,
+            workflowId: workflow.id,
+            userMessage: content,
+          })
+        : workflow.currentStepType === "confirm_plan"
+          ? await workflowService.requestPlanRevision({
+              sessionId,
+              workflowId: workflow.id,
+              revisionMessageId: message.id,
+              revisionText: content,
+            })
+          : workflow;
+
       return {
         message: {
           id: message.id,
@@ -133,9 +149,9 @@ export const messageService = {
         },
         agentRun: null,
         workflow: {
-          id: workflow.id,
-          status: workflow.status as NonNullable<SendMessageResponse["workflow"]>["status"],
-          currentStepType: workflow.currentStepType as NonNullable<SendMessageResponse["workflow"]>["currentStepType"],
+          id: advancedWorkflow?.id ?? workflow.id,
+          status: (advancedWorkflow?.status ?? workflow.status) as NonNullable<SendMessageResponse["workflow"]>["status"],
+          currentStepType: (advancedWorkflow?.currentStepType ?? workflow.currentStepType) as NonNullable<SendMessageResponse["workflow"]>["currentStepType"],
         },
         streamUrl: `/api/sessions/${sessionId}/stream`,
       };

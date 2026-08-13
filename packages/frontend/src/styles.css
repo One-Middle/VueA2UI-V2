@@ -208,13 +208,14 @@ body {
 
 .creation-shell {
   display: grid;
-  grid-template-columns: minmax(360px, 0.42fr) minmax(480px, 0.58fr);
+  grid-template-columns: minmax(300px, 0.32fr) minmax(340px, 0.3fr) minmax(460px, 0.38fr);
   gap: 18px;
   height: 100%;
   min-height: 0;
 }
 
 .creation-chat,
+.creation-workflow,
 .creation-preview,
 .page-panel {
   min-width: 0;
@@ -298,6 +299,7 @@ body {
   }
 
   .creation-chat,
+  .creation-workflow,
   .creation-preview {
     min-height: 520px;
   }

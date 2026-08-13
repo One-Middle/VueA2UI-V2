@@ -13,6 +13,8 @@
 
 import type {
   AgentRunDto,
+  AgentWorkflowDetailDto,
+  AgentWorkflowDto,
   A2UIEventDto,
   SessionDto,
   MessageDto,
@@ -23,6 +25,8 @@ import type {
   ToolCallDto,
   A2UIServerMessage,
   SurfaceState,
+  WorkflowArtifactDto,
+  WorkflowStepDto,
 } from "@a2ui-platform/shared";
 import { defineStore } from "pinia";
 import * as api from "../services/api";
@@ -64,6 +68,7 @@ export const useWorkspaceStore = defineStore("workspace", {
     enabledSkillIds: [] as string[],
     agentRuns: [] as AgentRunDto[],
     runtimeToolCalls: [] as ToolCallDto[],
+    workflows: [] as AgentWorkflowDetailDto[],
     a2uiEvents: [] as WorkspaceA2UIEvent[],
     surfaceSnapshots: [] as WorkspaceSurfaceSnapshot[],
 
@@ -99,6 +104,7 @@ export const useWorkspaceStore = defineStore("workspace", {
       this.enabledSkillIds = [];
       this.agentRuns = [];
       this.runtimeToolCalls = [];
+      this.workflows = [];
       this.a2uiEvents = [];
       this.surfaceSnapshots = [];
       this.isSending = false;
@@ -151,6 +157,7 @@ export const useWorkspaceStore = defineStore("workspace", {
       this.enabledSkillIds = [];
       this.agentRuns = [];
       this.runtimeToolCalls = [];
+      this.workflows = [];
       this.a2uiEvents = [];
       this.surfaceSnapshots = [];
 
@@ -166,6 +173,7 @@ export const useWorkspaceStore = defineStore("workspace", {
       void this.loadMessages(sessionId, sessionRevision);
       void this.loadFiles(sessionId, sessionRevision);
       void this.loadAgentRuns(sessionId, sessionRevision);
+      void this.loadWorkflows(sessionId, sessionRevision);
       void this.loadA2UIEvents(sessionId, sessionRevision);
       void this.loadSnapshots(sessionId, sessionRevision);
       void this.loadSessionDetail(sessionId, sessionRevision);
@@ -189,6 +197,7 @@ export const useWorkspaceStore = defineStore("workspace", {
           this.enabledSkillIds = [];
           this.agentRuns = [];
           this.runtimeToolCalls = [];
+          this.workflows = [];
           this.a2uiEvents = [];
           this.surfaceSnapshots = [];
           const renderer = useRendererStore();
@@ -424,6 +433,128 @@ export const useWorkspaceStore = defineStore("workspace", {
       }
     },
 
+    // ─── Workflow ───
+
+    /** 加载当前会话的 Workflow 历史。 */
+    async loadWorkflows(requestedSessionId?: string | null, requestedRevision?: number) {
+      const sessionId = requestedSessionId ?? this.activeSessionId;
+      const sessionRevision = requestedRevision ?? this._sessionRevision;
+      if (!sessionId) return;
+      try {
+        const result = await api.listWorkflows(sessionId);
+        if (!this.isCurrentSession(sessionId, sessionRevision)) return;
+        this.workflows = result.items;
+      } catch {
+        // 静默处理
+      }
+    },
+
+    /** 确认当前 plan，并启动 Candidate A2UI 生成。 */
+    async confirmWorkflowPlan() {
+      if (!this.activeSessionId) throw new Error("请先选择会话");
+      const result = await api.sendWorkflowAction(this.activeSessionId, {
+        action: "confirm_plan",
+        message: "确认方案",
+      });
+      this.upsertWorkflow(result.workflow);
+      if (result.message && !this.messages.some((message) => message.id === result.message!.id)) {
+        this.messages.push(result.message);
+      }
+      if (result.agentRun) {
+        this.upsertAgentRun(result.agentRun);
+        this.isGenerating = true;
+      }
+    },
+
+    /** 确认提交当前 Candidate A2UI。 */
+    async confirmWorkflowCommit(candidateArtifactId?: string) {
+      if (!this.activeSessionId) throw new Error("请先选择会话");
+      const result = await api.sendWorkflowAction(this.activeSessionId, {
+        action: "confirm_commit",
+        artifactId: candidateArtifactId,
+        message: "确认提交",
+      });
+      this.upsertWorkflow(result.workflow);
+      if (result.message && !this.messages.some((message) => message.id === result.message!.id)) {
+        this.messages.push(result.message);
+      }
+    },
+
+    /** 重试当前失败的 workflow step。 */
+    async retryWorkflowStep() {
+      if (!this.activeSessionId) throw new Error("请先选择会话");
+      const result = await api.sendWorkflowAction(this.activeSessionId, {
+        action: "retry_step",
+        message: "重试失败步骤",
+      });
+      this.upsertWorkflow(result.workflow);
+      if (result.message && !this.messages.some((message) => message.id === result.message!.id)) {
+        this.messages.push(result.message);
+      }
+      if (result.agentRun) {
+        this.upsertAgentRun(result.agentRun);
+        this.isGenerating = true;
+      }
+    },
+
+    /** 插入或更新 Workflow。 */
+    upsertWorkflow(workflow: AgentWorkflowDetailDto | AgentWorkflowDto) {
+      const existingIdx = this.workflows.findIndex((item) => item.id === workflow.id);
+      const detail = "steps" in workflow
+        ? workflow
+        : ({
+            ...workflow,
+            steps: existingIdx >= 0 ? this.workflows[existingIdx]!.steps : [],
+            artifacts: existingIdx >= 0 ? this.workflows[existingIdx]!.artifacts : [],
+            agentRuns: existingIdx >= 0 ? this.workflows[existingIdx]!.agentRuns : [],
+          } satisfies AgentWorkflowDetailDto);
+      if (existingIdx >= 0) {
+        this.workflows[existingIdx] = {
+          ...this.workflows[existingIdx],
+          ...detail,
+        };
+      } else {
+        this.workflows.unshift(detail);
+      }
+    },
+
+    /** 插入或更新 Workflow step。 */
+    upsertWorkflowStep(workflowId: string, step: WorkflowStepDto) {
+      const workflow = this.workflows.find((item) => item.id === workflowId);
+      if (!workflow) return;
+      const existingIdx = workflow.steps.findIndex((item) => item.id === step.id);
+      if (existingIdx >= 0) {
+        workflow.steps[existingIdx] = step;
+      } else {
+        workflow.steps.push(step);
+        workflow.steps.sort((a, b) => a.sequence - b.sequence);
+      }
+      workflow.currentStepType = step.type;
+    },
+
+    /** 插入或更新 Workflow artifact。 */
+    upsertWorkflowArtifact(workflowId: string, artifact: WorkflowArtifactDto) {
+      const workflow = this.workflows.find((item) => item.id === workflowId);
+      if (!workflow) return;
+      const existingIdx = workflow.artifacts.findIndex((item) => item.id === artifact.id);
+      if (existingIdx >= 0) {
+        workflow.artifacts[existingIdx] = artifact;
+      } else {
+        workflow.artifacts.push(artifact);
+        workflow.artifacts.sort((a, b) => a.kind.localeCompare(b.kind) || a.version - b.version);
+      }
+    },
+
+    /** 插入或更新 Agent run。 */
+    upsertAgentRun(agentRun: AgentRunDto) {
+      const existingIdx = this.agentRuns.findIndex((run) => run.id === agentRun.id);
+      if (existingIdx >= 0) {
+        this.agentRuns[existingIdx] = { ...this.agentRuns[existingIdx], ...agentRun };
+      } else {
+        this.agentRuns.push(agentRun);
+      }
+    },
+
     // ─── A2UI / Snapshots ───
 
     /** 加载当前会话的 A2UI Event 列表（最多 200 条）。 */
@@ -491,6 +622,36 @@ export const useWorkspaceStore = defineStore("workspace", {
           } else {
             this.agentRuns.push(data.agentRun as AgentRunDto);
           }
+        },
+
+        workflow_started: (data: { sessionId: string; workflow: AgentWorkflowDto }) => {
+          if (!isCurrent() || data.sessionId !== sessionId) return;
+          this.upsertWorkflow(data.workflow);
+        },
+
+        workflow_step_updated: (data: { sessionId: string; workflowId: string; step: WorkflowStepDto }) => {
+          if (!isCurrent() || data.sessionId !== sessionId) return;
+          this.upsertWorkflowStep(data.workflowId, data.step);
+        },
+
+        workflow_artifact_created: (data: { sessionId: string; workflowId: string; artifact: WorkflowArtifactDto }) => {
+          if (!isCurrent() || data.sessionId !== sessionId) return;
+          this.upsertWorkflowArtifact(data.workflowId, data.artifact);
+        },
+
+        workflow_completed: (data: { sessionId: string; workflow: AgentWorkflowDto }) => {
+          if (!isCurrent() || data.sessionId !== sessionId) return;
+          this.upsertWorkflow(data.workflow);
+          this.isGenerating = false;
+        },
+
+        workflow_failed: (data: { sessionId: string; workflow: AgentWorkflowDto; failedStep?: WorkflowStepDto }) => {
+          if (!isCurrent() || data.sessionId !== sessionId) return;
+          this.upsertWorkflow(data.workflow);
+          if (data.failedStep) {
+            this.upsertWorkflowStep(data.workflow.id, data.failedStep);
+          }
+          this.isGenerating = false;
         },
 
         agent_run_attempt: (data: { sessionId: string; agentRunId: string; attemptIndex: number; phase: string; toolCall?: ToolCallDto }) => {

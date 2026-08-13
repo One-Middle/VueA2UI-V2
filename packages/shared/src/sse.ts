@@ -2,14 +2,23 @@
  * SSE（Server-Sent Events）事件类型定义。
  *
  * 职责：
- * - 定义 Agent 运行阶段枚举（AgentRunPhase）
- * - 定义 SSE 事件名称联合类型（ServerSentEventName）
- * - 定义平台 SSE 事件的完整类型结构（PlatformSseEvent）
+ * - 定义 Agent 运行阶段枚举（AgentRunPhase）。
+ * - 定义 SSE 事件名称联合类型（ServerSentEventName）。
+ * - 定义平台 SSE 事件的完整类型结构（PlatformSseEvent）。
  *
  * 不负责：SSE 连接的建立与维护、事件发送逻辑。
  */
 
-import type { A2UIEventDto, AgentRunDto, MessageDto, SurfaceSnapshotDto, ToolCallDto } from "./api";
+import type {
+  A2UIEventDto,
+  AgentRunDto,
+  AgentWorkflowDto,
+  MessageDto,
+  SurfaceSnapshotDto,
+  ToolCallDto,
+  WorkflowArtifactDto,
+  WorkflowStepDto,
+} from "./api";
 
 /** Agent 运行阶段。 */
 export type AgentRunPhase =
@@ -29,7 +38,12 @@ export type ServerSentEventName =
   | "assistant_message"
   | "a2ui_messages"
   | "surface_snapshot"
-  | "agent_run_failed";
+  | "agent_run_failed"
+  | "workflow_started"
+  | "workflow_step_updated"
+  | "workflow_artifact_created"
+  | "workflow_completed"
+  | "workflow_failed";
 
 /** 平台 SSE 事件的完整类型联合，按 event 字段区分数据载荷。 */
 export type PlatformSseEvent =
@@ -88,4 +102,29 @@ export type PlatformSseEvent =
         agentRun: Pick<AgentRunDto, "id" | "status" | "attemptCount" | "failureReason">;
         message: MessageDto;
       };
+    }
+  | {
+      /** Agent Workflow 开始事件 */
+      event: "workflow_started";
+      data: { sessionId: string; workflow: AgentWorkflowDto };
+    }
+  | {
+      /** Workflow Step 更新事件 */
+      event: "workflow_step_updated";
+      data: { sessionId: string; workflowId: string; step: WorkflowStepDto };
+    }
+  | {
+      /** Workflow Artifact 创建事件 */
+      event: "workflow_artifact_created";
+      data: { sessionId: string; workflowId: string; artifact: WorkflowArtifactDto };
+    }
+  | {
+      /** Agent Workflow 完成事件 */
+      event: "workflow_completed";
+      data: { sessionId: string; workflow: AgentWorkflowDto };
+    }
+  | {
+      /** Agent Workflow 失败事件 */
+      event: "workflow_failed";
+      data: { sessionId: string; workflow: AgentWorkflowDto; failedStep?: WorkflowStepDto };
     };

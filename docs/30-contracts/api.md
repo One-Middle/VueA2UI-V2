@@ -45,6 +45,18 @@
 - `GET /api/sessions/:sessionId/agent-runs`
 - `GET /api/sessions/:sessionId/agent-runs/:agentRunId`
 
+### Agent Workflows
+
+Workflow DTO 与 action 契约由 `packages/shared/src/api.ts` 维护。第一期接口形态以通用 action 为目标：
+
+- `GET /api/sessions/:sessionId/workflows`
+- `GET /api/sessions/:sessionId/workflows/:workflowId`
+- `POST /api/sessions/:sessionId/workflow/actions`
+
+`MessageDto` 和 `AgentRunDto` 包含可选 `workflowId` 与 `workflowStepId`，用于把用户可见消息、模型运行记录和 workflow timeline 串起来。
+
+`POST /api/sessions/:sessionId/workflow/actions` 当前已支持 `confirm_plan` 和 `confirm_commit`。`confirm_plan` 会创建用户可见确认 message，确认最新 `confirm_plan` step，创建 `generate_a2ui` step，并启动 workflow-scoped Agent run。该 run 只生成和校验 Candidate A2UI：成功时写入 `candidate_a2ui_messages` artifact 并进入 `preview`，失败时写入 `validation_report` artifact，不创建正式 A2UI event 或 surface snapshot。`confirm_commit` 会校验当前 `preview` step 和已验证 candidate artifact，然后提交 exact stored candidate messages，创建正式 A2UI event、current surface snapshot 和 workflow completion metadata。
+
 ### Files
 
 - `POST /api/sessions/:sessionId/files`
@@ -95,6 +107,11 @@ SSE 事件类型由 `packages/shared/src/sse.ts` 维护。当前核心事件包�
 - `surface_snapshot`
 - `agent_run_completed`
 - `agent_run_failed`
+- `workflow_started`
+- `workflow_step_updated`
+- `workflow_artifact_created`
+- `workflow_completed`
+- `workflow_failed`
 
 前端必须在会话切换时关闭旧 SSE 连接，并使用会话 ID 与会话修订号拦截迟到事件。
 

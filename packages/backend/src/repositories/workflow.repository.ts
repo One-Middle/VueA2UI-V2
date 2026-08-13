@@ -54,7 +54,40 @@ export const workflowRepository = {
       include: {
         steps: { where: { deletedAt: null }, orderBy: { sequence: "asc" } },
         artifacts: { where: { deletedAt: null }, orderBy: [{ kind: "asc" }, { version: "asc" }] },
+        agentRuns: { where: { deletedAt: null }, orderBy: { createdAt: "asc" } },
       },
+    });
+  },
+
+  /** 查询单个 Workflow，包含 steps 和 artifacts。 */
+  findWorkflowById(id: string) {
+    return prisma.agentWorkflow.findFirst({
+      where: { id, deletedAt: null },
+      include: {
+        steps: { where: { deletedAt: null }, orderBy: { sequence: "asc" } },
+        artifacts: { where: { deletedAt: null }, orderBy: [{ kind: "asc" }, { version: "asc" }] },
+        agentRuns: { where: { deletedAt: null }, orderBy: { createdAt: "asc" } },
+      },
+    });
+  },
+
+  /** 查询 Workflow 中指定类型的最新 step。 */
+  findLatestStep(workflowId: string, type?: string) {
+    return prisma.workflowStep.findFirst({
+      where: {
+        workflowId,
+        deletedAt: null,
+        ...(type ? { type } : {}),
+      },
+      orderBy: { sequence: "desc" },
+    });
+  },
+
+  /** 查询 Workflow 中指定 kind 的最新 artifact。 */
+  findLatestArtifact(workflowId: string, kind: string) {
+    return prisma.workflowArtifact.findFirst({
+      where: { workflowId, kind, deletedAt: null },
+      orderBy: { version: "desc" },
     });
   },
 

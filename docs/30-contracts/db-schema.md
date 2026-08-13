@@ -13,6 +13,9 @@
 - `uploaded_files`：用户上传的 `.txt` 文件。
 - `skills`：可注入 Agent 上下文的文本说明；`metadata.references` 保存该 Skill 的参考资料列表，结构为 `id`、`title`、`content` 和可选 `description`。
 - `session_skills`：会话与 skill 的启用关系。
+- `agent_workflows`：session 内一次可恢复的 Agent Workflow 过程。
+- `workflow_steps`：Agent Workflow 中可观测、可失败重试和可确认的阶段记录。
+- `workflow_artifacts`：Agent Workflow 中产生的过程产物，例如澄清表单、Markdown 方案、候选 A2UI messages 和校验报告。
 - `agent_runs`：一次模型生成或修复过程。
 - `tool_calls`：校验、组件详情披露等工具调用记录。
 - `a2ui_events`：已提交的 A2UI 消息批次。
@@ -26,6 +29,9 @@
 - Surface snapshot 必须由 committed A2UI events 物化得到。
 - 文件上传只允许用户上传的 `.txt` 文件，不允许任意路径读取。
 - API key 不得写入数据库。
+- 一个 session 可以保留多次 Agent Workflow 历史，但同一时刻只能有一个处于 active、running、awaiting confirmation 或 retryable 状态的 workflow。
+- Agent run 和用户可见 message 可以关联到 workflow 和 workflow step，便于恢复完整 workflow timeline。
+- Candidate A2UI 只能作为 workflow artifact 保存；用户确认提交前不得写入 A2UI events 或 surface snapshots。
 
 ## 4. 提交事务
 

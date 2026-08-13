@@ -88,4 +88,4 @@ componentInfoRequest.components 只能填写 Basic Catalog 中存在的组件名
 ## References
 
 - [A2UI 标准生成规则](./references/a2ui-generation-standards.md)：生成 UI 前必须请求；包含符合 Renderer 的完整消息结构、组件树、dataModel、List、表单、事件、JSRuntime、安全边界、bad case 和输出检查。
-- [高质量 A2UI Good Case](./references/high-quality-a2ui-good-cases.md)：复杂 UI 或需要质量标杆时请求；包含来自 renderer-capability-demo 的 Music Player、Finance Brief、Work Board 三个完整 good case，并说明为什么好。
+- [高质量 A2UI Good Case](./references/high-quality-a2ui-good-cases.md)：复杂 UI 或需要质量标杆时请求；包含 Live Commerce（亮色电商）、Finance Brief（黑金金融）、Work Board（清爽工具）三个完整 good case，覆盖三种视觉范式。

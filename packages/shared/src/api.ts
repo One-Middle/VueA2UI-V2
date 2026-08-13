@@ -1,4 +1,4 @@
-/**
+﻿/**
  * API DTO 类型定义（请求/响应）。
  *
  * 职责：
@@ -40,6 +40,51 @@ export type MessageKind =
 export type AgentRunStatus = "pending" | "running" | "committed" | "failed" | "cancelled";
 /** 工具调用状态 */
 export type ToolCallStatus = "running" | "succeeded" | "failed";
+/** Agent Workflow 状态 */
+export type AgentWorkflowStatus =
+  | "active"
+  | "running"
+  | "awaiting_confirmation"
+  | "failed_retryable"
+  | "completed"
+  | "failed"
+  | "cancelled";
+/** Workflow Step 状态 */
+export type WorkflowStepStatus =
+  | "pending"
+  | "running"
+  | "awaiting_confirmation"
+  | "confirmed"
+  | "completed"
+  | "failed"
+  | "skipped";
+/** Workflow Step 类型 */
+export type WorkflowStepType =
+  | "understand"
+  | "clarify"
+  | "propose"
+  | "confirm_plan"
+  | "generate_a2ui"
+  | "validate"
+  | "preview"
+  | "confirm_commit"
+  | "commit";
+/** Workflow Artifact 类型 */
+export type WorkflowArtifactKind =
+  | "clarification_form"
+  | "plan_markdown"
+  | "candidate_a2ui_messages"
+  | "validation_report";
+/** Workflow Artifact 创建者 */
+export type WorkflowArtifactCreatedBy = "agent" | "user" | "backend";
+/** Workflow action 类型 */
+export type WorkflowActionType =
+  | "submit_clarification"
+  | "confirm_plan"
+  | "request_revision"
+  | "confirm_commit"
+  | "retry_step"
+  | "cancel";
 /** A2UI 事件状态 */
 export type A2UIEventStatus = "committed" | "reverted" | "ignored";
 /** 上传文件状态 */
@@ -111,6 +156,10 @@ export interface MessageDto {
   sessionId: string;
   /** 关联的 Agent 运行 ID（普通聊天消息为 null） */
   agentRunId: string | null;
+  /** 关联的 Agent Workflow ID */
+  workflowId: string | null;
+  /** 关联的 Workflow Step ID */
+  workflowStepId: string | null;
   /** 消息角色 */
   role: MessageRole;
   /** 消息种类 */
@@ -181,6 +230,10 @@ export interface AgentRunDto {
   id: string;
   /** 所属会话 ID */
   sessionId: string;
+  /** 关联的 Agent Workflow ID */
+  workflowId: string | null;
+  /** 关联的 Workflow Step ID */
+  workflowStepId: string | null;
   /** 触发消息 ID */
   triggerMessageId: string | null;
   /** 运行状态 */
@@ -213,6 +266,112 @@ export interface AgentRunDto {
   completedAt: string | null;
   /** 创建时间（ISO 8601） */
   createdAt: string;
+}
+
+/** Workflow Step DTO */
+export interface WorkflowStepDto {
+  /** Workflow Step 唯一 ID */
+  id: string;
+  /** 所属 Agent Workflow ID */
+  workflowId: string;
+  /** 所属 session ID */
+  sessionId: string;
+  /** Step 类型 */
+  type: WorkflowStepType;
+  /** Step 状态 */
+  status: WorkflowStepStatus;
+  /** Workflow 内顺序 */
+  sequence: number;
+  /** 已尝试次数 */
+  attemptCount: number;
+  /** 最大尝试次数 */
+  maxAttempts: number;
+  /** 失败原因 */
+  failureReason: string | null;
+  /** 失败元数据 */
+  failureMetadata: JsonObject;
+  /** 确认时间 */
+  confirmedAt: string | null;
+  /** 触发确认的用户消息 ID */
+  confirmedByMessageId: string | null;
+  /** 开始时间 */
+  startedAt: string | null;
+  /** 完成时间 */
+  completedAt: string | null;
+  /** 扩展元数据 */
+  metadata: JsonObject;
+  /** 创建时间 */
+  createdAt: string;
+  /** 更新时间 */
+  updatedAt: string;
+}
+
+/** Workflow Artifact DTO */
+export interface WorkflowArtifactDto {
+  /** Workflow Artifact 唯一 ID */
+  id: string;
+  /** 所属 Agent Workflow ID */
+  workflowId: string;
+  /** 所属 Workflow Step ID */
+  workflowStepId: string | null;
+  /** 所属 session ID */
+  sessionId: string;
+  /** Artifact 类型 */
+  kind: WorkflowArtifactKind;
+  /** 同 kind 下的版本号 */
+  version: number;
+  /** 文本内容 */
+  contentText: string | null;
+  /** JSON 内容 */
+  contentJson: JsonObject;
+  /** 创建者 */
+  createdBy: WorkflowArtifactCreatedBy;
+  /** 扩展元数据 */
+  metadata: JsonObject;
+  /** 创建时间 */
+  createdAt: string;
+  /** 更新时间 */
+  updatedAt: string;
+}
+
+/** Agent Workflow DTO */
+export interface AgentWorkflowDto {
+  /** Agent Workflow 唯一 ID */
+  id: string;
+  /** 所属 session ID */
+  sessionId: string;
+  /** Workflow 状态 */
+  status: AgentWorkflowStatus;
+  /** 当前 Step 类型 */
+  currentStepType: WorkflowStepType | null;
+  /** Workflow 标题 */
+  title: string | null;
+  /** 用户意图 */
+  intent: string | null;
+  /** 完成原因 */
+  completedReason: string | null;
+  /** 失败原因 */
+  failureReason: string | null;
+  /** 扩展元数据 */
+  metadata: JsonObject;
+  /** 开始时间 */
+  startedAt: string | null;
+  /** 完成时间 */
+  completedAt: string | null;
+  /** 创建时间 */
+  createdAt: string;
+  /** 更新时间 */
+  updatedAt: string;
+}
+
+/** Agent Workflow 详情 DTO */
+export interface AgentWorkflowDetailDto extends AgentWorkflowDto {
+  /** Workflow steps */
+  steps: WorkflowStepDto[];
+  /** Workflow artifacts */
+  artifacts: WorkflowArtifactDto[];
+  /** 关联 Agent runs */
+  agentRuns: AgentRunDto[];
 }
 
 /** 工具调用 DTO */
@@ -331,9 +490,35 @@ export interface SendMessageResponse {
   /** 创建的消息摘要 */
   message: Pick<MessageDto, "id" | "role" | "content">;
   /** 触发的 Agent 运行摘要 */
-  agentRun: Pick<AgentRunDto, "id" | "status">;
+  agentRun: Pick<AgentRunDto, "id" | "status"> | null;
+  /** 触发或推进的 Agent Workflow 摘要 */
+  workflow?: Pick<AgentWorkflowDto, "id" | "status" | "currentStepType"> | null;
   /** SSE 流地址 */
   streamUrl: string;
+}
+
+/** Workflow action 请求 */
+export interface WorkflowActionRequest {
+  /** Action 类型 */
+  action: WorkflowActionType;
+  /** 关联 step ID */
+  workflowStepId?: string;
+  /** 关联 artifact ID */
+  artifactId?: string;
+  /** 用户可见消息内容 */
+  message?: string;
+  /** 表单答案或结构化载荷 */
+  payload?: JsonObject;
+}
+
+/** Workflow action 响应 */
+export interface WorkflowActionResponse {
+  /** Workflow 详情 */
+  workflow: AgentWorkflowDetailDto;
+  /** 可选用户可见消息 */
+  message?: MessageDto;
+  /** 可选触发的 Agent run */
+  agentRun?: AgentRunDto;
 }
 
 /** Renderer Action 请求（复用 A2UI 客户端消息） */
@@ -371,6 +556,8 @@ export interface SessionDetailResponse {
   currentSnapshot: SurfaceSnapshotDto | null;
   /** 已启用的 Skill ID 列表 */
   enabledSkillIds: string[];
+  /** Workflow 历史 */
+  workflows?: AgentWorkflowDetailDto[];
 }
 
 // ─── Skill 请求 ─────────────────────────────────────────
@@ -496,3 +683,4 @@ export interface SessionSkillDto {
   /** 是否已启用 */
   enabled: boolean;
 }
+

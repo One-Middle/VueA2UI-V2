@@ -17,6 +17,7 @@ import ImportExportPanel from "../features/import-export/ImportExportPanel.vue";
 import PreviewPanel from "../features/preview/PreviewPanel.vue";
 import RuntimePanel from "../features/runtime/RuntimePanel.vue";
 import SkillsPanel from "../features/skills/SkillsPanel.vue";
+import WorkflowPanel from "../features/workflow/WorkflowPanel.vue";
 import { useWorkspaceStore, type WorkspaceTab } from "../stores/workspace";
 
 const workspace = useWorkspaceStore();
@@ -130,6 +131,9 @@ const createSession = () => {
           <section v-else-if="workspace.activeTab === 'conversation'" class="creation-shell">
             <div class="creation-chat">
               <ConversationPanel />
+            </div>
+            <div class="creation-workflow">
+              <WorkflowPanel />
             </div>
             <div class="creation-preview">
               <PreviewPanel compact />

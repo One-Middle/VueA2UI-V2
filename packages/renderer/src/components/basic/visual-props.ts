@@ -34,6 +34,8 @@ const DIRECT_STYLE_KEYS = [
   "alignSelf",
   "justifySelf",
   "opacity",
+  "overflow",
+  "flex",
 ] as const;
 
 const SHADOW_MAP: Record<string, string> = {

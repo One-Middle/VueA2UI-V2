@@ -45,7 +45,7 @@ const STYLE_PROPERTY: InternalPropertyDef = {
   name: "style",
   type: "object",
   description:
-    "受控样式对象，只允许 width/height/minWidth/maxWidth/minHeight/maxHeight/padding/paddingX/paddingY/margin/marginX/marginY/gap/color/backgroundColor/borderColor/borderWidth/borderRadius/fontSize/fontWeight/lineHeight/textAlign/alignSelf/justifySelf/shadow/opacity 等白名单字段",
+    "受控样式对象。可用字段：width (string)、height (string)、minWidth (string)、maxWidth (string)、minHeight (string)、maxHeight (string)、padding (string)、paddingX (string → paddingLeft+paddingRight)、paddingY (string → paddingTop+paddingBottom)、margin (string)、marginX (string → marginLeft+marginRight)、marginY (string → marginTop+marginBottom)、gap (string)、color (string)、backgroundColor (string)、borderColor (string)、borderWidth (string)、borderRadius (string)、fontSize (string)、fontWeight (number|string)、lineHeight (number|string)、textAlign (string)、alignSelf (string)、justifySelf (string)、shadow (string，允许值 none|xs|sm|md|lg，映射到 boxShadow)、opacity (number|string)、overflow (string)、flex (number|string)。不在上述列表中的字段会被渲染器忽略。",
 };
 
 const VISUAL_PROPERTIES: InternalPropertyDef[] = [

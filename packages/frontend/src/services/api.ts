@@ -8,6 +8,7 @@
 import type {
   AgentRunDetailResponse,
   AgentRunDto,
+  AgentWorkflowDetailDto,
   A2UIClientMessage,
   A2UIEventDto,
   CreateSessionRequest,
@@ -28,6 +29,8 @@ import type {
   UpdateSessionRequest,
   UpdateSkillRequest,
   UploadedFileDto,
+  WorkflowActionRequest,
+  WorkflowActionResponse,
 } from "@a2ui-platform/shared";
 import { logger } from "./logger";
 
@@ -225,6 +228,26 @@ export function listAgentRuns(sessionId: string, params?: { limit?: number; curs
 /** 获取 Agent Run 详情 */
 export function getAgentRunDetail(sessionId: string, runId: string): Promise<AgentRunDetailResponse> {
   return request("GET", `/sessions/${sessionId}/agent-runs/${runId}`);
+}
+
+// ─── Agent Workflow ───────────────────────────────────────
+
+/** 获取 Workflow 历史 */
+export function listWorkflows(sessionId: string): Promise<{ items: AgentWorkflowDetailDto[] }> {
+  return request("GET", `/sessions/${sessionId}/workflows`);
+}
+
+/** 获取 Workflow 详情 */
+export function getWorkflow(sessionId: string, workflowId: string): Promise<{ workflow: AgentWorkflowDetailDto }> {
+  return request("GET", `/sessions/${sessionId}/workflows/${workflowId}`);
+}
+
+/** 推进 Workflow action */
+export function sendWorkflowAction(
+  sessionId: string,
+  data: WorkflowActionRequest,
+): Promise<WorkflowActionResponse> {
+  return request("POST", `/sessions/${sessionId}/workflow/actions`, data);
 }
 
 // ─── 文件 ──────────────────────────────────────────────────

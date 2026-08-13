@@ -26,6 +26,7 @@ import { skillsRouter } from "./routes/skills.js";
 import { a2uiRouter } from "./routes/a2ui.js";
 import { rendererRouter } from "./routes/renderer.js";
 import { exportRouter } from "./routes/export.js";
+import { workflowsRouter } from "./routes/workflows.js";
 
 /**
  * 创建并配置 Express 应用实例。
@@ -87,6 +88,7 @@ export function createApp() {
   app.use("/api", a2uiRouter);
   app.use("/api", rendererRouter);
   app.use("/api", exportRouter);
+  app.use("/api", workflowsRouter);
 
   // 404 handler —— 未匹配到任何路由时返回
   app.use((_req, res) => {

@@ -20,7 +20,16 @@
 - 跨模块字段变更必须先修改 `shared`，再修改调用方。
 - 不允许在多个模块重复定义 Session、Message、A2UIEvent、SurfaceSnapshot、SSEEvent、AgentResult 等 DTO。
 
-## 3.1 Agent Runtime 共享字段
+## 3.1 Agent Workflow 共享字段
+
+- `AgentWorkflowDto` 描述 session 内一次可恢复 Agent Workflow 的状态、当前 step、意图、完成/失败原因和时间戳。
+- `WorkflowStepDto` 描述 workflow 中的可观测阶段，状态集合为 `pending`、`running`、`awaiting_confirmation`、`confirmed`、`completed`、`failed` 和 `skipped`。
+- `WorkflowArtifactDto` 描述 workflow 产物，`kind` 包含 `clarification_form`、`plan_markdown`、`candidate_a2ui_messages` 和 `validation_report`。
+- `MessageDto` 和 `AgentRunDto` 包含可选 `workflowId` 与 `workflowStepId`，用于恢复完整 workflow timeline。
+- `WorkflowActionRequest` 和 `WorkflowActionResponse` 是前端推进 workflow 的通用 action 契约。
+- `PlatformSseEvent` 包含 workflow 级事件：`workflow_started`、`workflow_step_updated`、`workflow_artifact_created`、`workflow_completed` 和 `workflow_failed`。
+
+## 3.2 Agent Runtime 共享字段
 
 - `AgentRunInput.enabledSkills` 包含 `id`、`name`、`description`、`content` 和可选 `references`；Runtime 初始 Prompt 只暴露 Skill 摘要和 Reference 摘要，完整 `content` 仅在 `skillInfoRequest` 命中后披露，完整 Reference 内容仅在 `skillReferenceRequest` 命中后披露。
 - `SkillReference` 包含 `id`、`title`、`content` 和可选 `description`，表示隶属于单个 Skill 的参考资料正文。

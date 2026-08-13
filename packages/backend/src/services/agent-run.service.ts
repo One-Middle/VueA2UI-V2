@@ -39,6 +39,7 @@ import { a2uiEventRepository } from "../repositories/a2ui-event.repository.js";
 import { agentRunRepository } from "../repositories/agent-run.repository.js";
 import { fileRepository } from "../repositories/file.repository.js";
 import { messageRepository } from "../repositories/message.repository.js";
+import { sessionRepository } from "../repositories/session.repository.js";
 import { surfaceSnapshotRepository } from "../repositories/surface-snapshot.repository.js";
 import { toolCallRepository } from "../repositories/tool-call.repository.js";
 import { notFound } from "../utils/errors.js";
@@ -46,6 +47,7 @@ import { config } from "../config.js";
 import { snapshotService } from "./snapshot.service.js";
 import { skillResolverService } from "./skill-resolver.service.js";
 import { streamService } from "./stream.service.js";
+import { workflowService } from "./workflow.service.js";
 
 /**
  * 截取 ID 前 8 位用于日志展示，避免完整 UUID 占满日志宽度。
@@ -118,6 +120,37 @@ function buildAgentRuntime(): IAgentRuntime {
   });
 }
 
+async function buildAgentInput(sessionId: string, userMessage: string): Promise<AgentRunInput> {
+  const currentSnapshot = await surfaceSnapshotRepository.findCurrentBySessionId(sessionId);
+  const recentMessages = await messageRepository.findBySessionId(sessionId, { limit: 20 });
+  const uploadedFiles = await fileRepository.findReadyWithContentBySessionId(sessionId);
+  const enabledSkills = await skillResolverService.resolveForSession(sessionId);
+
+  return {
+    sessionId,
+    userMessage,
+    recentMessages: recentMessages.map((message) => ({
+      role: message.role,
+      content: message.content,
+    })),
+    uploadedFiles: uploadedFiles.map((file) => ({
+      id: file.id,
+      originalName: file.originalName,
+      content: file.content,
+    })),
+    enabledSkills,
+    currentSnapshot: currentSnapshot ? (currentSnapshot.snapshot as AgentRunInput["currentSnapshot"]) : null,
+    catalogId: config.catalog.id,
+    catalogVersion: config.catalog.version,
+    rendererVersion: config.catalog.rendererVersion,
+    model: {
+      provider: "openai-compatible",
+      name: config.openai.model,
+      config: {},
+    },
+  };
+}
+
 /**
  * 记录 Agent Runtime 中单次工具调用的执行结果并推送到 SSE。
  *
@@ -171,6 +204,337 @@ async function recordRuntimeToolCall(
 
 export const agentRunService = {
   /**
+   * 为 workflow candidate 生成创建并启动一条 Agent run。
+   *
+   * @param input - workflow candidate run 启动参数
+   * @returns 新建的 Agent run 摘要
+   */
+  async startWorkflowCandidateRun(input: {
+    sessionId: string;
+    workflowId: string;
+    workflowStepId: string;
+    triggerMessageId: string;
+    planMarkdown: string;
+  }) {
+    const session = await sessionRepository.findById(input.sessionId);
+    if (!session) {
+      throw notFound("Session", input.sessionId);
+    }
+
+    const run = await agentRunRepository.create({
+      session: { connect: { id: input.sessionId } },
+      workflow: { connect: { id: input.workflowId } },
+      workflowStep: { connect: { id: input.workflowStepId } },
+      triggerMessageId: input.triggerMessageId,
+      status: "pending",
+      intent: "GENERATE_CANDIDATE_A2UI",
+      modelProvider: session.modelProvider,
+      modelName: session.modelName,
+      modelConfig: session.modelConfig as unknown as Prisma.InputJsonValue,
+      attemptCount: 0,
+      maxAttempts: 3,
+      metadata: {
+        planMarkdown: input.planMarkdown,
+      },
+    });
+
+    void agentRunService.executeWorkflowCandidateRun({
+      agentRunId: run.id,
+      sessionId: input.sessionId,
+      workflowId: input.workflowId,
+      workflowStepId: input.workflowStepId,
+      planMarkdown: input.planMarkdown,
+    });
+
+    return run;
+  },
+
+  /**
+   * 执行 workflow candidate 生成：调用 Runtime，但只保存 candidate artifact。
+   *
+   * 注意：本路径不调用 commitRun，因此不会创建正式 A2UI event 或 surface snapshot。
+   */
+  async executeWorkflowCandidateRun(input: {
+    agentRunId: string;
+    sessionId: string;
+    workflowId: string;
+    workflowStepId: string;
+    planMarkdown: string;
+  }): Promise<void> {
+    const run = await agentRunRepository.update(input.agentRunId, {
+      status: "running",
+      startedAt: new Date(),
+      attemptCount: 0,
+    });
+
+    streamService.send(input.sessionId, {
+      event: "agent_run_started",
+      data: {
+        sessionId: input.sessionId,
+        agentRun: {
+          id: run.id,
+          status: run.status as AgentRunDto["status"],
+          attemptCount: run.attemptCount,
+          maxAttempts: run.maxAttempts,
+        },
+      },
+    });
+
+    setImmediate(async () => {
+      try {
+        await workflowService.updateStep({
+          workflowId: input.workflowId,
+          sessionId: input.sessionId,
+          stepId: input.workflowStepId,
+          status: "running",
+          startedAt: new Date(),
+          metadata: {
+            gate: "generate_a2ui",
+            agentRunId: input.agentRunId,
+          },
+        });
+
+        const agentInput = await buildAgentInput(
+          input.sessionId,
+          [
+            "请根据下面已确认的 Markdown plan 生成 Candidate A2UI messages。",
+            "只输出合法 A2UI，不要提交正式状态；后端会把通过校验的结果保存为 candidate artifact。",
+            "",
+            input.planMarkdown,
+          ].join("\n"),
+        );
+        const runtime = buildAgentRuntime();
+        const toolCallTasks: Array<Promise<void>> = [];
+        const result = await runtime.run(agentInput, (record) => {
+          toolCallTasks.push(recordRuntimeToolCall(input.agentRunId, input.sessionId, record));
+        });
+        await Promise.all(toolCallTasks);
+
+        if (result.status === "COMMITTED") {
+          await workflowService.recordCandidateSuccess({
+            sessionId: input.sessionId,
+            workflowId: input.workflowId,
+            generateStepId: input.workflowStepId,
+            agentRunId: input.agentRunId,
+            assistantMessage: result.assistantMessage,
+            a2uiMessages: result.a2uiMessages,
+            validation: result.validation,
+            tokenUsage: result.tokenUsage,
+          });
+
+          await agentRunRepository.update(input.agentRunId, {
+            status: "committed",
+            attemptCount: result.attemptCount,
+            validationSummary: result.validation as unknown as Prisma.InputJsonValue,
+            tokenUsage: (result.tokenUsage ?? {}) as Prisma.InputJsonValue,
+            completedAt: new Date(),
+          });
+          return;
+        }
+
+        const failureReason = result.status === "TEXT_ONLY"
+          ? "Agent 未生成 Candidate A2UI messages"
+          : result.failureReason;
+        await workflowService.recordCandidateFailure({
+          sessionId: input.sessionId,
+          workflowId: input.workflowId,
+          generateStepId: input.workflowStepId,
+          agentRunId: input.agentRunId,
+          failureReason,
+          validation: result.status === "FAILED" ? result.validation : undefined,
+        });
+        await agentRunService.failRun(input.agentRunId, input.sessionId, failureReason, result.attemptCount);
+      } catch (err) {
+        const reason = toAgentRunError(err);
+        logger.error(`Workflow candidate run 执行失败 -> session=${SID(input.sessionId)}, runId=${SID(input.agentRunId)}, error=${reason.slice(0, 120)}`);
+        await workflowService.recordCandidateFailure({
+          sessionId: input.sessionId,
+          workflowId: input.workflowId,
+          generateStepId: input.workflowStepId,
+          agentRunId: input.agentRunId,
+          failureReason: reason,
+        });
+        await agentRunService.failRun(input.agentRunId, input.sessionId, reason, 1);
+      }
+    });
+  },
+
+  /**
+   * 将已确认的 Candidate A2UI artifact 提交为正式 A2UI event 和 current snapshot。
+   *
+   * 注意：提交使用 artifact 中保存的 exact messages，不重新调用 Agent Runtime。
+   */
+  async commitWorkflowCandidate(input: {
+    sessionId: string;
+    workflowId: string;
+    workflowStepId: string;
+    confirmedByMessageId: string;
+    candidateArtifact: {
+      id: string;
+      version: number;
+      contentText: string | null;
+      contentJson: unknown;
+    };
+  }) {
+    const content = input.candidateArtifact.contentJson as {
+      messages?: A2UIServerMessage[];
+      validation?: Extract<AgentRunResult, { status: "COMMITTED" }>["validation"];
+    };
+    const a2uiMessages = content.messages ?? [];
+    const validation = content.validation;
+    if (!validation?.valid || a2uiMessages.length === 0) {
+      throw new Error("Candidate artifact 缺少可提交的 A2UI messages 或 validation");
+    }
+
+    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const assistantMessage = await tx.message.create({
+        data: {
+          sessionId: input.sessionId,
+          workflowId: input.workflowId,
+          workflowStepId: input.workflowStepId,
+          role: "assistant",
+          kind: "chat",
+          content: input.candidateArtifact.contentText ?? "已提交 Candidate A2UI。",
+          attachments: [],
+          a2uiEventIds: [],
+          metadata: {
+            candidateArtifactId: input.candidateArtifact.id,
+            candidateVersion: input.candidateArtifact.version,
+          },
+        },
+      });
+
+      const sequence = await a2uiEventRepository.getNextSequence(input.sessionId, tx);
+      const surfaceIds = extractSurfaceIds(a2uiMessages);
+      const a2uiEvent = await tx.a2UIEvent.create({
+        data: {
+          sessionId: input.sessionId,
+          messageId: assistantMessage.id,
+          sequence,
+          status: "committed",
+          catalogId: config.catalog.id,
+          catalogVersion: config.catalog.version,
+          rendererVersion: config.catalog.rendererVersion,
+          surfaceIds,
+          messages: a2uiMessages as unknown as Prisma.InputJsonValue,
+          validationResult: validation as unknown as Prisma.InputJsonValue,
+          metadata: {
+            workflowId: input.workflowId,
+            workflowStepId: input.workflowStepId,
+            candidateArtifactId: input.candidateArtifact.id,
+          },
+        },
+      });
+
+      await tx.message.update({
+        where: { id: assistantMessage.id },
+        data: { a2uiEventIds: [a2uiEvent.id] },
+      });
+
+      const snapshotData = await snapshotService.computeFromEvents(input.sessionId, tx);
+      const { surfaceCount, componentCount } = snapshotService.getCounts(snapshotData);
+      await surfaceSnapshotRepository.unsetCurrent(input.sessionId, tx);
+
+      const newSnapshot = await tx.surfaceSnapshot.create({
+        data: {
+          sessionId: input.sessionId,
+          a2uiEventId: a2uiEvent.id,
+          sequence,
+          isCurrent: true,
+          catalogId: config.catalog.id,
+          catalogVersion: config.catalog.version,
+          rendererVersion: config.catalog.rendererVersion,
+          surfaceCount,
+          componentCount,
+          snapshot: snapshotData as unknown as Prisma.InputJsonValue,
+          summary: assistantMessage.content,
+          metadata: {
+            workflowId: input.workflowId,
+            workflowStepId: input.workflowStepId,
+            candidateArtifactId: input.candidateArtifact.id,
+          },
+        },
+      });
+
+      await tx.session.update({
+        where: { id: input.sessionId },
+        data: {
+          currentSnapshotId: newSnapshot.id,
+        },
+      });
+
+      await tx.workflowStep.update({
+        where: { id: input.workflowStepId },
+        data: {
+          status: "completed",
+          completedAt: new Date(),
+          metadata: {
+            gate: "commit",
+            committed: true,
+            confirmedByMessageId: input.confirmedByMessageId,
+            candidateArtifactId: input.candidateArtifact.id,
+            a2uiEventId: a2uiEvent.id,
+            snapshotId: newSnapshot.id,
+            assistantMessageId: assistantMessage.id,
+          },
+        },
+      });
+
+      const completedWorkflow = await tx.agentWorkflow.update({
+        where: { id: input.workflowId },
+        data: {
+          status: "completed",
+          currentStepType: "commit",
+          completedReason: "committed",
+          completedAt: new Date(),
+          metadata: {
+            committed: true,
+            confirmedByMessageId: input.confirmedByMessageId,
+            candidateArtifactId: input.candidateArtifact.id,
+            a2uiEventId: a2uiEvent.id,
+            snapshotId: newSnapshot.id,
+            assistantMessageId: assistantMessage.id,
+          },
+        },
+      });
+
+      streamService.send(input.sessionId, {
+        event: "assistant_message",
+        data: { sessionId: input.sessionId, message: buildMessageDto(assistantMessage) },
+      });
+      streamService.send(input.sessionId, {
+        event: "a2ui_messages",
+        data: { sessionId: input.sessionId, a2uiEvent: buildA2UIEventDto(a2uiEvent, input.sessionId) },
+      });
+      streamService.send(input.sessionId, {
+        event: "surface_snapshot",
+        data: { sessionId: input.sessionId, snapshot: buildSnapshotDto(newSnapshot, input.sessionId) },
+      });
+      streamService.send(input.sessionId, {
+        event: "workflow_completed",
+        data: {
+          sessionId: input.sessionId,
+          workflow: {
+            id: completedWorkflow.id,
+            sessionId: completedWorkflow.sessionId,
+            status: completedWorkflow.status as "completed",
+            currentStepType: completedWorkflow.currentStepType as "commit",
+            title: completedWorkflow.title,
+            intent: completedWorkflow.intent,
+            completedReason: completedWorkflow.completedReason,
+            failureReason: completedWorkflow.failureReason,
+            metadata: completedWorkflow.metadata as JsonObject,
+            startedAt: completedWorkflow.startedAt?.toISOString() ?? null,
+            completedAt: completedWorkflow.completedAt?.toISOString() ?? null,
+            createdAt: completedWorkflow.createdAt.toISOString(),
+            updatedAt: completedWorkflow.updatedAt.toISOString(),
+          },
+        },
+      });
+    });
+  },
+
+  /**
    * 执行一次正式 Agent run：启动、调用 Agent Runtime、提交或失败。
    */
   async executeRun(agentRunId: string, sessionId: string, userMessage: string): Promise<void> {
@@ -198,34 +562,7 @@ export const agentRunService = {
 
     setImmediate(async () => {
       try {
-        const currentSnapshot = await surfaceSnapshotRepository.findCurrentBySessionId(sessionId);
-        const recentMessages = await messageRepository.findBySessionId(sessionId, { limit: 20 });
-        const uploadedFiles = await fileRepository.findReadyWithContentBySessionId(sessionId);
-        const enabledSkills = await skillResolverService.resolveForSession(sessionId);
-
-        const agentInput: AgentRunInput = {
-          sessionId,
-          userMessage,
-          recentMessages: recentMessages.map((message) => ({
-            role: message.role,
-            content: message.content,
-          })),
-          uploadedFiles: uploadedFiles.map((file) => ({
-            id: file.id,
-            originalName: file.originalName,
-            content: file.content,
-          })),
-          enabledSkills,
-          currentSnapshot: currentSnapshot ? (currentSnapshot.snapshot as AgentRunInput["currentSnapshot"]) : null,
-          catalogId: config.catalog.id,
-          catalogVersion: config.catalog.version,
-          rendererVersion: config.catalog.rendererVersion,
-          model: {
-            provider: "openai-compatible",
-            name: config.openai.model,
-            config: {},
-          },
-        };
+        const agentInput = await buildAgentInput(sessionId, userMessage);
 
         const runtime = buildAgentRuntime();
         const toolCallTasks: Array<Promise<void>> = [];

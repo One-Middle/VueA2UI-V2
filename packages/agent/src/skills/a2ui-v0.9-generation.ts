@@ -34,24 +34,49 @@ const BASIC_CATALOG_ID =
 const svgDataUri = (svg: string): string =>
   `data:image/svg+xml,${encodeURIComponent(svg)}`;
 
-const GOOD_CASE_ALBUM_COVER = svgDataUri(`
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640">
-  <defs>
-    <linearGradient id="albumBg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#0f172a"/>
-      <stop offset="0.48" stop-color="#0ea5e9"/>
-      <stop offset="1" stop-color="#f97316"/>
-    </linearGradient>
-    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="18"/>
-    </filter>
-  </defs>
-  <rect width="640" height="640" rx="48" fill="url(#albumBg)"/>
-  <circle cx="214" cy="206" r="92" fill="#f8fafc" opacity="0.24" filter="url(#soft)"/>
-  <circle cx="430" cy="394" r="148" fill="#111827" opacity="0.45"/>
-  <circle cx="430" cy="394" r="42" fill="#f8fafc" opacity="0.92"/>
-  <path d="M188 424c92-132 172-188 264-168" fill="none" stroke="#f8fafc" stroke-width="22" stroke-linecap="round" opacity="0.88"/>
-  <text x="70" y="558" fill="#f8fafc" font-family="Arial, sans-serif" font-size="42" font-weight="700">Northline</text>
+// NOTE(skill): 以下 SVG 与 renderer-capability-demo/src/cases.ts 保持同步。
+const LIVE_COMMERCE_COVER = svgDataUri(`
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 520">
+  <defs><linearGradient id="w" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#dff7d4"/><stop offset="1" stop-color="#f8fafc"/></linearGradient><linearGradient id="c" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#d7b47a"/><stop offset="1" stop-color="#f4d99d"/></linearGradient><filter id="b"><feGaussianBlur stdDeviation="18"/></filter></defs>
+  <rect width="720" height="520" fill="#efe6d2"/>
+  <rect x="420" y="24" width="164" height="216" rx="8" fill="url(#w)"/>
+  <path d="M444 36v190M484 36v190M524 36v190M564 36v190M430 96h144M430 156h144" stroke="#b7d8a9" stroke-width="5" opacity="0.55"/>
+  <rect x="32" y="70" width="214" height="142" rx="12" fill="#baa37f"/>
+  <rect x="52" y="92" width="48" height="34" rx="4" fill="#f8fafc" opacity="0.65"/>
+  <rect x="112" y="92" width="46" height="34" rx="4" fill="#f8fafc" opacity="0.58"/>
+  <rect x="170" y="92" width="42" height="34" rx="4" fill="#f8fafc" opacity="0.5"/>
+  <circle cx="286" cy="116" r="34" fill="#efe9dc" stroke="#9c8b70" stroke-width="5"/>
+  <path d="M286 96v22l17 12" stroke="#766853" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <path d="M342 76h38v92h-38z" fill="#f2f6ef"/><path d="M360 76v-38" stroke="#415349" stroke-width="7" stroke-linecap="round"/>
+  <path d="M330 118c28-22 62-22 88 0" fill="#6d8472"/>
+  <rect x="0" y="314" width="720" height="118" fill="url(#c)"/>
+  <rect x="0" y="432" width="720" height="88" fill="#7a6b54" opacity="0.78"/>
+  <ellipse cx="362" cy="374" rx="250" ry="48" fill="#efe1bd" opacity="0.5" filter="url(#b)"/>
+  <path d="M320 170c48-24 104 4 108 62l6 100h-158l8-102c3-27 15-47 36-60z" fill="#f8fafc"/>
+  <path d="M300 214c-38 36-56 78-50 126" stroke="#f8fafc" stroke-width="32" stroke-linecap="round"/>
+  <path d="M428 224c36 30 52 64 56 106" stroke="#f8fafc" stroke-width="32" stroke-linecap="round"/>
+  <circle cx="356" cy="142" r="42" fill="#e6b28a"/>
+  <path d="M318 134c8-44 76-52 96-9-20 4-42 2-62-7-10 13-21 18-34 16z" fill="#172121"/>
+  <path d="M334 178c18 14 42 14 58 0" stroke="#b98060" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <path d="M224 336c50-34 112-36 164 0" fill="#d4b87e"/>
+  <circle cx="258" cy="320" r="18" fill="#6aa84f"/><circle cx="290" cy="312" r="20" fill="#9ac36b"/><circle cx="326" cy="320" r="18" fill="#6aa84f"/>
+  <rect x="458" y="320" width="78" height="52" rx="10" fill="#f7f7f2" stroke="#c7bfa8" stroke-width="4"/>
+  <rect x="538" y="322" width="72" height="46" rx="22" fill="#f2c2b8"/>
+  <rect x="268" y="250" width="124" height="38" rx="10" transform="rotate(12 330 269)" fill="#ffffff"/>
+  <rect x="276" y="255" width="50" height="28" rx="5" transform="rotate(12 301 269)" fill="#d71920"/>
+  <rect x="332" y="262" width="46" height="12" rx="3" transform="rotate(12 355 268)" fill="#93c47d"/>
+</svg>`);
+
+const WATER_THUMB = svgDataUri(`
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160">
+  <rect width="160" height="160" rx="18" fill="#f8fafc"/>
+  <rect x="26" y="70" width="82" height="56" rx="8" fill="#ffffff" stroke="#e5e7eb" stroke-width="4"/>
+  <rect x="30" y="82" width="74" height="26" rx="4" fill="#d71920"/>
+  <text x="39" y="101" fill="#ffffff" font-family="Arial, sans-serif" font-size="16" font-weight="700">山泉</text>
+  <rect x="92" y="34" width="34" height="94" rx="9" fill="#e0f2fe" stroke="#93c5fd" stroke-width="4"/>
+  <rect x="96" y="62" width="26" height="28" rx="4" fill="#d71920"/>
+  <rect x="98" y="24" width="22" height="14" rx="4" fill="#ef4444"/>
+  <circle cx="42" cy="55" r="14" fill="#22c55e"/><circle cx="64" cy="48" r="18" fill="#84cc16"/>
 </svg>`);
 
 /** A2UI v0.9 基础生成 Skill 的完整 Markdown 内容。 */
@@ -193,15 +218,136 @@ const A2UI_GENERATION_STANDARDS_REFERENCE: SkillReference = {
     "- Button.action.script 可以读取和写入 dataModel，但仍然不能访问 DOM、window、document、fetch、网络、定时器、import、async/await、eval、Function、Promise 或外部 API。",
     "- 不要生成 <script>、javascript:、HTML 字符串、onClick、onInput、onChange、innerHTML、className 或 css 字段。",
     "",
-    "## 6. 视觉质量标准",
+    "## 6. 语义优先，style 覆盖",
     "",
-    "- 常见 UI 必须主动使用 Renderer 支持的语义和视觉字段，例如 role、density、variant、preset、intent、importance、shape、size、gap、padding、borderRadius、shadow、emphasis、usageHint、truncate。",
-    "- 重要数值或行情使用 metric/role/status 等语义；次级信息使用 caption/muted；操作区使用 role=actions。",
-    "- 媒体类 UI 要有 Image、标题、说明、进度或状态、主次操作。",
-    "- 业务面板要有明确主题、摘要、指标或列表、筛选/操作、事件回传。",
-    "- 工具类 UI 要有输入、列表状态、局部写回、批量操作和空状态。",
+    "Renderer 有两套方式控制组件视觉，必须区分使用：",
     "",
-    "## 7. 常见 bad case",
+    "### 6.1 组件顶层语义字段（优先使用）",
+    "",
+    "这些字段直接放在组件对象上，Renderer 根据它们应用预设样式。优先使用语义字段可以保证视觉一致性：",
+    "",
+    "| 字段 | 类型 | 说明 | 常用值 |",
+    "|------|------|------|--------|",
+    "| role | string | 组件语义角色 | default, summary, metric, media, form, interactive, actions, metadata, mediaObject, emptyState |",
+    "| density | string | 内容密度 | compact, comfortable, spacious |",
+    "| variant | string | 视觉变体 | elevated, filled, plain, outline, ghost |",
+    "| preset | string | 复杂样式预设 | media, metric, title, subtitle, body, caption, summary, formPanel |",
+    "| intent | string | 按钮业务意图 | primary, secondary, danger, success, warning |",
+    "| importance | string | 按钮视觉重要程度 | normal, quiet, prominent |",
+    "| shape | string | 形状 | rounded, pill, square, circle |",
+    "| size | string | 尺寸密度 | sm, md, lg |",
+    "| emphasis | string | 文本强调语义 | default, muted, strong, danger, success, warning |",
+    "| usageHint | string | 文本样式提示 | h1, h2, h3, h4, h5, body, caption |",
+    "| truncate | boolean | 是否单行截断 | true, false |",
+    "| tone | string | 语义色调 | neutral, brand, success, warning, danger |",
+    "| icon | string | 按钮图标名称（直接字符串，不是 style） | \"plus\", \"search\", \"calendar_today\" |",
+    "| iconPosition | string | 图标位置 | left, right, only |",
+    "| fullWidth | boolean | 是否撑满父容器宽度 | true, false |",
+    "",
+    "### 6.2 style 对象（精准覆盖）",
+    "",
+    "当语义字段不足以表达需求时，在组件上添加 `\"style\": { ... }` 对象。**以下字段只能放在 style 对象内，不能放在组件顶层**：",
+    "",
+    "| 字段 | 类型 | 说明 | 示例 |",
+    "|------|------|------|------|",
+    "| width | string | 宽度 | \"100%\", \"200px\" |",
+    "| height | string | 高度 | \"auto\", \"48px\" |",
+    "| minWidth | string | 最小宽度 | \"0\", \"120px\" |",
+    "| maxWidth | string | 最大宽度 | \"600px\" |",
+    "| minHeight | string | 最小高度 | |",
+    "| maxHeight | string | 最大高度 | |",
+    "| padding | string | 四向内边距 | \"16px\", \"12px 16px\" |",
+    "| paddingX | string | 水平内边距（展开为 paddingLeft+paddingRight） | \"16px\" |",
+    "| paddingY | string | 垂直内边距（展开为 paddingTop+paddingBottom） | \"8px\" |",
+    "| margin | string | 四向外边距 | \"0 auto\" |",
+    "| marginX | string | 水平外边距（展开为 marginLeft+marginRight） | |",
+    "| marginY | string | 垂直外边距（展开为 marginTop+marginBottom） | |",
+    "| gap | string | 子元素间距（Column/Row/Grid 也可作顶层字段） | \"8px\", \"14px\" |",
+    "| color | string | 文字颜色 | \"#ffffff\", \"#1a1a2e\" |",
+    "| backgroundColor | string | 背景颜色 | \"#f8fafc\", \"#0F2A2E\" |",
+    "| borderColor | string | 边框颜色 | \"#e5e7eb\", \"#3c2d18\" |",
+    "| borderWidth | string | 边框宽度 | \"1px\", \"2px\" |",
+    "| borderRadius | string | 圆角 | \"8px\", \"12px\", \"24px\" |",
+    "| fontSize | string | 字号 | \"14px\", \"22px\" |",
+    "| fontWeight | number|string | 字重 | \"400\", \"700\", \"900\" |",
+    "| lineHeight | number|string | 行高 | \"1.5\", \"1.7\" |",
+    "| textAlign | string | 文字对齐 | \"center\", \"right\" |",
+    "| alignSelf | string | 自身交叉轴对齐 | \"center\" |",
+    "| justifySelf | string | 自身主轴对齐 | |",
+    "| shadow | string | 阴影（映射到 boxShadow），允许值 none|xs|sm|md|lg | \"sm\", \"md\" |",
+    "| opacity | number|string | 透明度 | \"0.8\", \"0.5\" |",
+    "| overflow | string | 溢出行为 | \"hidden\" |",
+    "| flex | number|string | 弹性伸缩 | \"1\", \"0\" |",
+    "",
+    "### 6.3 常见混淆",
+    "",
+    "**style 子字段，不能放在组件顶层：** padding, borderRadius, shadow, backgroundColor, color, fontWeight, fontSize, lineHeight, borderColor, borderWidth, opacity, overflow, flex, width, height, minWidth, maxWidth, textAlign（gap 在 Column/Row/Grid 上也可作为顶层字段）。",
+    "",
+    "**组件顶层字段，不能放在 style 内：** role, density, variant, preset, intent, importance, shape, size, emphasis, usageHint, truncate, tone, icon, iconPosition, fullWidth, child, children, action。",
+    "",
+    "## 7. style 白名单与视觉设计指南",
+    "",
+    "以下 5 个设计模式覆盖了 90% 的视觉需求。每个模式给出核心 style 字段和参考实例。",
+    "",
+    "### 模式 1：暗色主题卡片",
+    "",
+    "适用场景：媒体播放、金融资讯、夜间模式面板。",
+    "",
+    "核心字段组合：",
+    "- backgroundColor：深色背景（如 #080807, #0F2A2E）",
+    "- color：浅色文字（如 #ffffff, #f8edcf）",
+    "- borderColor：比背景稍亮的边框（如 #2f2415），拉开层次",
+    "- 子元素用 color/fontWeight 微调区分重要性",
+    "",
+    "参考实例：Finance Brief（黑金金融卡）——外围 Card 使用 backgroundColor: \"#080807\" + color: \"#f8edcf\" + borderRadius: \"24px\" + shadow: \"lg\"，内部 hero 区块用稍亮的 backgroundColor: \"#14100a\" 做层次。",
+    "",
+    "### 模式 2：圆角 + 阴影层次",
+    "",
+    "适用场景：商品卡、仪表盘、信息流卡片。",
+    "",
+    "核心字段组合：",
+    "- borderRadius：外层主卡片 16-24px（如 \"20px\", \"24px\"），内层区块 8-18px，标签 4px 或 999px（pill 形状）",
+    "- shadow：外层卡片用 sm 或 md，内层区块通常不设阴影",
+    "- overflow：配合 borderRadius 做圆角裁剪时设为 \"hidden\"",
+    "",
+    "参考实例：Live Commerce——外层 liveCard 使用 borderRadius: \"20px\" + shadow: \"md\" + overflow: \"hidden\"，内层标签 liveBadge 使用 borderRadius: \"4px\"。",
+    "",
+    "### 模式 3：色彩层次",
+    "",
+    "适用场景：卡片式布局、数据看板。",
+    "",
+    "三层配色方法：",
+    "1. 页面/外层背景：浅灰（#f8fafc）或深色（#080807）",
+    "2. 卡片背景：白色（#ffffff）或比外层稍亮的颜色",
+    "3. 强调色点缀：品牌色用于关键指标、主按钮、状态标签，不要滥用",
+    "",
+    "参考实例：Work Board——主卡片白色背景 + sm 阴影；统计区三张指标卡分别用紫色（#f5f3ff）、琥珀色（#fffbeb）、绿色（#f0fdf4）做语义区分；添加按钮用 backgroundColor: \"#7c3aed\" 品牌色。",
+    "",
+    "### 模式 4：字重节奏",
+    "",
+    "适用场景：任何有信息层级的 UI。",
+    "",
+    "字重层级：",
+    "- 标题/关键数值：fontWeight: \"800\" 或 \"900\"，配合 usageHint: \"h2\"-\"h4\"",
+    "- 正文：默认 fontWeight（400），需要强调时用 emphasis: \"strong\"，弱化时用 emphasis: \"muted\"",
+    "- 辅助信息（时间、来源、标签）：usageHint: \"caption\" + emphasis: \"muted\"",
+    "- 价格/指标数据：role: \"price\" + variant: \"metric\" + fontWeight: \"800\"",
+    "",
+    "参考实例：Live Commerce 价格使用 fontSize: \"22px\" 放大；Finance Brief 标题用 fontWeight: \"900\" + usageHint: \"h2\"；Work Board 指标数值使用 fontWeight: \"800\" + usageHint: \"h4\"。",
+    "",
+    "### 模式 5：间距系统",
+    "",
+    "适用场景：所有布局。",
+    "",
+    "常用取值约定：",
+    "- gap：紧凑 3-5px、标准 8-10px、宽松 14px",
+    "- padding：卡片内边距 12-18px（如 \"16px\", \"18px\"），标签内边距 2-6px + 6-10px（如 \"3px 8px\"）",
+    "- borderRadius：标签 4px、卡片 8-12px、主卡片 16-24px、pill 999px",
+    "- fontWeight：辅助 400、标题 700-800、强调数值 800-900",
+    "",
+    "参考实例：Work Board 主卡片 style: { padding: \"16px\" }，子区域 gap: \"14px\"，标签 style: { padding: \"3px 8px\", borderRadius: \"999px\" }。",
+    "",
+    "## 8. 常见 bad case",
     "",
     "### Bad Case A：平铺文本，没有结构",
     "",
@@ -250,7 +396,30 @@ const A2UI_GENERATION_STANDARDS_REFERENCE: SkillReference = {
     "",
     "问题：Card 应使用 child，不应使用 children；children 也不能嵌套完整组件对象。必须使用邻接表引用组件 id。",
     "",
-    "## 8. 输出前检查",
+    "### Bad Case F：style 字段误放在组件顶层",
+    "",
+    "```json",
+    "{",
+    '  "id": "card",',
+    '  "component": "Card",',
+    '  "child": "body",',
+    '  "padding": "10px",',
+    '  "borderRadius": "12px"',
+    "}",
+    "```",
+    "",
+    "问题：padding 和 borderRadius 是 style 子字段，必须嵌套在 `\"style\": {}` 内。上面写法即使校验通过，渲染器也会忽略这些字段。正确写法：",
+    "",
+    "```json",
+    "{",
+    '  "id": "card",',
+    '  "component": "Card",',
+    '  "child": "body",',
+    '  "style": { "padding": "10px", "borderRadius": "12px" }',
+    "}",
+    "```",
+    "",
+    "## 9. 输出前检查",
     "",
     "- 是否已经请求并遵循 a2ui-generation-standards？",
     "- 复杂 UI 是否请求 high-quality-a2ui-good-cases 作为质量标杆？",
@@ -262,6 +431,8 @@ const A2UI_GENERATION_STANDARDS_REFERENCE: SkillReference = {
     "- action.script 是否只做同步本地读写和 actions.emit？",
     "- 是否避免 Catalog 外组件和浏览器字段？",
     "- 是否使用足够的语义、密度、视觉和状态字段，让 UI 不只是默认 Card/Row/Text？",
+    "- style 对象内的字段是否都在白名单内？padding、borderRadius、shadow 等是否误放在组件顶层？",
+    "- 是否合理使用 dark 主题 / 圆角阴影 / 色彩层次 / 字重 / 间距等设计模式？",
   ].join("\n"),
 };
 
@@ -271,35 +442,47 @@ function buildHighQualityA2UIGoodCasesReference(): SkillReference {
   id: "high-quality-a2ui-good-cases",
   title: "高质量 A2UI Good Case",
   description:
-    "复杂 UI 或需要质量标杆时请求；包含来自 renderer-capability-demo 的 Music Player、Finance Brief、Work Board 三个完整 good case，并说明为什么好。",
+    "复杂 UI 或需要质量标杆时请求；包含 Live Commerce（亮色电商）、Finance Brief（黑金金融）、Work Board（清爽工具）三个完整 good case，覆盖三种视觉范式。",
   content: [
     "# 高质量 A2UI Good Case",
     "",
-    "本 Reference 收录完整、可审查的高质量 A2UI 标杆。Good Case 不是供照抄的小片段；它们用于建立质量判断：如何组织 dataModel、组件树、视觉层次、状态派生和事件回传。",
+    "本 Reference 收录完整、可审查的高质量 A2UI 标杆。三个 case 分别展示三种视觉范式：亮色电商（Live Commerce）、黑金金融（Finance Brief）、清爽工具（Work Board）。",
     "",
-    "## Good Case 1: Music Player",
+    "## Good Case 1: Live Commerce",
+    "",
+    "亮色电商视觉范式：白色卡片 + 圆角阴影 + 橙色系品牌色 + 暗色操作栏对比。",
     "",
     "```json",
-    JSON.stringify(buildA2UIMessages(MUSIC_PLAYER_DATA_MODEL, MUSIC_PLAYER_COMPONENTS), null, 2),
+    JSON.stringify(buildA2UIMessages(LIVE_COMMERCE_DATA_MODEL, LIVE_COMMERCE_COMPONENTS), null, 2),
     "```",
     "",
-    "为什么好：它把播放进度、播放状态和收藏状态放入 dataModel；封面、标题、作者、进度和控制区分层明确；Icon.name 和按钮 label 通过受限脚本从状态派生；收藏和播放按钮会写回本地状态并 actions.emit；上一首/下一首使用 action.event 只提交业务事件。",
+    "为什么好——架构层面：dataModel 按 /live 和 /product 域名聚合；hero 图片 + 直播信息条 + 商品货架 + 双购买 CTA 分层明确；社交指标和价格通过 data binding 关联；购物车和立即购买使用 action.event 提交业务事件。",
+    "",
+    "为什么好——视觉层面：外层 Card 使用 borderRadius: \"20px\" + shadow: \"md\" + overflow: \"hidden\" 做圆角裁剪；暗色操作栏（backgroundColor: \"#3d3b36\"）与白色卡片形成层次对比；直播标签使用 backgroundColor: \"#ff2f64\" 红色强调；立即购买按钮用 backgroundColor: \"#ff5a1f\" 品牌橙；价格用 fontSize: \"22px\" + role: \"price\" + variant: \"metric\" 放大突出。",
     "",
     "## Good Case 2: Finance Brief",
+    "",
+    "黑金金融视觉范式：深色背景 + 暖金色文字 + 多层次边框 + 大圆角阴影。",
     "",
     "```json",
     JSON.stringify(buildA2UIMessages(FINANCE_BRIEF_DATA_MODEL, FINANCE_BRIEF_COMPONENTS), null, 2),
     "```",
     "",
-    "为什么好：它把金融资讯拆成 hero、指标网格、分类操作、新闻列表和页脚事件；筛选和收藏都写回 dataModel；List 模板渲染 visibleNews；列表项使用相对 path 和 context；主题视觉通过受控 style、role、density、variant、shape、intent 等字段表达。",
+    "为什么好——架构层面：金融资讯拆成 hero、指标网格、分类操作、新闻列表和页脚事件；筛选和收藏都写回 dataModel；List 模板渲染 visibleNews；列表项使用相对 path 和 context。",
+    "",
+    "为什么好——视觉层面：外围 Card 使用 backgroundColor: \"#080807\" + color: \"#f8edcf\" + borderRadius: \"24px\" + shadow: \"lg\" 建立黑金基调；内部 hero 区块用 backgroundColor: \"#14100a\" + borderColor: \"#3c2d18\" + borderWidth: \"1px\" 拉开层次；指标卡用 backgroundColor: \"#120f0a\" 统一暗底；文字用三层金棕色（#fff7df / #d7b46a / #c8b98e）建立信息层级；分类标签通过 intent: \"warning\" vs importance: \"quiet\" 区分选中态。",
     "",
     "## Good Case 3: Work Board",
+    "",
+    "清爽工具视觉范式：浅色背景 + 白色卡片 + 蓝紫色品牌点缀 + 彩色指标卡 + 微阴影。",
     "",
     "```json",
     JSON.stringify(buildA2UIMessages(WORK_BOARD_DATA_MODEL, WORK_BOARD_COMPONENTS), null, 2),
     "```",
     "",
-    "为什么好：它把草稿输入和任务列表放入 dataModel；TextField 绑定可编辑 draft；List 模板渲染任务卡；CheckBox 写回 item 状态；新增和清理按钮使用 action.script 做本地数组更新并回传事件；顶部和底部统计通过属性 script 从列表派生。",
+    "为什么好——架构层面：草稿输入和任务列表放入 dataModel；顶部 3 列 Grid 指标卡通过属性 script 从 /todo/items 数组派生统计值；TextField 绑定可编辑 draft；List 模板渲染任务卡；CheckBox 写回 item 状态；新增和清理按钮使用 action.script 做本地数组更新并回传事件。",
+    "",
+    "为什么好——视觉层面：整体浅色背景（#f8fafc）+ 白色卡片（backgroundColor: \"#ffffff\", borderRadius: \"12px\", shadow: \"sm\"）；顶部统计区用三色指标卡——紫色（#f5f3ff）表总数、琥珀色（#fffbeb）表进行中、绿色（#f0fdf4）表已完成；数值用对应颜色 fontWeight: \"800\" + usageHint: \"h4\"；添加按钮用 backgroundColor: \"#7c3aed\" 品牌紫强调主操作；底部操作区用 borderTop 分隔线区分层级；列表项用 borderRadius: \"8px\" 微圆角保持清爽。",
   ].join("\n"),
   };
 }
@@ -331,34 +514,61 @@ function buildA2UIMessages(dataModel: JsonObject, components: A2UIComponent[]) {
   ];
 }
 
-// NOTE(skill): 以下 good case 来源于 renderer-capability-demo/src/cases.ts，字段和值保持原样。
-const MUSIC_PLAYER_DATA_MODEL: JsonObject = {
-  player: { isPlaying: false, progress: 32, isFavorite: false },
-  song: {
-    title: "Midnight Drive",
-    artist: "Synthwave Dreams",
-    coverUrl: GOOD_CASE_ALBUM_COVER,
+// NOTE(skill): 以下 good case 与 renderer-capability-demo/src/cases.ts 保持同步。
+const LIVE_COMMERCE_DATA_MODEL: JsonObject = {
+  live: {
+    badge: "直播中",
+    title: "农夫山泉 好礼相送",
+    cta: "去逛逛",
+    viewers: "3000+",
+    likes: "1444",
+    cover: LIVE_COMMERCE_COVER,
+  },
+  product: {
+    sku: "spring-water-5l-4",
+    brand: "天猫",
+    title: "农夫山泉旗舰店红盖5l*4桶饮用水",
+    detail: "详情",
+    price: "¥31.9",
+    subsidy: "补贴价",
+    sales: "已售3万+",
+    benefit: "淘宝秒杀 直降9.6元",
+    thumbnail: WATER_THUMB,
   },
 };
 
-const MUSIC_PLAYER_COMPONENTS: A2UIComponent[] = [
-  { id: "root", component: "Container", child: "musicCard", width: "content", padding: "none" },
-  { id: "musicCard", component: "Card", child: "musicBody", role: "media", density: "compact", preset: "media", variant: "elevated", style: { backgroundColor: "#0F2A2E", color: "#ffffff" } },
-  { id: "musicBody", component: "Column", children: ["cover", "musicInfoRow", "musicProgress", "musicControls"], gap: "14px" },
-  { id: "cover", component: "Image", url: { path: "/song/coverUrl" }, alt: "Album cover", role: "cover", shape: "rounded", fit: "cover", aspectRatio: "1:1", caption: "Live renderer state" },
-  { id: "musicInfoRow", component: "Row", children: ["songText", "favButton"], role: "mediaObject", alignment: "center", distribution: "spaceBetween", wrap: false },
-  { id: "songText", component: "Column", children: ["songLabel", "songTitle", "songArtist"], gap: "3px" },
-  { id: "songLabel", component: "Text", text: "NOW PLAYING", usageHint: "caption", emphasis: "success" },
-  { id: "songTitle", component: "Text", text: { path: "/song/title" }, usageHint: "h3", truncate: true, style: { color: "#ffffff" } },
-  { id: "songArtist", component: "Text", text: { path: "/song/artist" }, usageHint: "caption", emphasis: "muted" },
-  { id: "favIcon", component: "Icon", name: { script: { code: "return dataModel.get('/player/isFavorite') ? 'favorite' : 'favorite_border';", deps: ["/player/isFavorite"], fallback: "favorite_border" } }, semantic: "action", label: "收藏", status: "danger", tone: "danger" },
-  { id: "favButton", component: "Button", child: "favIcon", importance: "quiet", shape: "circle", action: { script: { code: "const next = !Boolean(dataModel.get('/player/isFavorite')); dataModel.set('/player/isFavorite', next); actions.emit('favoriteChanged', { isFavorite: next });", deps: ["/player/isFavorite"] } } },
-  { id: "musicProgress", component: "Slider", min: 0, max: 100, step: 1, value: { path: "/player/progress" }, valueDisplay: "none" },
-  { id: "musicControls", component: "Row", children: ["prevButton", "playButton", "nextButton"], role: "actions", alignment: "center", distribution: "spaceEvenly", wrap: false },
-  { id: "prevButton", component: "Button", icon: "skip_previous", iconPosition: "only", importance: "quiet", shape: "circle", action: { event: { name: "previousTrack", context: { title: { path: "/song/title" } } } } },
-  { id: "playIcon", component: "Icon", name: { script: { code: "return dataModel.get('/player/isPlaying') ? 'pause' : 'play_arrow';", deps: ["/player/isPlaying"], fallback: "play_arrow" } }, semantic: "action", label: "播放切换", size: "lg" },
-  { id: "playButton", component: "Button", child: "playIcon", intent: "primary", shape: "circle", importance: "prominent", size: "lg", action: { script: { code: "const next = !Boolean(dataModel.get('/player/isPlaying')); dataModel.set('/player/isPlaying', next); actions.emit('playToggled', { isPlaying: next });", deps: ["/player/isPlaying"] } } },
-  { id: "nextButton", component: "Button", icon: "skip_next", iconPosition: "only", importance: "quiet", shape: "circle", action: { event: { name: "nextTrack", context: { title: { path: "/song/title" } } } } },
+const LIVE_COMMERCE_COMPONENTS: A2UIComponent[] = [
+  { id: "root", component: "Container", child: "liveCard", width: "content", padding: "none" },
+  { id: "liveCard", component: "Card", child: "liveBody", role: "media", density: "compact", variant: "plain", style: { padding: "0", borderRadius: "20px", borderColor: "transparent", shadow: "md", backgroundColor: "#ffffff", overflow: "hidden" } },
+  { id: "liveBody", component: "Column", children: ["heroImage", "liveStrip", "productShelf", "commerceActions"], gap: "0" },
+  { id: "heroImage", component: "Image", url: { path: "/live/cover" }, alt: "Live kitchen", role: "hero", shape: "square", fit: "cover", aspectRatio: "16:13" },
+  { id: "liveStrip", component: "Row", children: ["liveTitleGroup", "liveVisit"], role: "actions", distribution: "spaceBetween", alignment: "center", wrap: false, style: { padding: "10px 12px", backgroundColor: "#3d3b36", gap: "10px" } },
+  { id: "liveTitleGroup", component: "Row", children: ["liveBadge", "liveTitle"], role: "metadata", alignment: "center", gap: "8px", wrap: false },
+  { id: "liveBadge", component: "Text", text: { path: "/live/badge" }, usageHint: "caption", role: "discount", style: { padding: "2px 6px", borderRadius: "4px", backgroundColor: "#ff2f64", color: "#ffffff", fontWeight: "800" } },
+  { id: "liveTitle", component: "Text", text: { path: "/live/title" }, usageHint: "body", truncate: true, style: { color: "#ffffff", fontWeight: "700", minWidth: "0" } },
+  { id: "liveVisit", component: "Button", label: { path: "/live/cta" }, icon: "chevron_right", iconPosition: "right", importance: "quiet", shape: "pill", action: { event: { name: "openLiveRoom", context: { title: { path: "/live/title" } } } }, style: { color: "#ffffff", padding: "4px 0", minWidth: "64px" } },
+  { id: "productShelf", component: "Row", children: ["productThumb", "productInfo"], role: "mediaObject", gap: "10px", alignment: "center", wrap: false, style: { padding: "10px 12px 6px" } },
+  { id: "productThumb", component: "Image", url: { path: "/product/thumbnail" }, alt: "Product thumbnail", role: "thumbnail", shape: "rounded", fit: "cover", aspectRatio: "1:1", style: { width: "46px" } },
+  { id: "productInfo", component: "Column", children: ["productTitleRow", "priceRow", "benefitRow"], gap: "4px", style: { minWidth: "0", flex: 1 } },
+  { id: "productTitleRow", component: "Row", children: ["productBrand", "productTitle", "productDetail"], role: "metadata", alignment: "center", gap: "4px", wrap: false },
+  { id: "productBrand", component: "Text", text: { path: "/product/brand" }, usageHint: "body", role: "discount", style: { fontWeight: "800" } },
+  { id: "productTitle", component: "Text", text: { path: "/product/title" }, usageHint: "body", emphasis: "strong", truncate: true, style: { minWidth: "0" } },
+  { id: "productDetail", component: "Text", text: { script: { code: "return `${dataModel.get('/product/detail')} ›`;", deps: ["/product/detail"], fallback: "详情 ›" } }, usageHint: "caption", emphasis: "muted", style: { minWidth: "38px" } },
+  { id: "priceRow", component: "Row", children: ["productPrice", "productSubsidy", "productSales"], role: "metadata", alignment: "end", gap: "4px", wrap: false },
+  { id: "productPrice", component: "Text", text: { path: "/product/price" }, role: "price", variant: "metric", tone: "warning", style: { fontSize: "22px" } },
+  { id: "productSubsidy", component: "Text", text: { path: "/product/subsidy" }, role: "discount", usageHint: "caption" },
+  { id: "productSales", component: "Text", text: { path: "/product/sales" }, usageHint: "caption", emphasis: "muted" },
+  { id: "benefitRow", component: "Text", text: { path: "/product/benefit" }, usageHint: "caption", role: "discount", style: { textAlign: "right" } },
+  { id: "commerceActions", component: "Row", children: ["socialStats", "cartButton", "buyButton"], role: "actions", alignment: "center", gap: "8px", wrap: false, style: { padding: "8px 12px 12px" } },
+  { id: "socialStats", component: "Row", children: ["commentMetric", "starMetric"], role: "metadata", gap: "10px", wrap: false, style: { minWidth: "88px" } },
+  { id: "commentMetric", component: "Column", children: ["commentIcon", "commentCount"], gap: "2px", alignment: "center" },
+  { id: "commentIcon", component: "Icon", icon: "chat_bubble", semantic: "comment", label: "comments", size: "md" },
+  { id: "commentCount", component: "Text", text: { path: "/live/viewers" }, usageHint: "caption", emphasis: "muted" },
+  { id: "starMetric", component: "Column", children: ["starIcon", "starCount"], gap: "2px", alignment: "center" },
+  { id: "starIcon", component: "Icon", icon: "star", semantic: "favorite", label: "favorites", size: "md" },
+  { id: "starCount", component: "Text", text: { path: "/live/likes" }, usageHint: "caption", emphasis: "muted" },
+  { id: "cartButton", component: "Button", label: "加入购物车", intent: "warning", shape: "rounded", importance: "prominent", fullWidth: true, action: { event: { name: "addToCart", context: { sku: { path: "/product/sku" }, title: { path: "/product/title" } } } } },
+  { id: "buyButton", component: "Button", label: "立即购买", intent: "danger", shape: "rounded", importance: "prominent", fullWidth: true, style: { backgroundColor: "#ff5a1f" }, action: { event: { name: "buyNow", context: { sku: { path: "/product/sku" }, price: { path: "/product/price" }, title: { path: "/product/title" } } } } },
 ];
 
 const FINANCE_BRIEF_DATA_MODEL: JsonObject = {
@@ -436,35 +646,48 @@ const FINANCE_BRIEF_COMPONENTS: A2UIComponent[] = [
 
 const WORK_BOARD_DATA_MODEL: JsonObject = {
   todo: {
-    draft: "补充 Slider 视觉回归",
+    draft: "",
     items: [
-      { id: "task-1", title: "整理 Basic Catalog 能力矩阵", project: "Renderer", done: true, priority: "High" },
-      { id: "task-2", title: "补齐表单组件截图测试", project: "QA", done: false, priority: "Medium" },
-      { id: "task-3", title: "验证 JSRuntime 安全边界", project: "Runtime", done: false, priority: "High" },
+      { id: "task-1", title: "整理 Basic Catalog 能力矩阵", project: "Renderer", done: true },
+      { id: "task-2", title: "补齐表单组件截图测试", project: "QA", done: false },
+      { id: "task-3", title: "验证 JSRuntime 安全边界", project: "Runtime", done: false },
+      { id: "task-4", title: "补充视觉设计指南 Reference", project: "Skill", done: true },
     ],
   },
 };
 
 const WORK_BOARD_COMPONENTS: A2UIComponent[] = [
   { id: "root", component: "Container", child: "todoCard", width: "content", padding: "none" },
-  { id: "todoCard", component: "Card", child: "todoBody", role: "summary", density: "comfortable", variant: "elevated", header: "Renderer 待办清单", subtitle: "复选框和按钮脚本都会改写 dataModel" },
-  { id: "todoBody", component: "Column", children: ["todoSummary", "todoComposer", "todoList", "todoActions"], gap: "14px" },
-  { id: "todoSummary", component: "Text", text: { script: { code: "const items = dataModel.get('/todo/items') || []; const done = items.filter((item) => item.done).length; return `${done}/${items.length} completed · ${items.length - done} open`; ", deps: ["/todo/items"], fallback: "0/0 completed" } }, role: "status", emphasis: "success", usageHint: "caption" },
-  { id: "todoComposer", component: "Grid", columns: "auto", minItemWidth: "180px", gap: "8px", children: ["todoDraftField", "todoAddButton"] },
+  { id: "todoCard", component: "Card", child: "todoBody", role: "summary", density: "comfortable", variant: "elevated", header: "Renderer 待办清单", subtitle: "复选框和按钮脚本都会改写 dataModel", style: { backgroundColor: "#ffffff", borderRadius: "12px", shadow: "sm" } },
+  { id: "todoBody", component: "Column", children: ["statsGrid", "todoComposer", "todoList", "todoActions"], gap: "14px" },
+  { id: "statsGrid", component: "Grid", columns: 3, gap: "10px", children: ["statTotal", "statActive", "statDone"] },
+  { id: "statTotal", component: "Card", child: "statTotalBody", role: "metric", density: "compact", variant: "filled", style: { backgroundColor: "#f5f3ff", borderColor: "#ddd6fe", borderRadius: "10px" } },
+  { id: "statTotalBody", component: "Column", children: ["statTotalLabel", "statTotalValue"], gap: "4px" },
+  { id: "statTotalLabel", component: "Text", text: "总计", usageHint: "caption", emphasis: "muted" },
+  { id: "statTotalValue", component: "Text", text: { script: { code: "const items = dataModel.get('/todo/items') || []; return String(items.length);", deps: ["/todo/items"], fallback: "0" } }, role: "price", variant: "metric", usageHint: "h4", style: { color: "#7c3aed", fontWeight: "800" } },
+  { id: "statActive", component: "Card", child: "statActiveBody", role: "metric", density: "compact", variant: "filled", style: { backgroundColor: "#fffbeb", borderColor: "#fde68a", borderRadius: "10px" } },
+  { id: "statActiveBody", component: "Column", children: ["statActiveLabel", "statActiveValue"], gap: "4px" },
+  { id: "statActiveLabel", component: "Text", text: "进行中", usageHint: "caption", emphasis: "muted" },
+  { id: "statActiveValue", component: "Text", text: { script: { code: "const items = dataModel.get('/todo/items') || []; return String(items.filter((item) => !item.done).length);", deps: ["/todo/items"], fallback: "0" } }, role: "price", variant: "metric", usageHint: "h4", style: { color: "#d97706", fontWeight: "800" } },
+  { id: "statDone", component: "Card", child: "statDoneBody", role: "metric", density: "compact", variant: "filled", style: { backgroundColor: "#f0fdf4", borderColor: "#bbf7d0", borderRadius: "10px" } },
+  { id: "statDoneBody", component: "Column", children: ["statDoneLabel", "statDoneValue"], gap: "4px" },
+  { id: "statDoneLabel", component: "Text", text: "已完成", usageHint: "caption", emphasis: "muted" },
+  { id: "statDoneValue", component: "Text", text: { script: { code: "const items = dataModel.get('/todo/items') || []; return String(items.filter((item) => item.done).length);", deps: ["/todo/items"], fallback: "0" } }, role: "price", variant: "metric", usageHint: "h4", style: { color: "#16a34a", fontWeight: "800" } },
+  { id: "todoComposer", component: "Row", children: ["todoDraftField", "todoAddButton"], role: "actions", distribution: "spaceBetween", alignment: "center", gap: "8px", wrap: false },
   { id: "todoDraftField", component: "TextField", label: "新增任务", text: { path: "/todo/draft" }, usageHint: "shortText", placeholder: "输入任务标题", density: "compact", helpText: "添加后会清空输入框。" },
-  { id: "todoAddButton", component: "Button", label: "添加", icon: "plus", intent: "primary", shape: "pill", action: { script: { code: "const title = String(dataModel.get('/todo/draft') || '').trim(); if (!title) { actions.emit('todoSkipped', { reason: 'empty' }); return; } const items = dataModel.get('/todo/items') || []; const next = [...items, { id: `task-${items.length + 1}`, title, project: 'Renderer Lab', done: false, priority: 'Normal' }]; dataModel.set('/todo/items', next); dataModel.set('/todo/draft', ''); actions.emit('todoAdded', { title, total: next.length });", deps: ["/todo/items", "/todo/draft"] } } },
-  { id: "todoList", component: "List", children: [{ path: "/todo/items", componentId: "todoItem" }], emptyText: "暂无任务", itemRole: "card", dividers: true },
-  { id: "todoItem", component: "Card", child: "todoItemBody", role: "summary", density: "compact", variant: "plain" },
-  { id: "todoItemBody", component: "Row", children: ["todoCheck", "todoTitle", "todoMeta", "todoPriority"], role: "mediaObject", alignment: "center", distribution: "spaceBetween", gap: "10px", wrap: false },
+  { id: "todoAddButton", component: "Button", label: "添加", icon: "plus", intent: "primary", shape: "pill", style: { backgroundColor: "#7c3aed" }, action: { script: { code: "const title = String(dataModel.get('/todo/draft') || '').trim(); if (!title) { actions.emit('todoSkipped', { reason: 'empty' }); return; } const items = dataModel.get('/todo/items') || []; const next = [...items, { id: `task-${items.length + 1}`, title, project: 'Renderer Lab', done: false }]; dataModel.set('/todo/items', next); dataModel.set('/todo/draft', ''); actions.emit('todoAdded', { title, total: next.length });", deps: ["/todo/items", "/todo/draft"] } } },
+  { id: "todoList", component: "List", children: [{ path: "/todo/items", componentId: "todoItem" }], emptyText: "暂无任务，用上方输入框添加", itemRole: "card", dividers: true },
+  { id: "todoItem", component: "Card", child: "todoItemBody", role: "summary", density: "compact", variant: "plain", style: { backgroundColor: "#ffffff", borderRadius: "8px" } },
+  { id: "todoItemBody", component: "Row", children: ["todoCheck", "todoTitle", "todoMeta", "todoToggleButton"], role: "mediaObject", alignment: "center", distribution: "spaceBetween", gap: "10px", wrap: false },
   { id: "todoCheck", component: "CheckBox", value: { path: "done" }, density: "compact" },
-  { id: "todoTitle", component: "Text", text: { path: "title" }, usageHint: "body", truncate: true, style: { minWidth: "86px" } },
-  { id: "todoMeta", component: "Column", children: ["todoProject", "todoState"], gap: "3px" },
+  { id: "todoTitle", component: "Text", text: { path: "title" }, usageHint: "body", truncate: true, style: { minWidth: "0", flex: 1 } },
+  { id: "todoMeta", component: "Column", children: ["todoProject", "todoStatus"], gap: "2px", alignment: "end" },
   { id: "todoProject", component: "Text", text: { path: "project" }, usageHint: "caption", emphasis: "muted" },
-  { id: "todoState", component: "Text", text: "复选框写回", role: "status", emphasis: "success", usageHint: "caption" },
-  { id: "todoPriority", component: "Text", text: { path: "priority" }, role: "status", emphasis: "warning", usageHint: "caption", truncate: true },
-  { id: "todoActions", component: "Row", children: ["clearDoneButton", "todoOpenCount"], role: "actions", distribution: "spaceBetween", alignment: "center", wrap: false },
-  { id: "clearDoneButton", component: "Button", label: "清理已完成", intent: "secondary", size: "sm", action: { script: { code: "const items = dataModel.get('/todo/items') || []; const next = items.filter((item) => !item.done); dataModel.set('/todo/items', next); actions.emit('completedCleared', { removed: items.length - next.length, remaining: next.length });", deps: ["/todo/items"] } } },
-  { id: "todoOpenCount", component: "Text", text: { script: { code: "const items = dataModel.get('/todo/items') || []; return `${items.filter((item) => !item.done).length} open`; ", deps: ["/todo/items"], fallback: "0 open" } }, usageHint: "caption", emphasis: "muted" },
+  { id: "todoStatus", component: "Text", text: { script: { code: "return dataModel.get('done') ? '已完成' : '进行中';", deps: ["done"], fallback: "进行中" } }, role: "status", emphasis: "success", usageHint: "caption" },
+  { id: "todoToggleButton", component: "Button", label: { script: { code: "return dataModel.get('done') ? '已完成' : '完成';", deps: ["done"], fallback: "完成" } }, intent: "secondary", importance: "quiet", size: "sm", shape: "rounded", action: { script: { code: "const id = String(context.itemId || ''); const items = dataModel.get('/todo/items') || []; dataModel.set('/todo/items', items.map((item) => item.id === id ? { ...item, done: !item.done } : item)); actions.emit('todoToggled', { id, done: !Boolean(items.find((item) => item.id === id)?.done) });", deps: ["/todo/items"], context: { itemId: { path: "id" } } } } },
+  { id: "todoActions", component: "Row", children: ["clearDoneButton", "todoSummary"], role: "actions", distribution: "spaceBetween", alignment: "center", wrap: false, style: { paddingTop: "8px", borderTop: "solid 1px #e5e7eb" } },
+  { id: "clearDoneButton", component: "Button", label: "清理已完成", intent: "secondary", size: "sm", shape: "rounded", action: { script: { code: "const items = dataModel.get('/todo/items') || []; const next = items.filter((item) => !item.done); dataModel.set('/todo/items', next); actions.emit('completedCleared', { removed: items.length - next.length, remaining: next.length });", deps: ["/todo/items"] } } },
+  { id: "todoSummary", component: "Text", text: { script: { code: "const items = dataModel.get('/todo/items') || []; const done = items.filter((item) => item.done).length; return `${done}/${items.length} 已完成 · ${items.length - done} 待办`;", deps: ["/todo/items"], fallback: "0/0 已完成" } }, usageHint: "caption", emphasis: "muted" },
 ];
 
 /** A2UI v0.9 基础生成 Skill 的参考资料。 */

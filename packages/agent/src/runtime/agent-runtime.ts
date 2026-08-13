@@ -15,6 +15,8 @@
 import type {
   AgentRunInput,
   AgentRunResult,
+  AgentWorkflowTaskInput,
+  AgentWorkflowTaskResult,
   IAgentRuntime,
   ToolCallRecord,
   ValidateA2UIResult,
@@ -25,6 +27,7 @@ import { AgentContextBuilder, type AgentContext } from "../context/context-build
 import { PromptComposer } from "../prompts/prompt-composer.js";
 import { ModelClient, type ModelResponse, type TokenUsage } from "../model/model-client.js";
 import { parseModelOutput } from "./output-parser.js";
+import { parseWorkflowTaskOutput } from "./workflow-task-parser.js";
 import { parseComponentInfoRequest } from "./component-info-request-parser.js";
 import { parseSkillInfoRequest } from "./skill-info-request-parser.js";
 import { parseSkillReferenceRequest } from "./skill-reference-request-parser.js";
@@ -285,6 +288,143 @@ export class AgentRuntime implements IAgentRuntime {
       validation: lastValidation,
       failureReason: "达到最大尝试次数",
     };
+  }
+
+  /**
+   * 执行 workflow-scoped Agent task，并返回 Runtime 解析后的结果。
+   *
+   * 注意：raw output 只保留短摘要给 debug metadata，不作为业务 artifact。
+   *
+   * @param input - Workflow task 上下文
+   * @param onToolCall - 工具调用记录回调
+   * @returns ParsedAgentResult 与 debug metadata
+   */
+  async runWorkflowTask(
+    input: AgentWorkflowTaskInput,
+    onToolCall?: (record: ToolCallRecord) => void,
+  ): Promise<AgentWorkflowTaskResult> {
+    const startedAt = Date.now();
+    const context = this.contextBuilder.buildContext(input);
+    const { systemPrompt, userPrompt } = this.composeWorkflowTaskPrompt(input, context);
+
+    try {
+      const modelResponse = await this.modelClient.generate([
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ]);
+      const rawOutputPreview = modelResponse.content.slice(0, 1000);
+      const parsedResult = parseWorkflowTaskOutput(modelResponse.content);
+
+      if (parsedResult.kind === "clarification_request") {
+        const toolCall: ToolCallRecord = {
+          toolName: "askClarification",
+          status: "succeeded",
+          attemptIndex: 1,
+          phase: "GENERATE_DRAFT",
+          inputSummary: {
+            gate: input.gate,
+            task: input.task,
+            fieldCount: parsedResult.form.fields.length,
+          },
+          output: {
+            fieldIds: parsedResult.form.fields.map((field) => field.id),
+          },
+          durationMs: Date.now() - startedAt,
+        };
+        onToolCall?.(toolCall);
+      }
+
+      return {
+        parsedResult,
+        debugMetadata: {
+          workflowId: input.workflowId,
+          workflowStepId: input.workflowStepId,
+          gate: input.gate,
+          task: input.task,
+          rawOutputPreview,
+        },
+        toolCalls: [],
+        rawOutputPreview,
+        attemptCount: 1,
+        tokenUsage: modelResponse.usage
+          ? {
+              promptTokens: modelResponse.usage.promptTokens,
+              completionTokens: modelResponse.usage.completionTokens,
+              totalTokens: modelResponse.usage.totalTokens,
+            }
+          : undefined,
+      };
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      return {
+        parsedResult: {
+          kind: "failure",
+          reason,
+        },
+        debugMetadata: {
+          workflowId: input.workflowId,
+          workflowStepId: input.workflowStepId,
+          gate: input.gate,
+          task: input.task,
+        },
+        toolCalls: [],
+        rawOutputPreview: "",
+        attemptCount: 1,
+      };
+    }
+  }
+
+  private composeWorkflowTaskPrompt(
+    input: AgentWorkflowTaskInput,
+    context: AgentContext,
+  ): { systemPrompt: string; userPrompt: string } {
+    const systemPrompt = [
+      "你是 A2UI Agent Workflow 中的 planning Agent。",
+      "你的职责是根据用户需求和上下文生成真实的 workflow 产物，而不是返回占位模板。",
+      "",
+      "你有一个内部工具 askClarification。需要澄清时，只输出 JSON：",
+      "{",
+      '  "tool": "askClarification",',
+      '  "arguments": {',
+      '    "title": "表单标题",',
+      '    "description": "为什么需要补充信息",',
+      '    "fields": [',
+      '      { "id": "page_goal", "label": "页面目标", "type": "textarea", "required": true, "reason": "用于确定信息架构" }',
+      "    ]",
+      "  }",
+      "}",
+      "fields 支持 select、radio、checkbox、text、textarea。每个问题必须有 id、label、type、required、reason；选择类问题必须有 options。",
+      "",
+      "如果信息足够，请直接输出 Markdown plan，不要包裹 JSON，不要使用代码块。",
+      "Markdown plan 必须包含这些标题：页面目标、布局结构、组件清单、Data Model、交互行为、假设、风险。",
+      "不要生成 A2UI messages；plan 阶段只生成计划或澄清请求。",
+    ].join("\n");
+
+    const parts = [
+      `## 当前 gate\n${input.gate}`,
+      `## 当前 task\n${input.task}`,
+      `## 用户需求\n${context.userMessage}`,
+      context.recentMessages,
+      context.uploadedFiles,
+      context.enabledSkills,
+      context.currentSnapshotSummary,
+    ];
+
+    if (input.clarificationAnswers) {
+      parts.push(`## 澄清答案\n${JSON.stringify(input.clarificationAnswers, null, 2)}`);
+    }
+    if (input.previousPlanMarkdown) {
+      parts.push(`## 上一版 Markdown plan\n${input.previousPlanMarkdown}`);
+    }
+    if (input.revisionText) {
+      parts.push(`## 用户修改意见\n${input.revisionText}`);
+    }
+    if (input.workflowContext) {
+      parts.push(`## Workflow 上下文\n${JSON.stringify(input.workflowContext, null, 2)}`);
+    }
+
+    parts.push("请基于以上上下文生成本次 workflow task 的真实结果。");
+    return { systemPrompt, userPrompt: parts.filter(Boolean).join("\n\n") };
   }
 
   /**
