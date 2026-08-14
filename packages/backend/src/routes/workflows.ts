@@ -16,8 +16,8 @@
  * - 本路由只分发 action，不在路由层决定 workflow 阶段能否推进。
  */
 import { Router, type NextFunction, type Request, type Response } from "express";
-import type { AgentRunDto, MessageDto, WorkflowActionRequest, WorkflowActionResponse } from "@a2ui-platform/shared";
-import { agentRunService } from "../services/agent-run.service.js";
+import type { MessageDto, WorkflowActionRequest, WorkflowActionResponse } from "@a2ui-platform/shared";
+import type { Prisma } from "@prisma/client";
 import { workflowService } from "../services/workflow.service.js";
 import { messageRepository } from "../repositories/message.repository.js";
 import { badRequest, conflict, notFound } from "../utils/errors.js";
@@ -71,24 +71,66 @@ workflowsRouter.post(
       const workflow = await workflowService.getActiveWorkflow(sessionId);
       if (!workflow) throw conflict("当前会话没有进行中的 Agent Workflow", "ACTIVE_WORKFLOW_NOT_FOUND", { sessionId });
 
-      if (!["confirm_plan", "confirm_commit", "retry_step"].includes(body.action)) {
-        throw badRequest(`暂不支持 workflow action: ${body.action}`, "WORKFLOW_ACTION_NOT_SUPPORTED", {
-          action: body.action,
-        });
-      }
-
       const message = await messageRepository.create({
         session: { connect: { id: sessionId } },
         workflow: { connect: { id: workflow.id } },
         role: "user",
         kind: "chat",
-        content: body.message ?? "确认方案",
+        content: workflowActionMessageContent(body),
         attachments: [],
         metadata: {
           workflowAction: body.action,
-          payload: body.payload ?? {},
+          payload: (body.payload ?? {}) as Prisma.InputJsonValue,
         },
       });
+
+      if (body.action === "submit_clarification") {
+        const workflowDetail = await workflowService.submitClarification({
+          sessionId,
+          workflowId: workflow.id,
+          artifactId: body.artifactId,
+          submittedByMessageId: message.id,
+          answers: body.payload.answers,
+          additionalText: body.payload.additionalText,
+        });
+        if (!workflowDetail) throw notFound("AgentWorkflow", workflow.id);
+
+        res.status(202).json({
+          workflow: workflowDetail,
+          message: toMessageDto(message),
+        } satisfies WorkflowActionResponse);
+        return;
+      }
+
+      if (body.action === "submit_decision") {
+        const workflowDetail = await workflowService.submitDecision({
+          sessionId,
+          workflowId: workflow.id,
+          artifactId: body.artifactId,
+          submittedByMessageId: message.id,
+          selectedOption: body.payload.selectedOption,
+          comment: body.payload.comment,
+        });
+        if (!workflowDetail) throw notFound("AgentWorkflow", workflow.id);
+
+        res.status(202).json({
+          workflow: workflowDetail,
+          message: toMessageDto(message),
+        } satisfies WorkflowActionResponse);
+        return;
+      }
+
+      if (body.action === "cancel") {
+        await workflowService.cancelWorkflow(workflow.id, sessionId);
+        const cancelledWorkflow = await workflowService.getWorkflowById(workflow.id);
+        if (!cancelledWorkflow) throw notFound("AgentWorkflow", workflow.id);
+
+        res.status(202).json({
+          workflow: cancelledWorkflow,
+          message: toMessageDto(message),
+        } satisfies WorkflowActionResponse);
+        return;
+      }
 
       if (body.action === "retry_step") {
         const workflowDetail = await workflowService.getWorkflowById(workflow.id);
@@ -113,7 +155,7 @@ workflowsRouter.post(
             retryByMessageId: message.id,
           },
         });
-        const agentRun = await agentRunService.startWorkflowCandidateRun({
+        void workflowService.executeGenerateA2UI({
           sessionId,
           workflowId: workflow.id,
           workflowStepId: retryStep.id,
@@ -126,87 +168,41 @@ workflowsRouter.post(
         res.status(202).json({
           workflow: latestWorkflow,
           message: toMessageDto(message),
-          agentRun: toAgentRunDto(agentRun),
         } satisfies WorkflowActionResponse);
         return;
       }
 
-      if (body.action === "confirm_commit") {
-        const confirmedCandidate = await workflowService.confirmCandidateCommit({
-          sessionId,
-          workflowId: workflow.id,
-          confirmedByMessageId: message.id,
-          candidateArtifactId: body.artifactId,
-        });
-
-        await agentRunService.commitWorkflowCandidate({
-          sessionId,
-          workflowId: workflow.id,
-          workflowStepId: confirmedCandidate.commitStep.id,
-          confirmedByMessageId: message.id,
-          candidateArtifact: confirmedCandidate.candidateArtifact,
-        });
-
-        const completedWorkflow = await workflowService.getWorkflowById(workflow.id);
-        if (!completedWorkflow) throw notFound("AgentWorkflow", workflow.id);
-
-        const response: WorkflowActionResponse = {
-          workflow: completedWorkflow,
-          message: toMessageDto(message),
-        };
-
-        res.status(202).json(response);
-        return;
-      }
-
-      const confirmedWorkflow = await workflowService.confirmPlan({
-        sessionId,
-        workflowId: workflow.id,
-        confirmedByMessageId: message.id,
+      const unsupportedAction = (body as { action: string }).action;
+      throw badRequest(`暂不支持 workflow action: ${unsupportedAction}`, "WORKFLOW_ACTION_NOT_SUPPORTED", {
+        action: unsupportedAction,
       });
-      if (!confirmedWorkflow) throw notFound("AgentWorkflow", workflow.id);
-
-      const generateStep = confirmedWorkflow.steps
-        .filter((step) => step.type === "generate_a2ui")
-        .at(-1);
-      const plan = confirmedWorkflow.artifacts
-        .filter((artifact) => artifact.kind === "plan_markdown")
-        .at(-1);
-
-      if (!generateStep || !plan?.contentText) {
-        throw conflict("确认 plan 后无法找到 candidate 生成所需上下文", "WORKFLOW_CANDIDATE_CONTEXT_MISSING", {
-          workflowId: workflow.id,
-        });
-      }
-
-      const agentRun = await agentRunService.startWorkflowCandidateRun({
-        sessionId,
-        workflowId: workflow.id,
-        workflowStepId: generateStep.id,
-        triggerMessageId: message.id,
-        planMarkdown: plan.contentText,
-      });
-
-      const response: WorkflowActionResponse = {
-        workflow: confirmedWorkflow,
-        message: toMessageDto(message),
-        agentRun: toAgentRunDto(agentRun),
-      };
-
-      res.status(202).json(response);
     } catch (err) {
       next(err);
     }
   },
 );
 
+function workflowActionMessageContent(body: WorkflowActionRequest): string {
+  if (body.message?.trim()) return body.message.trim();
+  if (body.action === "submit_clarification") {
+    return body.payload.additionalText?.trim() || "提交澄清答案";
+  }
+  if (body.action === "submit_decision") {
+    if (body.payload.selectedOption === "confirm") return "确认";
+    if (body.payload.selectedOption === "reject") return "拒绝";
+    return body.payload.comment ?? "提交修改意见";
+  }
+  if (body.action === "retry_step") return "重试失败步骤";
+  return "取消 workflow";
+}
+
 function toMessageDto(message: Awaited<ReturnType<typeof messageRepository.create>>): MessageDto {
   return {
     id: message.id,
     sessionId: message.sessionId,
-    agentRunId: message.agentRunId,
-    workflowId: message.workflowId,
-    workflowStepId: message.workflowStepId,
+    agentRunId: message.agentRunId ?? null,
+    workflowId: message.workflowId ?? null,
+    workflowStepId: message.workflowStepId ?? null,
     role: message.role as MessageDto["role"],
     kind: message.kind as MessageDto["kind"],
     content: message.content,
@@ -214,30 +210,5 @@ function toMessageDto(message: Awaited<ReturnType<typeof messageRepository.creat
     a2uiEventIds: message.a2uiEventIds as string[],
     metadata: message.metadata as MessageDto["metadata"],
     createdAt: message.createdAt.toISOString(),
-  };
-}
-
-function toAgentRunDto(agentRun: Awaited<ReturnType<typeof agentRunService.startWorkflowCandidateRun>>): AgentRunDto {
-  return {
-    id: agentRun.id,
-    sessionId: agentRun.sessionId,
-    workflowId: agentRun.workflowId,
-    workflowStepId: agentRun.workflowStepId,
-    triggerMessageId: agentRun.triggerMessageId,
-    status: agentRun.status as AgentRunDto["status"],
-    intent: agentRun.intent,
-    modelProvider: agentRun.modelProvider,
-    modelName: agentRun.modelName,
-    attemptCount: agentRun.attemptCount,
-    maxAttempts: agentRun.maxAttempts,
-    inputSnapshotId: agentRun.inputSnapshotId,
-    outputSnapshotId: agentRun.outputSnapshotId,
-    assistantMessageId: agentRun.assistantMessageId,
-    failureReason: agentRun.failureReason,
-    validationSummary: agentRun.validationSummary as AgentRunDto["validationSummary"],
-    tokenUsage: agentRun.tokenUsage as AgentRunDto["tokenUsage"],
-    startedAt: agentRun.startedAt?.toISOString() ?? null,
-    completedAt: agentRun.completedAt?.toISOString() ?? null,
-    createdAt: agentRun.createdAt.toISOString(),
   };
 }

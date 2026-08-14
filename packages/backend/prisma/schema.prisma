@@ -203,6 +203,7 @@ model WorkflowStep {
   sessionId            String    @map("session_id") @db.Uuid
   type                 String
   status               String    @default("pending")
+  stageState           String?   @map("stage_state")
   sequence             Int
   attemptCount         Int       @default(0) @map("attempt_count")
   maxAttempts          Int       @default(3) @map("max_attempts")

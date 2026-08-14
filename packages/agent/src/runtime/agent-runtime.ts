@@ -314,9 +314,11 @@ export class AgentRuntime implements IAgentRuntime {
       ]);
       const rawOutputPreview = modelResponse.content.slice(0, 1000);
       const parsedResult = parseWorkflowTaskOutput(modelResponse.content);
+      const workflowToolCalls: ToolCallRecord[] = [];
 
       if (parsedResult.kind === "clarification_request") {
         const toolCall: ToolCallRecord = {
+          toolCallId: `${input.workflowStepId}:askClarification:1`,
           toolName: "askClarification",
           status: "succeeded",
           attemptIndex: 1,
@@ -331,6 +333,34 @@ export class AgentRuntime implements IAgentRuntime {
           },
           durationMs: Date.now() - startedAt,
         };
+        workflowToolCalls.push(toolCall);
+        onToolCall?.(toolCall);
+      }
+
+      if (parsedResult.kind === "plan_markdown" || parsedResult.kind === "decision_form") {
+        const form = parsedResult.kind === "plan_markdown"
+          ? parsedResult.decisionForm
+          : parsedResult.form;
+        const toolCall: ToolCallRecord = {
+          toolCallId: `${input.workflowStepId}:askUserDecision:1`,
+          toolName: "askUserDecision",
+          status: "succeeded",
+          attemptIndex: 1,
+          phase: "GENERATE_DRAFT",
+          inputSummary: {
+            gate: input.gate,
+            task: input.task,
+            target: form.target,
+            optionIds: form.options.map((option) => option.id),
+          },
+          output: {
+            title: form.title,
+            target: form.target,
+            targetArtifactId: form.targetArtifactId ?? null,
+          },
+          durationMs: Date.now() - startedAt,
+        };
+        workflowToolCalls.push(toolCall);
         onToolCall?.(toolCall);
       }
 
@@ -340,10 +370,13 @@ export class AgentRuntime implements IAgentRuntime {
           workflowId: input.workflowId,
           workflowStepId: input.workflowStepId,
           gate: input.gate,
+          stepType: input.stepType ?? input.gate,
+          stageState: input.stageState ?? null,
           task: input.task,
+          availableTools: input.availableTools ?? [],
           rawOutputPreview,
         },
-        toolCalls: [],
+        toolCalls: workflowToolCalls,
         rawOutputPreview,
         attemptCount: 1,
         tokenUsage: modelResponse.usage
@@ -360,12 +393,16 @@ export class AgentRuntime implements IAgentRuntime {
         parsedResult: {
           kind: "failure",
           reason,
+          recoverable: true,
         },
         debugMetadata: {
           workflowId: input.workflowId,
           workflowStepId: input.workflowStepId,
           gate: input.gate,
+          stepType: input.stepType ?? input.gate,
+          stageState: input.stageState ?? null,
           task: input.task,
+          availableTools: input.availableTools ?? [],
         },
         toolCalls: [],
         rawOutputPreview: "",
@@ -395,14 +432,32 @@ export class AgentRuntime implements IAgentRuntime {
       "}",
       "fields 支持 select、radio、checkbox、text、textarea。每个问题必须有 id、label、type、required、reason；选择类问题必须有 options。",
       "",
-      "如果信息足够，请直接输出 Markdown plan，不要包裹 JSON，不要使用代码块。",
+      "如果信息足够生成 plan，必须同时请求用户确认。请输出 askUserDecision JSON，并在 markdown 字段中放入 Markdown plan：",
+      "{",
+      '  "tool": "askUserDecision",',
+      '  "markdown": "## 页面目标\\n...\\n## 布局结构\\n...\\n## 组件清单\\n...\\n## Data Model\\n...\\n## 交互行为\\n...\\n## 假设\\n...\\n## 风险\\n...",',
+      '  "arguments": {',
+      '    "title": "确认方案",',
+      '    "prompt": "请确认是否按这个方案继续。",',
+      '    "guidance": "选择确认会进入生成；选择修改必须填写修改意见；选择拒绝会停留在当前阶段。",',
+      '    "target": "plan_markdown",',
+      '    "options": [',
+      '      { "id": "confirm", "label": "确认" },',
+      '      { "id": "revise", "label": "需要修改" },',
+      '      { "id": "reject", "label": "拒绝" }',
+      "    ]",
+      "  }",
+      "}",
       "Markdown plan 必须包含这些标题：页面目标、布局结构、组件清单、Data Model、交互行为、假设、风险。",
-      "不要生成 A2UI messages；plan 阶段只生成计划或澄清请求。",
+      "除非当前 task 是 generate_a2ui，否则不要生成 A2UI messages。",
     ].join("\n");
 
     const parts = [
       `## 当前 gate\n${input.gate}`,
+      `## 当前 step\n${input.stepType ?? input.gate}`,
+      `## 当前 stageState\n${input.stageState ?? "null"}`,
       `## 当前 task\n${input.task}`,
+      `## 当前可见 AgentTools\n${(input.availableTools ?? []).join(", ") || "未指定"}`,
       `## 用户需求\n${context.userMessage}`,
       context.recentMessages,
       context.uploadedFiles,
@@ -416,8 +471,20 @@ export class AgentRuntime implements IAgentRuntime {
     if (input.previousPlanMarkdown) {
       parts.push(`## 上一版 Markdown plan\n${input.previousPlanMarkdown}`);
     }
+    if (input.previousCandidate) {
+      parts.push(`## 历史 Candidate A2UI\n${JSON.stringify(input.previousCandidate, null, 2)}`);
+    }
     if (input.revisionText) {
       parts.push(`## 用户修改意见\n${input.revisionText}`);
+    }
+    if (input.task === "preview_decision") {
+      parts.push([
+        "## preview decision 输出要求",
+        "当前任务只负责请求用户确认 validated candidate。",
+        "必须输出 askUserDecision JSON，不要输出 Markdown plan。",
+        "arguments.target 必须是 candidate_a2ui_messages。",
+        "options 必须且只能包含 confirm、revise、reject 三项。",
+      ].join("\n"));
     }
     if (input.workflowContext) {
       parts.push(`## Workflow 上下文\n${JSON.stringify(input.workflowContext, null, 2)}`);

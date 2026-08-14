@@ -30,7 +30,6 @@ vi.mock("../workflow.service.js", () => ({
     getActiveWorkflow: vi.fn(),
     createWorkflow: vi.fn(),
     startInitialPlanning: vi.fn(),
-    requestPlanRevision: vi.fn(),
   },
 }));
 
@@ -68,7 +67,7 @@ function workflowRecord(overrides: Record<string, unknown> = {}) {
   return {
     id: "workflow-a",
     status: "active",
-    currentStepType: null,
+    currentStepType: "plan",
     ...overrides,
   };
 }
@@ -76,7 +75,7 @@ function workflowRecord(overrides: Record<string, unknown> = {}) {
 describe("messageService.createUserMessageAndAgentRun", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("routes a message to the active workflow without creating an agent run", async () => {
+  it("records an ordinary message on the active workflow without advancing workflow gates", async () => {
     vi.mocked(sessionRepository.findById).mockResolvedValue(sessionRecord() as never);
     vi.mocked(workflowService.getActiveWorkflow).mockResolvedValue(workflowRecord() as never);
     vi.mocked(messageRepository.create).mockResolvedValue(messageRecord({ workflowId: "workflow-a" }) as never);
@@ -89,18 +88,17 @@ describe("messageService.createUserMessageAndAgentRun", () => {
     }));
     expect(agentRunRepository.create).not.toHaveBeenCalled();
     expect(workflowService.startInitialPlanning).not.toHaveBeenCalled();
-    expect(workflowService.requestPlanRevision).not.toHaveBeenCalled();
     expect(result.agentRun).toBeNull();
-    expect(result.workflow).toMatchObject({ id: "workflow-a", status: "active" });
+    expect(result.workflow).toMatchObject({ id: "workflow-a", status: "active", currentStepType: "plan" });
   });
 
-  it("starts a workflow for A2UI generation intent", async () => {
+  it("starts a plan workflow for A2UI generation intent", async () => {
     vi.mocked(sessionRepository.findById).mockResolvedValue(sessionRecord() as never);
     vi.mocked(workflowService.getActiveWorkflow).mockResolvedValue(null);
     vi.mocked(workflowService.createWorkflow).mockResolvedValue(workflowRecord({ id: "workflow-new" }) as never);
     vi.mocked(workflowService.startInitialPlanning).mockResolvedValue(workflowRecord({
       id: "workflow-new",
-      currentStepType: "confirm_plan",
+      currentStepType: "plan",
     }) as never);
     vi.mocked(messageRepository.create).mockResolvedValue(messageRecord({ workflowId: "workflow-new" }) as never);
 
@@ -118,35 +116,10 @@ describe("messageService.createUserMessageAndAgentRun", () => {
       userMessage: "生成一个数据看板",
     });
     expect(agentRunRepository.create).not.toHaveBeenCalled();
-    expect(result.workflow).toMatchObject({ id: "workflow-new", currentStepType: "confirm_plan" });
+    expect(result.workflow).toMatchObject({ id: "workflow-new", currentStepType: "plan" });
   });
 
-  it("treats natural language at confirm_plan as a plan revision", async () => {
-    vi.mocked(sessionRepository.findById).mockResolvedValue(sessionRecord() as never);
-    vi.mocked(workflowService.getActiveWorkflow).mockResolvedValue(workflowRecord({
-      currentStepType: "confirm_plan",
-    }) as never);
-    vi.mocked(workflowService.requestPlanRevision).mockResolvedValue(workflowRecord({
-      currentStepType: "clarify",
-    }) as never);
-    vi.mocked(messageRepository.create).mockResolvedValue(messageRecord({
-      id: "message-revision",
-      workflowId: "workflow-a",
-    }) as never);
-
-    const result = await messageService.createUserMessageAndAgentRun("session-a", "把筛选条件改成下拉框");
-
-    expect(workflowService.requestPlanRevision).toHaveBeenCalledWith({
-      sessionId: "session-a",
-      workflowId: "workflow-a",
-      revisionMessageId: "message-revision",
-      revisionText: "把筛选条件改成下拉框",
-    });
-    expect(agentRunRepository.create).not.toHaveBeenCalled();
-    expect(result.workflow).toMatchObject({ id: "workflow-a", currentStepType: "clarify" });
-  });
-
-  it("keeps ordinary messages on the existing lightweight agent run path", async () => {
+  it("keeps ordinary messages on the existing lightweight agent run path when no workflow is active", async () => {
     vi.mocked(sessionRepository.findById).mockResolvedValue(sessionRecord() as never);
     vi.mocked(workflowService.getActiveWorkflow).mockResolvedValue(null);
     vi.mocked(messageRepository.create).mockResolvedValue(messageRecord({ content: "你好" }) as never);

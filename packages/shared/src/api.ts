@@ -60,18 +60,21 @@ export type WorkflowStepStatus =
   | "skipped";
 /** Workflow Step 类型 */
 export type WorkflowStepType =
-  | "understand"
-  | "clarify"
-  | "propose"
-  | "confirm_plan"
+  | "plan"
   | "generate_a2ui"
   | "validate"
   | "preview"
-  | "confirm_commit"
   | "commit";
+/** Workflow 阶段内领域等待态。 */
+export type WorkflowStageState =
+  | "awaiting_clarification"
+  | "awaiting_plan_confirmation"
+  | "awaiting_preview_confirmation"
+  | null;
 /** Workflow Artifact 类型 */
 export type WorkflowArtifactKind =
   | "clarification_form"
+  | "decision_form"
   | "plan_markdown"
   | "candidate_a2ui_messages"
   | "validation_report";
@@ -80,11 +83,11 @@ export type WorkflowArtifactCreatedBy = "agent" | "user" | "backend";
 /** Workflow action 类型 */
 export type WorkflowActionType =
   | "submit_clarification"
-  | "confirm_plan"
-  | "request_revision"
-  | "confirm_commit"
+  | "submit_decision"
   | "retry_step"
   | "cancel";
+/** Workflow decision form 的用户选择。 */
+export type WorkflowDecisionOption = "confirm" | "revise" | "reject";
 /** A2UI 事件状态 */
 export type A2UIEventStatus = "committed" | "reverted" | "ignored";
 /** 上传文件状态 */
@@ -280,6 +283,8 @@ export interface WorkflowStepDto {
   type: WorkflowStepType;
   /** Step 状态 */
   status: WorkflowStepStatus;
+  /** 阶段内领域等待态 */
+  stageState: WorkflowStageState;
   /** Workflow 内顺序 */
   sequence: number;
   /** 已尝试次数 */
@@ -497,8 +502,77 @@ export interface SendMessageResponse {
   streamUrl: string;
 }
 
+/** 提交 clarification form 的 Workflow action 请求。 */
+export interface SubmitClarificationWorkflowActionRequest {
+  /** Action 类型 */
+  action: "submit_clarification";
+  /** 关联 artifact ID */
+  artifactId: string;
+  /** 关联 step ID */
+  workflowStepId?: string;
+  /** 用户可见消息内容 */
+  message?: string;
+  /** clarification form 答案 */
+  payload: {
+    /** 按问题 ID 索引的答案 */
+    answers: Record<string, unknown>;
+    /** 额外自然语言补充 */
+    additionalText?: string;
+  };
+}
+
+/** 提交 decision form 的 Workflow action 请求。 */
+export interface SubmitDecisionWorkflowActionRequest {
+  /** Action 类型 */
+  action: "submit_decision";
+  /** 关联 artifact ID */
+  artifactId: string;
+  /** 关联 step ID */
+  workflowStepId?: string;
+  /** 用户可见消息内容 */
+  message?: string;
+  /** decision form 三选一结果 */
+  payload: {
+    /** 用户选择 */
+    selectedOption: WorkflowDecisionOption;
+    /** revise 时必填，confirm 时禁止携带 */
+    comment?: string;
+  };
+}
+
+/** 重试失败 Workflow step 的 action 请求。 */
+export interface RetryWorkflowActionRequest {
+  /** Action 类型 */
+  action: "retry_step";
+  /** 关联 step ID */
+  workflowStepId?: string;
+  /** 用户可见消息内容 */
+  message?: string;
+  /** 附加结构化载荷 */
+  payload?: JsonObject;
+}
+
+/** 取消当前 Workflow 的 action 请求。 */
+export interface CancelWorkflowActionRequest {
+  /** Action 类型 */
+  action: "cancel";
+  /** 关联 step ID */
+  workflowStepId?: string;
+  /** 用户可见消息内容 */
+  message?: string;
+  /** 附加结构化载荷 */
+  payload?: JsonObject;
+}
+
 /** Workflow action 请求 */
-export interface WorkflowActionRequest {
+export type WorkflowActionRequest =
+  | SubmitClarificationWorkflowActionRequest
+  | SubmitDecisionWorkflowActionRequest
+  | RetryWorkflowActionRequest
+  | CancelWorkflowActionRequest;
+
+/** @deprecated 使用 WorkflowActionRequest union 中的具体 action 请求类型。 */
+export interface LegacyWorkflowActionRequest {
   /** Action 类型 */
   action: WorkflowActionType;
   /** 关联 step ID */

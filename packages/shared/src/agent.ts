@@ -10,7 +10,7 @@
  */
 
 import type { A2UIServerMessage, JsonObject, SurfaceSnapshotData } from "./a2ui";
-import type { SkillReference, WorkflowStepType } from "./api";
+import type { SkillReference, WorkflowDecisionOption, WorkflowStageState, WorkflowStepType } from "./api";
 import type { AgentRunPhase } from "./sse";
 
 /** A2UI 校验过程中发现的单个问题。 */
@@ -85,21 +85,45 @@ export interface AgentRunInput {
 export interface AgentWorkflowTaskInput extends AgentRunInput {
   /** 当前 Workflow 所处 gate。 */
   gate: WorkflowStepType;
+  /** 当前 Workflow Step 类型。 */
+  stepType?: WorkflowStepType;
+  /** 当前 Workflow Step 的领域等待态。 */
+  stageState?: WorkflowStageState;
   /** Workflow ID，用于 debug metadata 和审计关联。 */
   workflowId: string;
   /** Workflow step ID，用于 debug metadata 和审计关联。 */
   workflowStepId: string;
   /** 当前 task 的类型。 */
-  task: "initial_planning" | "revise_plan" | "generate_candidate";
+  task:
+    | "plan"
+    | "revise_plan"
+    | "generate_a2ui"
+    | "validate"
+    | "preview_decision"
+    | "initial_planning"
+    | "generate_candidate";
+  /** 当前 gate 允许 Agent 看见和调用的工具集合。 */
+  availableTools?: AgentToolName[];
   /** 用户提交的澄清答案。 */
   clarificationAnswers?: JsonObject;
   /** 已确认或最近生成的 Markdown plan。 */
   previousPlanMarkdown?: string | null;
+  /** 最近通过 validate 的 Candidate A2UI 摘要或完整内容。 */
+  previousCandidate?: JsonObject | null;
   /** 用户针对上一版 plan 的修改意见。 */
   revisionText?: string | null;
   /** 历史 candidate 或额外 workflow artifact 摘要。 */
   workflowContext?: JsonObject;
 }
+
+/** Workflow 内 Agent 可以调用的受控工具名称。 */
+export type AgentToolName =
+  | "askClarification"
+  | "askUserDecision"
+  | "getSkillContent"
+  | "getSkillReferenceContent"
+  | "getCatalogComponentDetails"
+  | "validateA2UI";
 
 /** Clarification Form 支持的问题类型。 */
 export type ClarificationQuestionType = "select" | "radio" | "checkbox" | "text" | "textarea";
@@ -128,6 +152,26 @@ export interface ClarificationForm {
   fields: ClarificationQuestion[];
 }
 
+/** Decision Form 目标 artifact 类型。 */
+export type DecisionFormTarget = "plan_markdown" | "candidate_a2ui_messages";
+
+/** Decision Form 三选一选项。 */
+export interface DecisionFormOption {
+  id: WorkflowDecisionOption;
+  label: string;
+  description?: string;
+}
+
+/** Runtime 解析后的用户决策表单。 */
+export interface DecisionForm {
+  title: string;
+  prompt: string;
+  guidance: string;
+  target: DecisionFormTarget;
+  targetArtifactId?: string;
+  options: DecisionFormOption[];
+}
+
 /** Agent Runtime 解析、归一化、校验后的 workflow 结果。 */
 export type ParsedAgentResult =
   | {
@@ -137,16 +181,21 @@ export type ParsedAgentResult =
   | {
       kind: "plan_markdown";
       markdown: string;
+      decisionForm: DecisionForm;
     }
   | {
       kind: "candidate_a2ui_messages";
-      assistantMessage: string;
-      a2uiMessages: A2UIServerMessage[];
-      validation: ValidateA2UIResult;
+      messages: A2UIServerMessage[];
+      assistantMessage?: string;
+    }
+  | {
+      kind: "decision_form";
+      form: DecisionForm;
     }
   | {
       kind: "failure";
       reason: string;
+      recoverable: boolean;
       details?: JsonObject;
     };
 
@@ -203,6 +252,8 @@ export type AgentRunResult =
 
 /** Agent 运行过程中的单次工具调用记录。 */
 export interface ToolCallRecord {
+  /** Runtime 生成的工具调用关联 ID，持久化后可映射到数据库 tool call ID。 */
+  toolCallId?: string;
   /** 工具名称 */
   toolName: string;
   /** 调用状态 */

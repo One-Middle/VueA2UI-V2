@@ -8,24 +8,31 @@
  * - 鍚庣画 WorkflowService API 涓?sendMessage 缂栨帓鍏ュ彛銆? * 娉ㄦ剰锛? * - 鏈湇鍔℃殏涓嶈皟鐢?Agent Runtime锛屼篃涓嶆彁浜?A2UI event/snapshot銆? */
 import type {
   A2UIServerMessage,
+  A2UIEventDto,
   AgentRunInput,
   AgentWorkflowTaskInput,
   AgentWorkflowTaskResult,
   AgentWorkflowDto,
   IAgentRuntime,
   JsonObject,
+  MessageDto,
   ParsedAgentResult,
+  SurfaceSnapshotDto,
   ToolCallRecord,
   ValidateA2UIResult,
   WorkflowArtifactDto,
   WorkflowArtifactKind,
+  WorkflowDecisionOption,
+  WorkflowStageState,
   WorkflowStepDto,
   WorkflowStepStatus,
   WorkflowStepType,
 } from "@a2ui-platform/shared";
-import { createAgentRuntime } from "@a2ui-platform/agent";
+import { createAgentRuntime, validateA2UI } from "@a2ui-platform/agent";
 import type { Prisma } from "@prisma/client";
 import { config } from "../config.js";
+import { prisma } from "../db.js";
+import { a2uiEventRepository } from "../repositories/a2ui-event.repository.js";
 import { agentRunRepository } from "../repositories/agent-run.repository.js";
 import { fileRepository } from "../repositories/file.repository.js";
 import { messageRepository } from "../repositories/message.repository.js";
@@ -35,6 +42,7 @@ import { toolCallRepository } from "../repositories/tool-call.repository.js";
 import { workflowRepository } from "../repositories/workflow.repository.js";
 import { conflict } from "../utils/errors.js";
 import { skillResolverService } from "./skill-resolver.service.js";
+import { snapshotService } from "./snapshot.service.js";
 import { streamService } from "./stream.service.js";
 
 /** 鍒涘缓 Agent Workflow 鐨勮緭鍏ュ弬鏁般€?*/
@@ -48,9 +56,10 @@ export type CreateWorkflowInput = {
 export type CreateWorkflowStepInput = {
   workflowId: string;
   sessionId: string;
-  type: WorkflowStepType;
+  type: WorkflowStepType | string;
   sequence: number;
   status?: WorkflowStepStatus;
+  stageState?: WorkflowStageState;
   maxAttempts?: number;
   metadata?: Prisma.InputJsonValue;
 };
@@ -60,6 +69,7 @@ export type UpdateWorkflowStepInput = {
   sessionId: string;
   workflowId: string;
   status?: WorkflowStepStatus;
+  stageState?: WorkflowStageState;
   attemptCount?: number;
   failureReason?: string | null;
   failureMetadata?: Prisma.InputJsonValue;
@@ -111,10 +121,45 @@ export type RequestPlanRevisionInput = {
   revisionText: string;
 };
 
+export type RequestPreviewRevisionInput = {
+  sessionId: string;
+  workflowId: string;
+  revisionMessageId: string;
+  revisionText: string;
+  previewStepId: string;
+  decisionArtifactId: string;
+};
+
 export type ConfirmPlanInput = {
   sessionId: string;
   workflowId: string;
   confirmedByMessageId: string;
+};
+
+export type SubmitClarificationInput = {
+  sessionId: string;
+  workflowId: string;
+  artifactId: string;
+  submittedByMessageId: string;
+  answers: Record<string, unknown>;
+  additionalText?: string;
+};
+
+export type SubmitDecisionInput = {
+  sessionId: string;
+  workflowId: string;
+  artifactId: string;
+  submittedByMessageId: string;
+  selectedOption: WorkflowDecisionOption;
+  comment?: string;
+};
+
+export type ExecuteGenerateA2UIInput = {
+  sessionId: string;
+  workflowId: string;
+  workflowStepId: string;
+  triggerMessageId: string;
+  planMarkdown?: string;
 };
 
 export type RecordCandidateSuccessInput = {
@@ -249,9 +294,12 @@ async function runWorkflowTask(input: {
   workflowStepId: string;
   task: AgentWorkflowTaskInput["task"];
   gate: WorkflowStepType;
+  stageState?: AgentWorkflowTaskInput["stageState"];
+  availableTools?: AgentWorkflowTaskInput["availableTools"];
   userMessage: string;
   clarificationAnswers?: JsonObject;
   previousPlanMarkdown?: string | null;
+  previousCandidate?: JsonObject | null;
   revisionText?: string | null;
   workflowContext?: JsonObject;
 }): Promise<{ runId: string; result: AgentWorkflowTaskResult }> {
@@ -277,9 +325,19 @@ async function runWorkflowTask(input: {
       workflowId: input.workflowId,
       workflowStepId: input.workflowStepId,
       gate: input.gate,
+      stepType: input.gate,
+      stageState: input.stageState ?? null,
       task: input.task,
+      availableTools: input.availableTools ?? [
+        "askClarification",
+        "askUserDecision",
+        "getSkillContent",
+        "getSkillReferenceContent",
+        "getCatalogComponentDetails",
+      ],
       clarificationAnswers: input.clarificationAnswers,
       previousPlanMarkdown: input.previousPlanMarkdown,
+      previousCandidate: input.previousCandidate,
       revisionText: input.revisionText,
       workflowContext: input.workflowContext,
     },
@@ -319,6 +377,25 @@ function getPlanValidationFailure(markdown: string): string | null {
 
 function resultFailureReason(result: ParsedAgentResult): string {
   return result.kind === "failure" ? result.reason : `当前 gate 不接受 Agent result: ${result.kind}`;
+}
+
+function extractSurfaceIds(messages: A2UIServerMessage[]): string[] {
+  const surfaceIds = new Set<string>();
+  for (const message of messages) {
+    if ("createSurface" in message && message.createSurface) {
+      surfaceIds.add(message.createSurface.surfaceId);
+    }
+    if ("updateComponents" in message && message.updateComponents) {
+      surfaceIds.add(message.updateComponents.surfaceId);
+    }
+    if ("updateDataModel" in message && message.updateDataModel) {
+      surfaceIds.add(message.updateDataModel.surfaceId);
+    }
+    if ("deleteSurface" in message && message.deleteSurface) {
+      surfaceIds.add(message.deleteSurface.surfaceId);
+    }
+  }
+  return [...surfaceIds];
 }
 
 /**
@@ -364,6 +441,7 @@ function toStepDto(step: {
   sessionId: string;
   type: string;
   status: string;
+  stageState: string | null;
   sequence: number;
   attemptCount: number;
   maxAttempts: number;
@@ -383,6 +461,7 @@ function toStepDto(step: {
     sessionId: step.sessionId,
     type: step.type as WorkflowStepDto["type"],
     status: step.status as WorkflowStepDto["status"],
+    stageState: step.stageState as WorkflowStepDto["stageState"],
     sequence: step.sequence,
     attemptCount: step.attemptCount,
     maxAttempts: step.maxAttempts,
@@ -542,6 +621,7 @@ export const workflowService = {
       type: input.type,
       sequence: input.sequence,
       status: input.status ?? "pending",
+      stageState: input.stageState ?? null,
       maxAttempts: input.maxAttempts ?? 3,
       metadata: input.metadata ?? {},
     });
@@ -566,6 +646,7 @@ export const workflowService = {
   async updateStep(input: UpdateWorkflowStepInput) {
     const step = await workflowRepository.updateStep(input.stepId, {
       status: input.status,
+      stageState: input.stageState,
       attemptCount: input.attemptCount,
       failureReason: input.failureReason,
       failureMetadata: input.failureMetadata,
@@ -708,39 +789,30 @@ export const workflowService = {
    */
   async startInitialPlanning(input: StartPlanningInput) {
     const now = new Date();
-    const understandStep = await this.createStep({
+    const planStep = await this.createStep({
       workflowId: input.workflowId,
       sessionId: input.sessionId,
-      type: "understand",
+      type: "plan",
       sequence: 1,
-      status: "completed",
-      maxAttempts: 1,
-      metadata: { userMessage: input.userMessage },
-    });
-
-    const proposeStep = await this.createStep({
-      workflowId: input.workflowId,
-      sessionId: input.sessionId,
-      type: "propose",
-      sequence: 2,
       status: "running",
+      stageState: null,
       maxAttempts: 1,
       metadata: {
-        gate: "propose",
-        allowedOutput: ["clarification_form", "plan_markdown"],
-        previousStepId: understandStep.id,
+        gate: "plan",
+        allowedOutput: ["clarification_form", "plan_markdown", "decision_form"],
+        userMessage: input.userMessage,
       },
     });
 
     const { runId, result } = await runWorkflowTask({
       sessionId: input.sessionId,
       workflowId: input.workflowId,
-      workflowStepId: proposeStep.id,
-      task: "initial_planning",
-      gate: "propose",
+      workflowStepId: planStep.id,
+      task: "plan",
+      gate: "plan",
       userMessage: input.userMessage,
       workflowContext: {
-        understandStepId: understandStep.id,
+        planStepId: planStep.id,
       },
     });
 
@@ -748,34 +820,19 @@ export const workflowService = {
       await this.updateStep({
         workflowId: input.workflowId,
         sessionId: input.sessionId,
-        stepId: proposeStep.id,
-        status: "completed",
-        completedAt: now,
+        stepId: planStep.id,
+        status: "awaiting_confirmation",
+        stageState: "awaiting_clarification",
         metadata: {
-          ...(toJsonObject(proposeStep.metadata)),
+          ...(toJsonObject(planStep.metadata)),
           agentRunId: runId,
           parsedResultKind: result.parsedResult.kind,
         },
       });
 
-      const clarifyStep = await this.createStep({
-        workflowId: input.workflowId,
-        sessionId: input.sessionId,
-        type: "clarify",
-        sequence: 3,
-        status: "awaiting_confirmation",
-        maxAttempts: 1,
-        metadata: {
-          gate: "clarify",
-          allowedOutput: "clarification_form",
-          previousStepId: understandStep.id,
-          agentRunId: runId,
-        },
-      });
-
       await this.createArtifact({
         workflowId: input.workflowId,
-        workflowStepId: clarifyStep.id,
+        workflowStepId: planStep.id,
         sessionId: input.sessionId,
         kind: "clarification_form",
         version: 1,
@@ -791,6 +848,8 @@ export const workflowService = {
         createdBy: "agent",
         metadata: {
           agentRunId: runId,
+          source: "askClarification",
+          toolCallId: result.toolCalls.find((call) => call.toolName === "askClarification")?.toolCallId ?? null,
         },
       });
 
@@ -803,8 +862,9 @@ export const workflowService = {
       const failedStep = await this.updateStep({
         workflowId: input.workflowId,
         sessionId: input.sessionId,
-        stepId: proposeStep.id,
+        stepId: planStep.id,
         status: "failed",
+        stageState: null,
         failureReason,
         failureMetadata: {
           agentRunId: runId,
@@ -812,7 +872,7 @@ export const workflowService = {
         },
         completedAt: now,
         metadata: {
-          ...(toJsonObject(proposeStep.metadata)),
+          ...(toJsonObject(planStep.metadata)),
           agentRunId: runId,
         },
       });
@@ -832,8 +892,9 @@ export const workflowService = {
       const failedStep = await this.updateStep({
         workflowId: input.workflowId,
         sessionId: input.sessionId,
-        stepId: proposeStep.id,
+        stepId: planStep.id,
         status: "failed",
+        stageState: null,
         failureReason: planFailure,
         failureMetadata: {
           agentRunId: runId,
@@ -841,7 +902,7 @@ export const workflowService = {
         },
         completedAt: now,
         metadata: {
-          ...(toJsonObject(proposeStep.metadata)),
+          ...(toJsonObject(planStep.metadata)),
           agentRunId: runId,
         },
       });
@@ -859,19 +920,19 @@ export const workflowService = {
     await this.updateStep({
       workflowId: input.workflowId,
       sessionId: input.sessionId,
-      stepId: proposeStep.id,
-      status: "completed",
-      completedAt: now,
+      stepId: planStep.id,
+      status: "awaiting_confirmation",
+      stageState: "awaiting_plan_confirmation",
       metadata: {
-        ...(toJsonObject(proposeStep.metadata)),
+        ...(toJsonObject(planStep.metadata)),
         agentRunId: runId,
         parsedResultKind: result.parsedResult.kind,
       },
     });
 
-    await this.createArtifact({
+    const planArtifact = await this.createArtifact({
       workflowId: input.workflowId,
-      workflowStepId: proposeStep.id,
+      workflowStepId: planStep.id,
       sessionId: input.sessionId,
       kind: "plan_markdown",
       version: 1,
@@ -882,18 +943,21 @@ export const workflowService = {
       },
     });
 
-    await this.createStep({
+    await this.createArtifact({
       workflowId: input.workflowId,
+      workflowStepId: planStep.id,
       sessionId: input.sessionId,
-      type: "confirm_plan",
-      sequence: 3,
-      status: "awaiting_confirmation",
-      maxAttempts: 1,
+      kind: "decision_form",
+      version: 1,
+      contentJson: {
+        ...result.parsedResult.decisionForm,
+        targetArtifactId: planArtifact.id,
+      } as unknown as Prisma.InputJsonValue,
+      createdBy: "agent",
       metadata: {
-        gate: "confirm_plan",
-        allowedActions: ["confirm_plan", "request_revision"],
-        enteredAt: now.toISOString(),
-        planVersion: 1,
+        source: "askUserDecision",
+        agentRunId: runId,
+        toolCallId: result.toolCalls.find((call) => call.toolName === "askUserDecision")?.toolCallId ?? null,
       },
     });
 
@@ -906,6 +970,377 @@ export const workflowService = {
    * @param input - 纭鍙傛暟
    * @returns 褰撳墠 workflow 璇︽儏
    */
+  /**
+   * 提交 plan 阶段的 clarification form，并重新运行真实 Agent plan task。
+   *
+   * 注意：本方法只接受当前 plan step 的 awaiting_clarification 状态，不会用后端模板补 plan。
+   *
+   * @param input - 澄清表单提交参数，包含 artifact、答案和用户消息 ID
+   * @returns 更新后的 workflow 详情
+   */
+  async submitClarification(input: SubmitClarificationInput) {
+    const artifact = await workflowRepository.findArtifactById(input.artifactId);
+    if (!artifact || artifact.workflowId !== input.workflowId || artifact.kind !== "clarification_form") {
+      throw conflict("提交的 clarification artifact 不属于当前 workflow", "CLARIFICATION_ARTIFACT_NOT_AVAILABLE", {
+        workflowId: input.workflowId,
+        artifactId: input.artifactId,
+      });
+    }
+
+    if (!artifact.workflowStepId) {
+      throw conflict("clarification artifact 缺少关联的 workflow step", "CLARIFICATION_STEP_NOT_AVAILABLE", {
+        workflowId: input.workflowId,
+        artifactId: input.artifactId,
+      });
+    }
+
+    const planStep = await workflowRepository.findStepById(artifact.workflowStepId);
+    if (
+      !planStep ||
+      planStep.workflowId !== input.workflowId ||
+      planStep.type !== "plan" ||
+      planStep.status !== "awaiting_confirmation" ||
+      planStep.stageState !== "awaiting_clarification"
+    ) {
+      throw conflict("当前 workflow 不在等待澄清的 plan 状态", "PLAN_CLARIFICATION_NOT_AVAILABLE", {
+        workflowId: input.workflowId,
+        artifactId: input.artifactId,
+      });
+    }
+
+    await this.updateStep({
+      workflowId: input.workflowId,
+      sessionId: input.sessionId,
+      stepId: planStep.id,
+      status: "running",
+      stageState: null,
+      metadata: {
+        ...(toJsonObject(planStep.metadata)),
+        submittedClarificationArtifactId: input.artifactId,
+        submittedClarificationMessageId: input.submittedByMessageId,
+      },
+    });
+
+    const latestPlan = await workflowRepository.findLatestArtifact(input.workflowId, "plan_markdown");
+    const latestClarification = await workflowRepository.findLatestArtifact(input.workflowId, "clarification_form");
+    const latestDecision = await workflowRepository.findLatestArtifact(input.workflowId, "decision_form");
+    const nextPlanVersion = (latestPlan?.version ?? 0) + 1;
+    const nextClarificationVersion = (latestClarification?.version ?? 0) + 1;
+    const nextDecisionVersion = (latestDecision?.version ?? 0) + 1;
+
+    const { runId, result } = await runWorkflowTask({
+      sessionId: input.sessionId,
+      workflowId: input.workflowId,
+      workflowStepId: planStep.id,
+      task: "plan",
+      gate: "plan",
+      userMessage: input.additionalText?.trim() || "用户提交了澄清答案",
+      clarificationAnswers: input.answers as JsonObject,
+      workflowContext: {
+        clarificationArtifactId: input.artifactId,
+        submittedByMessageId: input.submittedByMessageId,
+      },
+    });
+
+    if (result.parsedResult.kind === "clarification_request") {
+      await this.updateStep({
+        workflowId: input.workflowId,
+        sessionId: input.sessionId,
+        stepId: planStep.id,
+        status: "awaiting_confirmation",
+        stageState: "awaiting_clarification",
+        metadata: {
+          ...(toJsonObject(planStep.metadata)),
+          agentRunId: runId,
+          parsedResultKind: result.parsedResult.kind,
+          submittedClarificationArtifactId: input.artifactId,
+          submittedClarificationMessageId: input.submittedByMessageId,
+        },
+      });
+
+      await this.createArtifact({
+        workflowId: input.workflowId,
+        workflowStepId: planStep.id,
+        sessionId: input.sessionId,
+        kind: "clarification_form",
+        version: nextClarificationVersion,
+        contentJson: {
+          ...result.parsedResult.form,
+          additionalInstructions: {
+            id: "additional_instructions",
+            type: "textarea",
+            label: "其他自然语言补充",
+            required: false,
+          },
+        } as unknown as Prisma.InputJsonValue,
+        createdBy: "agent",
+        metadata: {
+          agentRunId: runId,
+          source: "askClarification",
+          toolCallId: result.toolCalls.find((call) => call.toolName === "askClarification")?.toolCallId ?? null,
+          previousClarificationArtifactId: input.artifactId,
+        },
+      });
+
+      const workflow = await workflowRepository.findWorkflowById(input.workflowId);
+      return workflow ? toWorkflowDetailDto(workflow) : null;
+    }
+
+    if (result.parsedResult.kind !== "plan_markdown") {
+      const failureReason = resultFailureReason(result.parsedResult);
+      const failedStep = await this.updateStep({
+        workflowId: input.workflowId,
+        sessionId: input.sessionId,
+        stepId: planStep.id,
+        status: "failed",
+        stageState: null,
+        failureReason,
+        failureMetadata: {
+          agentRunId: runId,
+          parsedResultKind: result.parsedResult.kind,
+        },
+        completedAt: new Date(),
+        metadata: {
+          ...(toJsonObject(planStep.metadata)),
+          agentRunId: runId,
+          submittedClarificationArtifactId: input.artifactId,
+          submittedClarificationMessageId: input.submittedByMessageId,
+        },
+      });
+      await this.failWorkflow({
+        workflowId: input.workflowId,
+        sessionId: input.sessionId,
+        failureReason,
+        failedStep: toStepDto(failedStep),
+        retryable: true,
+      });
+      const workflow = await workflowRepository.findWorkflowById(input.workflowId);
+      return workflow ? toWorkflowDetailDto(workflow) : null;
+    }
+
+    const planFailure = getPlanValidationFailure(result.parsedResult.markdown);
+    if (planFailure) {
+      const failedStep = await this.updateStep({
+        workflowId: input.workflowId,
+        sessionId: input.sessionId,
+        stepId: planStep.id,
+        status: "failed",
+        stageState: null,
+        failureReason: planFailure,
+        failureMetadata: {
+          agentRunId: runId,
+          validation: "markdown_plan_required_headings",
+        },
+        completedAt: new Date(),
+        metadata: {
+          ...(toJsonObject(planStep.metadata)),
+          agentRunId: runId,
+          submittedClarificationArtifactId: input.artifactId,
+          submittedClarificationMessageId: input.submittedByMessageId,
+        },
+      });
+      await this.failWorkflow({
+        workflowId: input.workflowId,
+        sessionId: input.sessionId,
+        failureReason: planFailure,
+        failedStep: toStepDto(failedStep),
+        retryable: true,
+      });
+      const workflow = await workflowRepository.findWorkflowById(input.workflowId);
+      return workflow ? toWorkflowDetailDto(workflow) : null;
+    }
+
+    await this.updateStep({
+      workflowId: input.workflowId,
+      sessionId: input.sessionId,
+      stepId: planStep.id,
+      status: "awaiting_confirmation",
+      stageState: "awaiting_plan_confirmation",
+      metadata: {
+        ...(toJsonObject(planStep.metadata)),
+        agentRunId: runId,
+        parsedResultKind: result.parsedResult.kind,
+        submittedClarificationArtifactId: input.artifactId,
+        submittedClarificationMessageId: input.submittedByMessageId,
+      },
+    });
+
+    const planArtifact = await this.createArtifact({
+      workflowId: input.workflowId,
+      workflowStepId: planStep.id,
+      sessionId: input.sessionId,
+      kind: "plan_markdown",
+      version: nextPlanVersion,
+      contentText: result.parsedResult.markdown,
+      createdBy: "agent",
+      metadata: {
+        agentRunId: runId,
+        clarificationArtifactId: input.artifactId,
+        submittedByMessageId: input.submittedByMessageId,
+      },
+    });
+
+    await this.createArtifact({
+      workflowId: input.workflowId,
+      workflowStepId: planStep.id,
+      sessionId: input.sessionId,
+      kind: "decision_form",
+      version: nextDecisionVersion,
+      contentJson: {
+        ...result.parsedResult.decisionForm,
+        targetArtifactId: planArtifact.id,
+      } as unknown as Prisma.InputJsonValue,
+      createdBy: "agent",
+      metadata: {
+        source: "askUserDecision",
+        agentRunId: runId,
+        toolCallId: result.toolCalls.find((call) => call.toolName === "askUserDecision")?.toolCallId ?? null,
+        targetArtifactId: planArtifact.id,
+      },
+    });
+
+    const workflow = await workflowRepository.findWorkflowById(input.workflowId);
+    return workflow ? toWorkflowDetailDto(workflow) : null;
+  },
+
+  /**
+   * 提交 decision form 的三选一结果，并由当前 step/stageState 做门禁。
+   *
+   * 注意：confirm 不接受 comment；revise 必须有 comment；reject 只记录停留，不推进 workflow。
+   *
+   * @param input - decision 表单提交参数
+   * @returns 更新后的 workflow 详情
+   */
+  async submitDecision(input: SubmitDecisionInput) {
+    const artifact = await workflowRepository.findArtifactById(input.artifactId);
+    if (!artifact || artifact.workflowId !== input.workflowId || artifact.kind !== "decision_form") {
+      throw conflict("提交的 decision artifact 不属于当前 workflow", "DECISION_ARTIFACT_NOT_AVAILABLE", {
+        workflowId: input.workflowId,
+        artifactId: input.artifactId,
+      });
+    }
+
+    if (!artifact.workflowStepId) {
+      throw conflict("decision artifact 缺少关联的 workflow step", "DECISION_STEP_NOT_AVAILABLE", {
+        workflowId: input.workflowId,
+        artifactId: input.artifactId,
+      });
+    }
+
+    const step = await workflowRepository.findStepById(artifact.workflowStepId);
+    if (!step || step.workflowId !== input.workflowId || step.status !== "awaiting_confirmation") {
+      throw conflict("当前 workflow 不在等待 decision 的状态", "DECISION_NOT_AVAILABLE", {
+        workflowId: input.workflowId,
+        artifactId: input.artifactId,
+      });
+    }
+
+    if (input.selectedOption === "reject") {
+      await this.updateStep({
+        workflowId: input.workflowId,
+        sessionId: input.sessionId,
+        stepId: step.id,
+        metadata: {
+          ...(toJsonObject(step.metadata)),
+          lastRejectedDecisionArtifactId: input.artifactId,
+          lastRejectedByMessageId: input.submittedByMessageId,
+        },
+      });
+      const workflow = await workflowRepository.findWorkflowById(input.workflowId);
+      return workflow ? toWorkflowDetailDto(workflow) : null;
+    }
+
+    if (step.type === "plan" && step.stageState === "awaiting_plan_confirmation") {
+      if (input.selectedOption === "revise") {
+        return this.requestPlanRevision({
+          sessionId: input.sessionId,
+          workflowId: input.workflowId,
+          revisionMessageId: input.submittedByMessageId,
+          revisionText: input.comment ?? "",
+        });
+      }
+
+      const latestStep = await workflowRepository.findLatestStep(input.workflowId);
+      await this.updateStep({
+        workflowId: input.workflowId,
+        sessionId: input.sessionId,
+        stepId: step.id,
+        status: "completed",
+        stageState: null,
+        confirmedAt: new Date(),
+        confirmedByMessageId: input.submittedByMessageId,
+        completedAt: new Date(),
+        metadata: {
+          ...(toJsonObject(step.metadata)),
+          confirmedDecisionArtifactId: input.artifactId,
+          confirmedByMessageId: input.submittedByMessageId,
+        },
+      });
+
+      const generateStep = await this.createStep({
+        workflowId: input.workflowId,
+        sessionId: input.sessionId,
+        type: "generate_a2ui",
+        sequence: (latestStep?.sequence ?? step.sequence) + 1,
+        status: "pending",
+        metadata: {
+          gate: "generate_a2ui",
+          precondition: "confirmed_plan",
+          confirmedPlanStepId: step.id,
+          decisionArtifactId: input.artifactId,
+          confirmedByMessageId: input.submittedByMessageId,
+        },
+      });
+
+      void this.executeGenerateA2UI({
+        sessionId: input.sessionId,
+        workflowId: input.workflowId,
+        workflowStepId: generateStep.id,
+        triggerMessageId: input.submittedByMessageId,
+      });
+
+      const workflow = await workflowRepository.findWorkflowById(input.workflowId);
+      return workflow ? toWorkflowDetailDto(workflow) : null;
+    }
+
+    if (step.type === "preview" && step.stageState === "awaiting_preview_confirmation") {
+      if (input.selectedOption === "revise") {
+        return this.requestPreviewRevision({
+          sessionId: input.sessionId,
+          workflowId: input.workflowId,
+          revisionMessageId: input.submittedByMessageId,
+          revisionText: input.comment ?? "",
+          previewStepId: step.id,
+          decisionArtifactId: input.artifactId,
+        });
+      }
+
+      const decisionContent = toJsonObject(artifact.contentJson);
+      const confirmed = await this.confirmCandidateCommit({
+        sessionId: input.sessionId,
+        workflowId: input.workflowId,
+        confirmedByMessageId: input.submittedByMessageId,
+        candidateArtifactId: typeof decisionContent["targetArtifactId"] === "string" ? decisionContent["targetArtifactId"] : undefined,
+      });
+      await this.commitExactCandidate({
+        sessionId: input.sessionId,
+        workflowId: input.workflowId,
+        commitStepId: confirmed.commitStep.id,
+        confirmedByMessageId: input.submittedByMessageId,
+        candidateArtifact: confirmed.candidateArtifact,
+      });
+      const workflow = await workflowRepository.findWorkflowById(input.workflowId);
+      return workflow ? toWorkflowDetailDto(workflow) : null;
+    }
+
+    throw conflict("decision artifact 与当前 step/stageState 不匹配", "DECISION_STAGE_STATE_MISMATCH", {
+      workflowId: input.workflowId,
+      artifactId: input.artifactId,
+      stepType: step.type,
+      stageState: step.stageState,
+    });
+  },
+
   async confirmPlan(input: ConfirmPlanInput) {
     const latestConfirmStep = await workflowRepository.findLatestStep(input.workflowId, "confirm_plan");
     if (!latestConfirmStep || latestConfirmStep.status !== "awaiting_confirmation") {
@@ -951,9 +1386,246 @@ export const workflowService = {
    * @param input - 淇敼璇锋眰鍙傛暟
    * @returns 褰撳墠 workflow 璇︽儏
    */
+  /**
+   * 从 preview revise 回到新的 plan iteration。
+   *
+   * 注意：旧 plan、candidate 与 validation artifact 都保留；新 plan 通过真实 Agent 重新生成。
+   *
+   * @param input - preview revise 的用户意见与关联 artifact
+   * @returns 更新后的 workflow 详情
+   */
+  async requestPreviewRevision(input: RequestPreviewRevisionInput) {
+    const previewStep = await workflowRepository.findStepById(input.previewStepId);
+    if (
+      !previewStep ||
+      previewStep.workflowId !== input.workflowId ||
+      previewStep.type !== "preview" ||
+      previewStep.status !== "awaiting_confirmation" ||
+      previewStep.stageState !== "awaiting_preview_confirmation"
+    ) {
+      throw conflict("当前 workflow 不在可修改的 preview 等待态", "PREVIEW_REVISION_NOT_AVAILABLE", {
+        workflowId: input.workflowId,
+        previewStepId: input.previewStepId,
+      });
+    }
+
+    const latestPlan = await workflowRepository.findLatestArtifact(input.workflowId, "plan_markdown");
+    const latestCandidate = await workflowRepository.findLatestArtifact(input.workflowId, "candidate_a2ui_messages");
+    const latestValidation = await workflowRepository.findLatestArtifact(input.workflowId, "validation_report");
+    const latestStep = await workflowRepository.findLatestStep(input.workflowId);
+    const nextSequence = (latestStep?.sequence ?? previewStep.sequence) + 1;
+    const nextVersion = (latestPlan?.version ?? 0) + 1;
+
+    await this.updateStep({
+      workflowId: input.workflowId,
+      sessionId: input.sessionId,
+      stepId: previewStep.id,
+      status: "skipped",
+      stageState: null,
+      completedAt: new Date(),
+      metadata: {
+        ...(toJsonObject(previewStep.metadata)),
+        supersededByRevisionMessageId: input.revisionMessageId,
+        revisionText: input.revisionText,
+      },
+    });
+
+    const planStep = await this.createStep({
+      workflowId: input.workflowId,
+      sessionId: input.sessionId,
+      type: "plan",
+      sequence: nextSequence,
+      status: "running",
+      stageState: null,
+      maxAttempts: 1,
+      metadata: {
+        gate: "plan",
+        source: "preview_revision",
+        revisionMessageId: input.revisionMessageId,
+        decisionArtifactId: input.decisionArtifactId,
+        previousPlanArtifactId: latestPlan?.id ?? null,
+        previousCandidateArtifactId: latestCandidate?.id ?? null,
+        previousValidationReportArtifactId: latestValidation?.id ?? null,
+        planVersion: nextVersion,
+      },
+    });
+
+    const { runId, result } = await runWorkflowTask({
+      sessionId: input.sessionId,
+      workflowId: input.workflowId,
+      workflowStepId: planStep.id,
+      task: "revise_plan",
+      gate: "plan",
+      userMessage: input.revisionText,
+      previousPlanMarkdown: latestPlan?.contentText ?? null,
+      previousCandidate: latestCandidate ? toJsonObject(latestCandidate.contentJson) : null,
+      revisionText: input.revisionText,
+      workflowContext: {
+        source: "preview_revision",
+        revisionMessageId: input.revisionMessageId,
+        decisionArtifactId: input.decisionArtifactId,
+        previousPlanArtifactId: latestPlan?.id ?? null,
+        previousCandidateArtifactId: latestCandidate?.id ?? null,
+        previousValidationReportArtifactId: latestValidation?.id ?? null,
+        previousValidation: latestValidation ? toJsonObject(latestValidation.contentJson) : null,
+      },
+    });
+
+    if (result.parsedResult.kind === "clarification_request") {
+      await this.updateStep({
+        workflowId: input.workflowId,
+        sessionId: input.sessionId,
+        stepId: planStep.id,
+        status: "awaiting_confirmation",
+        stageState: "awaiting_clarification",
+        metadata: {
+          ...(toJsonObject(planStep.metadata)),
+          agentRunId: runId,
+          parsedResultKind: result.parsedResult.kind,
+        },
+      });
+
+      const latestClarification = await workflowRepository.findLatestArtifact(input.workflowId, "clarification_form");
+      await this.createArtifact({
+        workflowId: input.workflowId,
+        workflowStepId: planStep.id,
+        sessionId: input.sessionId,
+        kind: "clarification_form",
+        version: (latestClarification?.version ?? 0) + 1,
+        contentJson: {
+          ...result.parsedResult.form,
+          additionalInstructions: {
+            id: "additional_instructions",
+            type: "textarea",
+            label: "其他自然语言补充",
+            required: false,
+          },
+        } as unknown as Prisma.InputJsonValue,
+        createdBy: "agent",
+        metadata: {
+          agentRunId: runId,
+          source: "askClarification",
+          toolCallId: result.toolCalls.find((call) => call.toolName === "askClarification")?.toolCallId ?? null,
+          revisionMessageId: input.revisionMessageId,
+        },
+      });
+
+      const workflow = await workflowRepository.findWorkflowById(input.workflowId);
+      return workflow ? toWorkflowDetailDto(workflow) : null;
+    }
+
+    if (result.parsedResult.kind !== "plan_markdown") {
+      const failureReason = resultFailureReason(result.parsedResult);
+      const failedStep = await this.updateStep({
+        workflowId: input.workflowId,
+        sessionId: input.sessionId,
+        stepId: planStep.id,
+        status: "failed",
+        stageState: null,
+        failureReason,
+        failureMetadata: {
+          agentRunId: runId,
+          parsedResultKind: result.parsedResult.kind,
+        },
+        completedAt: new Date(),
+      });
+      await this.failWorkflow({
+        workflowId: input.workflowId,
+        sessionId: input.sessionId,
+        failureReason,
+        failedStep: toStepDto(failedStep),
+        retryable: true,
+      });
+      const workflow = await workflowRepository.findWorkflowById(input.workflowId);
+      return workflow ? toWorkflowDetailDto(workflow) : null;
+    }
+
+    const planFailure = getPlanValidationFailure(result.parsedResult.markdown);
+    if (planFailure) {
+      const failedStep = await this.updateStep({
+        workflowId: input.workflowId,
+        sessionId: input.sessionId,
+        stepId: planStep.id,
+        status: "failed",
+        stageState: null,
+        failureReason: planFailure,
+        failureMetadata: {
+          agentRunId: runId,
+          validation: "markdown_plan_required_headings",
+        },
+        completedAt: new Date(),
+      });
+      await this.failWorkflow({
+        workflowId: input.workflowId,
+        sessionId: input.sessionId,
+        failureReason: planFailure,
+        failedStep: toStepDto(failedStep),
+        retryable: true,
+      });
+      const workflow = await workflowRepository.findWorkflowById(input.workflowId);
+      return workflow ? toWorkflowDetailDto(workflow) : null;
+    }
+
+    await this.updateStep({
+      workflowId: input.workflowId,
+      sessionId: input.sessionId,
+      stepId: planStep.id,
+      status: "awaiting_confirmation",
+      stageState: "awaiting_plan_confirmation",
+      metadata: {
+        ...(toJsonObject(planStep.metadata)),
+        agentRunId: runId,
+        parsedResultKind: result.parsedResult.kind,
+      },
+    });
+
+    const planArtifact = await this.createArtifact({
+      workflowId: input.workflowId,
+      workflowStepId: planStep.id,
+      sessionId: input.sessionId,
+      kind: "plan_markdown",
+      version: nextVersion,
+      contentText: result.parsedResult.markdown,
+      createdBy: "agent",
+      metadata: {
+        agentRunId: runId,
+        previousPlanArtifactId: latestPlan?.id ?? null,
+        previousCandidateArtifactId: latestCandidate?.id ?? null,
+        revisionMessageId: input.revisionMessageId,
+      },
+    });
+
+    const latestDecision = await workflowRepository.findLatestArtifact(input.workflowId, "decision_form");
+    await this.createArtifact({
+      workflowId: input.workflowId,
+      workflowStepId: planStep.id,
+      sessionId: input.sessionId,
+      kind: "decision_form",
+      version: (latestDecision?.version ?? 0) + 1,
+      contentJson: {
+        ...result.parsedResult.decisionForm,
+        targetArtifactId: planArtifact.id,
+      } as unknown as Prisma.InputJsonValue,
+      createdBy: "agent",
+      metadata: {
+        source: "askUserDecision",
+        agentRunId: runId,
+        toolCallId: result.toolCalls.find((call) => call.toolName === "askUserDecision")?.toolCallId ?? null,
+        revisionMessageId: input.revisionMessageId,
+      },
+    });
+
+    const workflow = await workflowRepository.findWorkflowById(input.workflowId);
+    return workflow ? toWorkflowDetailDto(workflow) : null;
+  },
+
   async requestPlanRevision(input: RequestPlanRevisionInput) {
-    const latestConfirmStep = await workflowRepository.findLatestStep(input.workflowId, "confirm_plan");
-    if (!latestConfirmStep || latestConfirmStep.status !== "awaiting_confirmation") {
+    const latestPlanStep = await workflowRepository.findLatestStep(input.workflowId, "plan");
+    if (
+      !latestPlanStep ||
+      latestPlanStep.status !== "awaiting_confirmation" ||
+      latestPlanStep.stageState !== "awaiting_plan_confirmation"
+    ) {
       throw conflict("当前 workflow 没有可修改的待确认 plan", "PLAN_REVISION_NOT_AVAILABLE", {
         workflowId: input.workflowId,
       });
@@ -962,30 +1634,32 @@ export const workflowService = {
     const latestPlan = await workflowRepository.findLatestArtifact(input.workflowId, "plan_markdown");
     const nextVersion = (latestPlan?.version ?? 0) + 1;
     const latestStep = await workflowRepository.findLatestStep(input.workflowId);
-    const nextSequence = (latestStep?.sequence ?? latestConfirmStep.sequence) + 1;
+    const nextSequence = (latestStep?.sequence ?? latestPlanStep.sequence) + 1;
 
     await this.updateStep({
       workflowId: input.workflowId,
       sessionId: input.sessionId,
-      stepId: latestConfirmStep.id,
+      stepId: latestPlanStep.id,
       status: "skipped",
+      stageState: null,
       completedAt: new Date(),
       metadata: {
-        ...(toJsonObject(latestConfirmStep.metadata)),
+        ...(toJsonObject(latestPlanStep.metadata)),
         supersededByRevisionMessageId: input.revisionMessageId,
         revisionText: input.revisionText,
       },
     });
 
-    const proposeStep = await this.createStep({
+    const planStep = await this.createStep({
       workflowId: input.workflowId,
       sessionId: input.sessionId,
-      type: "propose",
+      type: "plan",
       sequence: nextSequence,
       status: "running",
+      stageState: null,
       maxAttempts: 1,
       metadata: {
-        gate: "propose",
+        gate: "plan",
         revisionMessageId: input.revisionMessageId,
         previousPlanArtifactId: latestPlan?.id ?? null,
         planVersion: nextVersion,
@@ -995,9 +1669,9 @@ export const workflowService = {
     const { runId, result } = await runWorkflowTask({
       sessionId: input.sessionId,
       workflowId: input.workflowId,
-      workflowStepId: proposeStep.id,
+      workflowStepId: planStep.id,
       task: "revise_plan",
-      gate: "propose",
+      gate: "plan",
       userMessage: latestPlan?.contentText ?? input.revisionText,
       previousPlanMarkdown: latestPlan?.contentText ?? null,
       revisionText: input.revisionText,
@@ -1012,34 +1686,19 @@ export const workflowService = {
       await this.updateStep({
         workflowId: input.workflowId,
         sessionId: input.sessionId,
-        stepId: proposeStep.id,
-        status: "completed",
-        completedAt: new Date(),
+        stepId: planStep.id,
+        status: "awaiting_confirmation",
+        stageState: "awaiting_clarification",
         metadata: {
-          ...(toJsonObject(proposeStep.metadata)),
+          ...(toJsonObject(planStep.metadata)),
           agentRunId: runId,
           parsedResultKind: result.parsedResult.kind,
         },
       });
 
-      const clarifyStep = await this.createStep({
-        workflowId: input.workflowId,
-        sessionId: input.sessionId,
-        type: "clarify",
-        sequence: nextSequence + 1,
-        status: "awaiting_confirmation",
-        maxAttempts: 1,
-        metadata: {
-          gate: "clarify",
-          revisionMessageId: input.revisionMessageId,
-          planVersion: nextVersion,
-          agentRunId: runId,
-        },
-      });
-
       await this.createArtifact({
         workflowId: input.workflowId,
-        workflowStepId: clarifyStep.id,
+        workflowStepId: planStep.id,
         sessionId: input.sessionId,
         kind: "clarification_form",
         version: nextVersion,
@@ -1055,6 +1714,8 @@ export const workflowService = {
         createdBy: "agent",
         metadata: {
           agentRunId: runId,
+          source: "askClarification",
+          toolCallId: result.toolCalls.find((call) => call.toolName === "askClarification")?.toolCallId ?? null,
           revisionMessageId: input.revisionMessageId,
         },
       });
@@ -1068,8 +1729,9 @@ export const workflowService = {
       const failedStep = await this.updateStep({
         workflowId: input.workflowId,
         sessionId: input.sessionId,
-        stepId: proposeStep.id,
+        stepId: planStep.id,
         status: "failed",
+        stageState: null,
         failureReason,
         failureMetadata: {
           agentRunId: runId,
@@ -1077,7 +1739,7 @@ export const workflowService = {
         },
         completedAt: new Date(),
         metadata: {
-          ...(toJsonObject(proposeStep.metadata)),
+          ...(toJsonObject(planStep.metadata)),
           agentRunId: runId,
         },
       });
@@ -1097,8 +1759,9 @@ export const workflowService = {
       const failedStep = await this.updateStep({
         workflowId: input.workflowId,
         sessionId: input.sessionId,
-        stepId: proposeStep.id,
+        stepId: planStep.id,
         status: "failed",
+        stageState: null,
         failureReason: planFailure,
         failureMetadata: {
           agentRunId: runId,
@@ -1106,7 +1769,7 @@ export const workflowService = {
         },
         completedAt: new Date(),
         metadata: {
-          ...(toJsonObject(proposeStep.metadata)),
+          ...(toJsonObject(planStep.metadata)),
           agentRunId: runId,
         },
       });
@@ -1124,19 +1787,19 @@ export const workflowService = {
     await this.updateStep({
       workflowId: input.workflowId,
       sessionId: input.sessionId,
-      stepId: proposeStep.id,
-      status: "completed",
-      completedAt: new Date(),
+      stepId: planStep.id,
+      status: "awaiting_confirmation",
+      stageState: "awaiting_plan_confirmation",
       metadata: {
-        ...(toJsonObject(proposeStep.metadata)),
+        ...(toJsonObject(planStep.metadata)),
         agentRunId: runId,
         parsedResultKind: result.parsedResult.kind,
       },
     });
 
-    await this.createArtifact({
+    const planArtifact = await this.createArtifact({
       workflowId: input.workflowId,
-      workflowStepId: proposeStep.id,
+      workflowStepId: planStep.id,
       sessionId: input.sessionId,
       kind: "plan_markdown",
       version: nextVersion,
@@ -1149,18 +1812,22 @@ export const workflowService = {
       },
     });
 
-    await this.createStep({
+    await this.createArtifact({
       workflowId: input.workflowId,
+      workflowStepId: planStep.id,
       sessionId: input.sessionId,
-      type: "confirm_plan",
-      sequence: nextSequence + 1,
-      status: "awaiting_confirmation",
-      maxAttempts: 1,
+      kind: "decision_form",
+      version: nextVersion,
+      contentJson: {
+        ...result.parsedResult.decisionForm,
+        targetArtifactId: planArtifact.id,
+      } as unknown as Prisma.InputJsonValue,
+      createdBy: "agent",
       metadata: {
-        gate: "confirm_plan",
-        allowedActions: ["confirm_plan", "request_revision"],
+        source: "askUserDecision",
+        agentRunId: runId,
+        toolCallId: result.toolCalls.find((call) => call.toolName === "askUserDecision")?.toolCallId ?? null,
         revisionMessageId: input.revisionMessageId,
-        planVersion: nextVersion,
       },
     });
 
@@ -1173,6 +1840,402 @@ export const workflowService = {
    * @param input - Candidate 鐢熸垚鎴愬姛鍙傛暟
    * @returns 褰撳墠 workflow 璇︽儏
    */
+  /**
+   * 执行已确认 plan 的 Candidate A2UI 生成与校验流程。
+   *
+   * 注意：generate 阶段只消费 Parsed Agent Result；validate 通过前不会保存 candidate artifact，
+   * 也不会提交正式 A2UI event 或 surface snapshot。
+   *
+   * @param input - generate step、触发消息和可选 plan 内容
+   */
+  /**
+   * 基于已校验 candidate 创建 preview 决策表单。
+   *
+   * @param input - candidate artifact 与 preview step 序号上下文
+   * @returns 创建出的 preview step
+   */
+  async createPreviewDecision(input: {
+    sessionId: string;
+    workflowId: string;
+    sequence: number;
+    candidateArtifact: {
+      id: string;
+      version: number;
+      contentText: string | null;
+      contentJson: unknown;
+    };
+    validationReportArtifactId?: string | null;
+    sourceAgentRunId?: string | null;
+  }) {
+    const previewStep = await this.createStep({
+      workflowId: input.workflowId,
+      sessionId: input.sessionId,
+      type: "preview",
+      sequence: input.sequence,
+      status: "running",
+      stageState: null,
+      metadata: {
+        gate: "preview",
+        candidateArtifactId: input.candidateArtifact.id,
+        candidateVersion: input.candidateArtifact.version,
+        validationReportArtifactId: input.validationReportArtifactId ?? null,
+        sourceAgentRunId: input.sourceAgentRunId ?? null,
+      },
+    });
+
+    const { runId, result } = await runWorkflowTask({
+      sessionId: input.sessionId,
+      workflowId: input.workflowId,
+      workflowStepId: previewStep.id,
+      task: "preview_decision",
+      gate: "preview",
+      userMessage: [
+        "请为已通过 validate 的 Candidate A2UI 生成用户决策表单。",
+        "必须调用 askUserDecision，target 必须是 candidate_a2ui_messages。",
+        "",
+        JSON.stringify(toJsonObject(input.candidateArtifact.contentJson), null, 2),
+      ].join("\n"),
+      availableTools: ["askUserDecision"],
+      workflowContext: {
+        candidateArtifactId: input.candidateArtifact.id,
+        candidateVersion: input.candidateArtifact.version,
+        validationReportArtifactId: input.validationReportArtifactId ?? null,
+      },
+    });
+
+    if (
+      result.parsedResult.kind !== "decision_form" ||
+      result.parsedResult.form.target !== "candidate_a2ui_messages"
+    ) {
+      const failureReason = result.parsedResult.kind === "decision_form"
+        ? "preview decision_form target 必须是 candidate_a2ui_messages"
+        : resultFailureReason(result.parsedResult);
+      const failedStep = await this.updateStep({
+        workflowId: input.workflowId,
+        sessionId: input.sessionId,
+        stepId: previewStep.id,
+        status: "failed",
+        stageState: null,
+        failureReason,
+        failureMetadata: {
+          agentRunId: runId,
+          parsedResultKind: result.parsedResult.kind,
+        },
+        completedAt: new Date(),
+      });
+      await this.failWorkflow({
+        workflowId: input.workflowId,
+        sessionId: input.sessionId,
+        failureReason,
+        failedStep: toStepDto(failedStep),
+        retryable: true,
+      });
+      return previewStep;
+    }
+
+    const latestDecision = await workflowRepository.findLatestArtifact(input.workflowId, "decision_form");
+    await this.createArtifact({
+      workflowId: input.workflowId,
+      workflowStepId: previewStep.id,
+      sessionId: input.sessionId,
+      kind: "decision_form",
+      version: (latestDecision?.version ?? 0) + 1,
+      contentJson: {
+        ...result.parsedResult.form,
+        targetArtifactId: input.candidateArtifact.id,
+      } as unknown as Prisma.InputJsonValue,
+      createdBy: "agent",
+      metadata: {
+        source: "askUserDecision",
+        agentRunId: runId,
+        toolCallId: result.toolCalls.find((call) => call.toolName === "askUserDecision")?.toolCallId ?? null,
+        targetArtifactId: input.candidateArtifact.id,
+      },
+    });
+
+    await this.updateStep({
+      workflowId: input.workflowId,
+      sessionId: input.sessionId,
+      stepId: previewStep.id,
+      status: "awaiting_confirmation",
+      stageState: "awaiting_preview_confirmation",
+      metadata: {
+        ...(toJsonObject(previewStep.metadata)),
+        agentRunId: runId,
+        parsedResultKind: result.parsedResult.kind,
+      },
+    });
+
+    return previewStep;
+  },
+
+  async executeGenerateA2UI(input: ExecuteGenerateA2UIInput): Promise<void> {
+    setImmediate(() => {
+      void (async () => {
+        try {
+      const latestPlanStep = await workflowRepository.findLatestStep(input.workflowId, "plan");
+      const latestPlan = await workflowRepository.findLatestArtifact(input.workflowId, "plan_markdown");
+      const generateStep = await workflowRepository.findStepById(input.workflowStepId);
+
+      if (
+        !latestPlanStep ||
+        latestPlanStep.status !== "completed" ||
+        !latestPlan?.contentText ||
+        !generateStep ||
+        generateStep.workflowId !== input.workflowId ||
+        generateStep.type !== "generate_a2ui"
+      ) {
+        const failedStep = generateStep
+          ? await this.updateStep({
+            workflowId: input.workflowId,
+            sessionId: input.sessionId,
+            stepId: generateStep.id,
+            status: "failed",
+            failureReason: "generate_a2ui 缺少已确认 plan",
+            completedAt: new Date(),
+          })
+          : undefined;
+        await this.failWorkflow({
+          workflowId: input.workflowId,
+          sessionId: input.sessionId,
+          failureReason: "generate_a2ui 缺少已确认 plan",
+          failedStep: failedStep ? toStepDto(failedStep) : undefined,
+          retryable: true,
+        });
+        return;
+      }
+
+      await this.updateStep({
+        workflowId: input.workflowId,
+        sessionId: input.sessionId,
+        stepId: generateStep.id,
+        status: "running",
+        startedAt: new Date(),
+        metadata: {
+          ...(toJsonObject(generateStep.metadata)),
+          gate: "generate_a2ui",
+          triggerMessageId: input.triggerMessageId,
+          planArtifactId: latestPlan.id,
+        },
+      });
+
+      const { runId, result } = await runWorkflowTask({
+        sessionId: input.sessionId,
+        workflowId: input.workflowId,
+        workflowStepId: generateStep.id,
+        task: "generate_a2ui",
+        gate: "generate_a2ui",
+        userMessage: [
+          "请根据已确认 Markdown plan 生成 Candidate A2UI messages。",
+          "只输出 candidate_a2ui_messages Parsed Agent Result；不要提交正式 A2UI event 或 snapshot。",
+          "",
+          input.planMarkdown ?? latestPlan.contentText,
+        ].join("\n"),
+        previousPlanMarkdown: input.planMarkdown ?? latestPlan.contentText,
+        availableTools: [
+          "getSkillContent",
+          "getSkillReferenceContent",
+          "getCatalogComponentDetails",
+        ],
+        workflowContext: {
+          planStepId: latestPlanStep.id,
+          planArtifactId: latestPlan.id,
+          triggerMessageId: input.triggerMessageId,
+        },
+      });
+
+      if (result.parsedResult.kind !== "candidate_a2ui_messages") {
+        const failureReason = resultFailureReason(result.parsedResult);
+        const failedStep = await this.updateStep({
+          workflowId: input.workflowId,
+          sessionId: input.sessionId,
+          stepId: generateStep.id,
+          status: "failed",
+          failureReason,
+          failureMetadata: {
+            agentRunId: runId,
+            parsedResultKind: result.parsedResult.kind,
+          },
+          completedAt: new Date(),
+          metadata: {
+            ...(toJsonObject(generateStep.metadata)),
+            agentRunId: runId,
+            planArtifactId: latestPlan.id,
+          },
+        });
+        await this.failWorkflow({
+          workflowId: input.workflowId,
+          sessionId: input.sessionId,
+          failureReason,
+          failedStep: toStepDto(failedStep),
+          retryable: true,
+        });
+        return;
+      }
+
+      await this.updateStep({
+        workflowId: input.workflowId,
+        sessionId: input.sessionId,
+        stepId: generateStep.id,
+        status: "completed",
+        completedAt: new Date(),
+        metadata: {
+          ...(toJsonObject(generateStep.metadata)),
+          agentRunId: runId,
+          planArtifactId: latestPlan.id,
+          messageCount: result.parsedResult.messages.length,
+        },
+      });
+
+      const validateStep = await this.createStep({
+        workflowId: input.workflowId,
+        sessionId: input.sessionId,
+        type: "validate",
+        sequence: generateStep.sequence + 1,
+        status: "running",
+        metadata: {
+          gate: "validate",
+          agentRunId: runId,
+          generateStepId: generateStep.id,
+        },
+      });
+
+      const validateStartTime = Date.now();
+      const validation = validateA2UI({
+        messages: result.parsedResult.messages,
+        catalogId: config.catalog.id,
+      });
+      await recordRuntimeToolCall(runId, input.sessionId, {
+        toolName: "validateA2UI",
+        status: validation.valid ? "succeeded" : "failed",
+        attemptIndex: result.attemptCount,
+        inputSummary: {
+          messageCount: result.parsedResult.messages.length,
+          catalogId: config.catalog.id,
+          catalogVersion: config.catalog.version,
+        },
+        output: validation as unknown as JsonObject,
+        durationMs: Date.now() - validateStartTime,
+        phase: "VALIDATE_DRAFT",
+      });
+
+      const latestReport = await workflowRepository.findLatestArtifact(input.workflowId, "validation_report");
+      const validationReportArtifact = await this.createArtifact({
+        workflowId: input.workflowId,
+        workflowStepId: validateStep.id,
+        sessionId: input.sessionId,
+        kind: "validation_report",
+        version: (latestReport?.version ?? 0) + 1,
+        contentText: validation.valid ? "Candidate A2UI 校验通过" : "Candidate A2UI 校验失败",
+        contentJson: validation as unknown as Prisma.InputJsonValue,
+        createdBy: "backend",
+        metadata: {
+          agentRunId: runId,
+          generateStepId: generateStep.id,
+        },
+      });
+
+      await agentRunRepository.update(runId, {
+        status: validation.valid ? "committed" : "failed",
+        failureReason: validation.valid ? null : "Candidate A2UI 未通过 validateA2UI 校验",
+        validationSummary: validation as unknown as Prisma.InputJsonValue,
+        completedAt: new Date(),
+      });
+
+      if (!validation.valid) {
+        const failedStep = await this.updateStep({
+          workflowId: input.workflowId,
+          sessionId: input.sessionId,
+          stepId: validateStep.id,
+          status: "failed",
+          failureReason: "Candidate A2UI 未通过 validateA2UI 校验",
+          failureMetadata: validation as unknown as Prisma.InputJsonValue,
+          completedAt: new Date(),
+          metadata: {
+            ...(toJsonObject(validateStep.metadata)),
+            valid: false,
+            errorCount: validation.errors.length,
+            warningCount: validation.warnings.length,
+          },
+        });
+        await this.failWorkflow({
+          workflowId: input.workflowId,
+          sessionId: input.sessionId,
+          failureReason: "Candidate A2UI 未通过 validateA2UI 校验",
+          failedStep: toStepDto(failedStep),
+          retryable: true,
+        });
+        return;
+      }
+
+      await this.updateStep({
+        workflowId: input.workflowId,
+        sessionId: input.sessionId,
+        stepId: validateStep.id,
+        status: "completed",
+        completedAt: new Date(),
+        metadata: {
+          ...(toJsonObject(validateStep.metadata)),
+          valid: true,
+          errorCount: validation.errors.length,
+          warningCount: validation.warnings.length,
+        },
+      });
+
+      const latestCandidate = await workflowRepository.findLatestArtifact(input.workflowId, "candidate_a2ui_messages");
+      const version = (latestCandidate?.version ?? 0) + 1;
+      const candidateArtifact = await this.createArtifact({
+        workflowId: input.workflowId,
+        workflowStepId: validateStep.id,
+        sessionId: input.sessionId,
+        kind: "candidate_a2ui_messages",
+        version,
+        contentText: result.parsedResult.assistantMessage ?? "Candidate A2UI messages",
+        contentJson: {
+          messages: result.parsedResult.messages,
+          validation,
+        } as unknown as Prisma.InputJsonValue,
+        createdBy: "agent",
+        metadata: {
+          agentRunId: runId,
+          validateStepId: validateStep.id,
+          planArtifactId: latestPlan.id,
+        },
+      });
+
+      await this.createPreviewDecision({
+        workflowId: input.workflowId,
+        sessionId: input.sessionId,
+        sequence: generateStep.sequence + 2,
+        candidateArtifact,
+        validationReportArtifactId: validationReportArtifact.id,
+        sourceAgentRunId: runId,
+      });
+        } catch (err) {
+          const reason = err instanceof Error ? err.message : String(err);
+          const generateStep = await workflowRepository.findStepById(input.workflowStepId);
+          const failedStep = generateStep
+            ? await this.updateStep({
+              workflowId: input.workflowId,
+              sessionId: input.sessionId,
+              stepId: generateStep.id,
+              status: "failed",
+              failureReason: reason,
+              completedAt: new Date(),
+            })
+            : undefined;
+          await this.failWorkflow({
+            workflowId: input.workflowId,
+            sessionId: input.sessionId,
+            failureReason: reason,
+            failedStep: failedStep ? toStepDto(failedStep) : undefined,
+            retryable: true,
+          });
+        }
+      })();
+    });
+  },
+
   async recordCandidateSuccess(input: RecordCandidateSuccessInput) {
     const generateStep = await workflowRepository.findLatestStep(input.workflowId, "generate_a2ui");
     if (!generateStep || generateStep.id !== input.generateStepId) {
@@ -1210,6 +2273,29 @@ export const workflowService = {
       },
     });
 
+    const latestReport = await workflowRepository.findLatestArtifact(input.workflowId, "validation_report");
+    const validationReportArtifact = await this.createArtifact({
+      workflowId: input.workflowId,
+      workflowStepId: validateStep.id,
+      sessionId: input.sessionId,
+      kind: "validation_report",
+      version: (latestReport?.version ?? 0) + 1,
+      contentText: input.validation.valid ? "Candidate A2UI 校验通过" : "Candidate A2UI 校验失败",
+      contentJson: input.validation as unknown as Prisma.InputJsonValue,
+      createdBy: "backend",
+      metadata: {
+        agentRunId: input.agentRunId,
+        generateStepId: input.generateStepId,
+      },
+    });
+
+    if (!input.validation.valid) {
+      throw conflict("Candidate A2UI 未通过 validateA2UI 校验，不能保存 candidate artifact", "CANDIDATE_VALIDATION_FAILED", {
+        workflowId: input.workflowId,
+        generateStepId: input.generateStepId,
+      });
+    }
+
     const latestCandidate = await workflowRepository.findLatestArtifact(input.workflowId, "candidate_a2ui_messages");
     const version = (latestCandidate?.version ?? 0) + 1;
     const candidateArtifact = await this.createArtifact({
@@ -1230,18 +2316,13 @@ export const workflowService = {
       },
     });
 
-    await this.createStep({
+    await this.createPreviewDecision({
       workflowId: input.workflowId,
       sessionId: input.sessionId,
-      type: "preview",
       sequence: generateStep.sequence + 2,
-      status: "awaiting_confirmation",
-      metadata: {
-        gate: "preview",
-        allowedActions: ["confirm_commit", "request_revision"],
-        candidateArtifactId: candidateArtifact.id,
-        candidateVersion: version,
-      },
+      candidateArtifact,
+      validationReportArtifactId: validationReportArtifact.id,
+      sourceAgentRunId: input.agentRunId,
     });
 
     const workflow = await workflowRepository.findWorkflowById(input.workflowId);
@@ -1304,6 +2385,219 @@ export const workflowService = {
    * @param input - Candidate 鎻愪氦纭鍙傛暟
    * @returns 宸茬‘璁ょ殑 candidate artifact 涓?commit step
    */
+  /**
+   * 提交 exact stored candidate artifact，创建正式 A2UI event 与 current snapshot。
+   *
+   * 注意：本方法不调用 Agent Runtime，不接受 raw Agent Output，只读取已保存且已校验通过的 candidate artifact。
+   *
+   * @param input - commit step 与 candidate artifact
+   */
+  async commitExactCandidate(input: {
+    sessionId: string;
+    workflowId: string;
+    commitStepId: string;
+    confirmedByMessageId: string;
+    candidateArtifact: {
+      id: string;
+      version: number;
+      contentText: string | null;
+      contentJson: unknown;
+    };
+  }): Promise<void> {
+    const content = toJsonObject(input.candidateArtifact.contentJson);
+    const validation = toJsonObject(content["validation"]);
+    const messages = content["messages"];
+    if (validation["valid"] !== true || !Array.isArray(messages)) {
+      throw conflict("Candidate artifact 缺少通过校验的 A2UI messages", "CANDIDATE_NOT_VALIDATED", {
+        workflowId: input.workflowId,
+        candidateArtifactId: input.candidateArtifact.id,
+      });
+    }
+
+    const a2uiMessages = messages as unknown as A2UIServerMessage[];
+    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const assistantMessage = await tx.message.create({
+        data: {
+          sessionId: input.sessionId,
+          workflowId: input.workflowId,
+          workflowStepId: input.commitStepId,
+          role: "assistant",
+          kind: "chat",
+          content: input.candidateArtifact.contentText ?? "已提交 Candidate A2UI。",
+          attachments: [],
+          a2uiEventIds: [],
+          metadata: {
+            candidateArtifactId: input.candidateArtifact.id,
+            candidateVersion: input.candidateArtifact.version,
+          },
+        },
+      });
+
+      const sequence = await a2uiEventRepository.getNextSequence(input.sessionId, tx);
+      const a2uiEvent = await tx.a2UIEvent.create({
+        data: {
+          sessionId: input.sessionId,
+          messageId: assistantMessage.id,
+          sequence,
+          status: "committed",
+          catalogId: config.catalog.id,
+          catalogVersion: config.catalog.version,
+          rendererVersion: config.catalog.rendererVersion,
+          surfaceIds: extractSurfaceIds(a2uiMessages),
+          messages: a2uiMessages as unknown as Prisma.InputJsonValue,
+          validationResult: validation as unknown as Prisma.InputJsonValue,
+          metadata: {
+            workflowId: input.workflowId,
+            workflowStepId: input.commitStepId,
+            candidateArtifactId: input.candidateArtifact.id,
+          },
+        },
+      });
+
+      await tx.message.update({
+        where: { id: assistantMessage.id },
+        data: { a2uiEventIds: [a2uiEvent.id] },
+      });
+
+      const snapshotData = await snapshotService.computeFromEvents(input.sessionId, tx);
+      const { surfaceCount, componentCount } = snapshotService.getCounts(snapshotData);
+      await surfaceSnapshotRepository.unsetCurrent(input.sessionId, tx);
+
+      const snapshot = await tx.surfaceSnapshot.create({
+        data: {
+          sessionId: input.sessionId,
+          a2uiEventId: a2uiEvent.id,
+          sequence,
+          isCurrent: true,
+          catalogId: config.catalog.id,
+          catalogVersion: config.catalog.version,
+          rendererVersion: config.catalog.rendererVersion,
+          surfaceCount,
+          componentCount,
+          snapshot: snapshotData as unknown as Prisma.InputJsonValue,
+          summary: assistantMessage.content,
+          metadata: {
+            workflowId: input.workflowId,
+            workflowStepId: input.commitStepId,
+            candidateArtifactId: input.candidateArtifact.id,
+          },
+        },
+      });
+
+      await tx.session.update({
+        where: { id: input.sessionId },
+        data: {
+          currentSnapshotId: snapshot.id,
+        },
+      });
+
+      await tx.workflowStep.update({
+        where: { id: input.commitStepId },
+        data: {
+          status: "completed",
+          completedAt: new Date(),
+          metadata: {
+            gate: "commit",
+            committed: true,
+            confirmedByMessageId: input.confirmedByMessageId,
+            candidateArtifactId: input.candidateArtifact.id,
+            candidateVersion: input.candidateArtifact.version,
+            a2uiEventId: a2uiEvent.id,
+            snapshotId: snapshot.id,
+            assistantMessageId: assistantMessage.id,
+          },
+        },
+      });
+
+      const completedWorkflow = await tx.agentWorkflow.update({
+        where: { id: input.workflowId },
+        data: {
+          status: "completed",
+          currentStepType: "commit",
+          completedReason: "committed",
+          completedAt: new Date(),
+          metadata: {
+            committed: true,
+            confirmedByMessageId: input.confirmedByMessageId,
+            candidateArtifactId: input.candidateArtifact.id,
+            candidateVersion: input.candidateArtifact.version,
+            a2uiEventId: a2uiEvent.id,
+            snapshotId: snapshot.id,
+            assistantMessageId: assistantMessage.id,
+          },
+        },
+      });
+
+      streamService.send(input.sessionId, {
+        event: "assistant_message",
+        data: {
+          sessionId: input.sessionId,
+          message: {
+            id: assistantMessage.id,
+            sessionId: assistantMessage.sessionId,
+            agentRunId: assistantMessage.agentRunId,
+            workflowId: assistantMessage.workflowId,
+            workflowStepId: assistantMessage.workflowStepId,
+            role: assistantMessage.role as MessageDto["role"],
+            kind: assistantMessage.kind as MessageDto["kind"],
+            content: assistantMessage.content,
+            attachments: assistantMessage.attachments as MessageDto["attachments"],
+            a2uiEventIds: [a2uiEvent.id],
+            metadata: assistantMessage.metadata as MessageDto["metadata"],
+            createdAt: assistantMessage.createdAt.toISOString(),
+          },
+        },
+      });
+      streamService.send(input.sessionId, {
+        event: "a2ui_messages",
+        data: {
+          sessionId: input.sessionId,
+          a2uiEvent: {
+            id: a2uiEvent.id,
+            sessionId: a2uiEvent.sessionId,
+            agentRunId: a2uiEvent.agentRunId,
+            messageId: a2uiEvent.messageId,
+            sequence: a2uiEvent.sequence,
+            status: a2uiEvent.status as A2UIEventDto["status"],
+            catalogId: a2uiEvent.catalogId,
+            catalogVersion: a2uiEvent.catalogVersion,
+            rendererVersion: a2uiEvent.rendererVersion,
+            surfaceIds: a2uiEvent.surfaceIds,
+            messages: a2uiEvent.messages as unknown as A2UIEventDto["messages"],
+            validationResult: a2uiEvent.validationResult as A2UIEventDto["validationResult"],
+            createdAt: a2uiEvent.createdAt.toISOString(),
+          },
+        },
+      });
+      streamService.send(input.sessionId, {
+        event: "surface_snapshot",
+        data: {
+          sessionId: input.sessionId,
+          snapshot: {
+            id: snapshot.id,
+            sessionId: snapshot.sessionId,
+            a2uiEventId: snapshot.a2uiEventId,
+            agentRunId: snapshot.agentRunId,
+            sequence: snapshot.sequence,
+            isCurrent: snapshot.isCurrent,
+            catalogId: snapshot.catalogId,
+            catalogVersion: snapshot.catalogVersion,
+            rendererVersion: snapshot.rendererVersion,
+            surfaceCount: snapshot.surfaceCount,
+            componentCount: snapshot.componentCount,
+            snapshot: snapshot.snapshot as unknown as SurfaceSnapshotDto["snapshot"],
+            summary: snapshot.summary,
+            createdAt: snapshot.createdAt.toISOString(),
+          },
+        },
+      });
+      streamService.send(input.sessionId, {
+        event: "workflow_completed",
+        data: { sessionId: input.sessionId, workflow: toWorkflowDto(completedWorkflow) },
+      });
+    });
+  },
+
   async confirmCandidateCommit(input: ConfirmCandidateCommitInput) {
     const latestPreviewStep = await workflowRepository.findLatestStep(input.workflowId, "preview");
     if (!latestPreviewStep || latestPreviewStep.status !== "awaiting_confirmation") {

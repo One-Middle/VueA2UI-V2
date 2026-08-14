@@ -132,14 +132,7 @@ export const messageService = {
             workflowId: workflow.id,
             userMessage: content,
           })
-        : workflow.currentStepType === "confirm_plan"
-          ? await workflowService.requestPlanRevision({
-              sessionId,
-              workflowId: workflow.id,
-              revisionMessageId: message.id,
-              revisionText: content,
-            })
-          : workflow;
+        : workflow;
 
       return {
         message: {

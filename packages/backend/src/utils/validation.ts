@@ -43,20 +43,58 @@ export const sendMessageSchema = z.object({
 /**
  * Workflow action 校验。
  */
-export const workflowActionSchema = z.object({
-  action: z.enum([
-    "submit_clarification",
-    "confirm_plan",
-    "request_revision",
-    "confirm_commit",
-    "retry_step",
-    "cancel",
-  ]),
+const submitClarificationWorkflowActionSchema = z.object({
+  action: z.literal("submit_clarification"),
   workflowStepId: z.string().uuid().optional(),
-  artifactId: z.string().uuid().optional(),
+  artifactId: z.string().uuid(),
+  message: z.string().min(1).max(10000).optional(),
+  payload: z.object({
+    answers: z.record(z.unknown()),
+    additionalText: z.string().max(10000).optional(),
+  }),
+});
+
+const submitDecisionWorkflowActionSchema = z.object({
+  action: z.literal("submit_decision"),
+  workflowStepId: z.string().uuid().optional(),
+  artifactId: z.string().uuid(),
+  message: z.string().min(1).max(10000).optional(),
+  payload: z.discriminatedUnion("selectedOption", [
+    z.object({
+      selectedOption: z.literal("confirm"),
+      comment: z.never().optional(),
+    }),
+    z.object({
+      selectedOption: z.literal("revise"),
+      comment: z.string().trim().min(1).max(10000),
+    }),
+    z.object({
+      selectedOption: z.literal("reject"),
+      comment: z.string().max(10000).optional(),
+    }),
+  ]),
+});
+
+const retryWorkflowActionSchema = z.object({
+  action: z.literal("retry_step"),
+  workflowStepId: z.string().uuid().optional(),
   message: z.string().min(1).max(10000).optional(),
   payload: z.record(z.unknown()).optional(),
 });
+
+const cancelWorkflowActionSchema = z.object({
+  action: z.literal("cancel"),
+  workflowStepId: z.string().uuid().optional(),
+  message: z.string().min(1).max(10000).optional(),
+  payload: z.record(z.unknown()).optional(),
+});
+
+export const workflowActionSchema = z.discriminatedUnion("action", [
+  submitClarificationWorkflowActionSchema,
+  submitDecisionWorkflowActionSchema,
+  retryWorkflowActionSchema,
+  cancelWorkflowActionSchema,
+]);
 
 /**
  * 创建 Skill 校验。

@@ -47,7 +47,9 @@
 
 ### Agent Workflows
 
-Workflow DTO 与 action 契约由 `packages/shared/src/api.ts` 维护。第一期接口形态以通用 action 为目标：
+Workflow DTO 与 action 契约由 `packages/shared/src/api.ts` 维护。
+
+> 状态：planned。以下为新 Agent Workflow 目标 API 契约，当前代码仍在迁移中。
 
 - `GET /api/sessions/:sessionId/workflows`
 - `GET /api/sessions/:sessionId/workflows/:workflowId`
@@ -55,7 +57,77 @@ Workflow DTO 与 action 契约由 `packages/shared/src/api.ts` 维护。第一�
 
 `MessageDto` 和 `AgentRunDto` 包含可选 `workflowId` 与 `workflowStepId`，用于把用户可见消息、模型运行记录和 workflow timeline 串起来。
 
-`POST /api/sessions/:sessionId/workflow/actions` 当前已支持 `confirm_plan` 和 `confirm_commit`。`confirm_plan` 会创建用户可见确认 message，确认最新 `confirm_plan` step，创建 `generate_a2ui` step，并启动 workflow-scoped Agent run。该 run 只生成和校验 Candidate A2UI：成功时写入 `candidate_a2ui_messages` artifact 并进入 `preview`，失败时写入 `validation_report` artifact，不创建正式 A2UI event 或 surface snapshot。`confirm_commit` 会校验当前 `preview` step 和已验证 candidate artifact，然后提交 exact stored candidate messages，创建正式 A2UI event、current surface snapshot 和 workflow completion metadata。
+目标 workflow 阶段：
+
+```text
+plan -> generate_a2ui -> validate -> preview -> commit
+```
+
+`WorkflowStepDto.stageState` 是 API DTO 字段，用于表达阶段内等待态：
+
+- `awaiting_clarification`
+- `awaiting_plan_confirmation`
+- `awaiting_preview_confirmation`
+- `null`
+
+`POST /api/sessions/:sessionId/workflow/actions` 目标 action：
+
+- `submit_clarification`
+- `submit_decision`
+- `retry_step`
+- `cancel`
+
+`submit_clarification`：
+
+```json
+{
+  "action": "submit_clarification",
+  "artifactId": "clarification_form_artifact_id",
+  "payload": {
+    "answers": {},
+    "additionalText": "补充说明"
+  }
+}
+```
+
+规则：
+
+- 只能作用于当前 `plan` step。
+- 当前 step 必须是 `awaiting_confirmation + awaiting_clarification`。
+- 后端记录用户 message 后重新运行 plan task。
+
+`submit_decision`：
+
+```json
+{
+  "action": "submit_decision",
+  "artifactId": "decision_form_artifact_id",
+  "payload": {
+    "selectedOption": "confirm",
+    "comment": "修改意见，仅 revise 允许"
+  }
+}
+```
+
+规则：
+
+- `selectedOption` 只能是 `confirm`、`revise` 或 `reject`。
+- `confirm` 不允许携带 comment。
+- `revise` 必须携带非空 comment。
+- `reject` 不要求 comment，后端记录用户 message，并停留在当前等待态。
+- 在 `plan + awaiting_plan_confirmation` 下，`confirm` 完成 plan 并进入 `generate_a2ui`。
+- 在 `plan + awaiting_plan_confirmation` 下，`revise` 保留旧 plan artifact，重新运行 plan task。
+- 在 `preview + awaiting_preview_confirmation` 下，`confirm` 进入 `commit`。
+- 在 `preview + awaiting_preview_confirmation` 下，`revise` 回到 `plan`，并把 preview 修改意见、旧 plan、candidate 和最近上下文传给 Agent。
+
+artifact 输出规则：
+
+- `clarification_form` 由 Agent 调用 `askClarification` 后生成。
+- `plan_markdown` 由 Agent 生成，并必须通过 Markdown 最低校验。
+- `decision_form` 由 Agent 调用 `askUserDecision` 后生成，只在工具实际调用时展示为特殊 UI block。
+- `candidate_a2ui_messages` 只在 `validate` 通过后保存。
+- `validation_report` 在 validate 成功或失败时都可以保存；失败时不得保存 candidate artifact。
+- raw Agent Output 不进入 API 主流程，也不得作为 artifact content 返回。
 
 ### Files
 

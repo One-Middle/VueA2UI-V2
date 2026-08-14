@@ -22,19 +22,171 @@
 
 ## 3.1 Agent Workflow 共享字段
 
+> 状态：planned。以下为新 Agent Workflow 目标契约，当前代码仍在迁移中。
+
 - `AgentWorkflowDto` 描述 session 内一次可恢复 Agent Workflow 的状态、当前 step、意图、完成/失败原因和时间戳。
-- `WorkflowStepDto` 描述 workflow 中的可观测阶段，状态集合为 `pending`、`running`、`awaiting_confirmation`、`confirmed`、`completed`、`failed` 和 `skipped`。
-- `WorkflowArtifactDto` 描述 workflow 产物，`kind` 包含 `clarification_form`、`plan_markdown`、`candidate_a2ui_messages` 和 `validation_report`。
+- `WorkflowStepDto` 描述 workflow 中的可观测阶段，`type` 只能是 `plan`、`generate_a2ui`、`validate`、`preview` 或 `commit`。
+- `WorkflowStepDto.status` 描述通用执行状态，集合为 `pending`、`running`、`awaiting_confirmation`、`confirmed`、`completed`、`failed` 和 `skipped`。
+- `WorkflowStepDto.stageState` 描述领域等待态，集合为 `awaiting_clarification`、`awaiting_plan_confirmation`、`awaiting_preview_confirmation` 或 `null`。该字段是主状态字段，不放入 `metadata`。
+- `WorkflowArtifactDto` 描述 workflow 产物，`kind` 包含 `clarification_form`、`decision_form`、`plan_markdown`、`candidate_a2ui_messages` 和 `validation_report`。
 - `MessageDto` 和 `AgentRunDto` 包含可选 `workflowId` 与 `workflowStepId`，用于恢复完整 workflow timeline。
-- `WorkflowActionRequest` 和 `WorkflowActionResponse` 是前端推进 workflow 的通用 action 契约。
+- `WorkflowActionRequest` 和 `WorkflowActionResponse` 是前端推进 workflow 的通用 action 契约。第一版 action 集合为 `submit_clarification`、`submit_decision`、`retry_step` 和 `cancel`。
 - `PlatformSseEvent` 包含 workflow 级事件：`workflow_started`、`workflow_step_updated`、`workflow_artifact_created`、`workflow_completed` 和 `workflow_failed`。
+
+### WorkflowStepType
+
+```ts
+export type WorkflowStepType =
+  | "plan"
+  | "generate_a2ui"
+  | "validate"
+  | "preview"
+  | "commit";
+```
+
+### WorkflowStageState
+
+```ts
+export type WorkflowStageState =
+  | "awaiting_clarification"
+  | "awaiting_plan_confirmation"
+  | "awaiting_preview_confirmation"
+  | null;
+```
+
+### WorkflowArtifactKind
+
+```ts
+export type WorkflowArtifactKind =
+  | "clarification_form"
+  | "decision_form"
+  | "plan_markdown"
+  | "candidate_a2ui_messages"
+  | "validation_report";
+```
+
+### WorkflowActionType
+
+```ts
+export type WorkflowActionType =
+  | "submit_clarification"
+  | "submit_decision"
+  | "retry_step"
+  | "cancel";
+```
+
+`submit_clarification` payload：
+
+```ts
+{
+  action: "submit_clarification";
+  artifactId: string;
+  payload: {
+    answers: Record<string, unknown>;
+    additionalText?: string;
+  };
+}
+```
+
+`submit_decision` payload：
+
+```ts
+{
+  action: "submit_decision";
+  artifactId: string;
+  payload: {
+    selectedOption: "confirm" | "revise" | "reject";
+    comment?: string;
+  };
+}
+```
+
+约束：
+
+- `confirm` 不允许携带 comment。
+- `revise` 必须携带非空 comment。
+- `reject` 不要求 comment，后端记录用户 message 后停留在当前等待态。
+- `clarification_form` 收集信息，`decision_form` 做三选一决策，两者 action 和 payload 必须拆分。
+
+### ParsedAgentResult
+
+Agent Runtime 将 raw Agent Output 解析为内部结构化 union。它不是 API Output，也不要求 Agent 直接输出 JSON。
+
+```ts
+export type ParsedAgentResult =
+  | {
+      kind: "clarification_request";
+      form: ClarificationForm;
+    }
+  | {
+      kind: "plan_markdown";
+      markdown: string;
+      decisionForm: DecisionForm;
+    }
+  | {
+      kind: "candidate_a2ui_messages";
+      messages: A2UIServerMessage[];
+      assistantMessage?: string;
+    }
+  | {
+      kind: "decision_form";
+      form: DecisionForm;
+    }
+  | {
+      kind: "failure";
+      reason: string;
+      recoverable: boolean;
+    };
+```
+
+### ClarificationForm
+
+Clarification Form 由 `askClarification` 生成，负责收集信息，不负责确认产物。
+
+字段要求：
+
+- 每个问题必须有 `id`、`label`、`type`、`required`、`reason`。
+- `type` 支持 `select`、`radio`、`checkbox`、`text`、`textarea`。
+- 选择类问题必须有 `options`。
+- 前端额外提供自然语言输入框，对应 `additionalText`。
+
+### DecisionForm
+
+Decision Form 由 `askUserDecision` 生成，只有工具实际被调用时前端才展示特殊 UI block。
+
+```ts
+export interface DecisionForm {
+  title: string;
+  prompt: string;
+  guidance: string;
+  target: "plan_markdown" | "candidate_a2ui_messages";
+  targetArtifactId?: string;
+  options: Array<{
+    id: "confirm" | "revise" | "reject";
+    label: string;
+    description?: string;
+  }>;
+}
+```
+
+同一次 Agent run 生成 `plan_markdown + decision_form` 时，Runtime 尚不知道 artifact id。WorkflowService 创建 `plan_markdown` artifact 后，再创建 `decision_form` artifact，并回填 `targetArtifactId`。
+
+`decision_form.metadata` 至少包含：
+
+```ts
+{
+  source: "askUserDecision";
+  agentRunId: string;
+  toolCallId: string;
+}
+```
 
 ## 3.2 Agent Runtime 共享字段
 
 - `AgentRunInput.enabledSkills` 包含 `id`、`name`、`description`、`content` 和可选 `references`；Runtime 初始 Prompt 只暴露 Skill 摘要和 Reference 摘要，完整 `content` 仅在 `skillInfoRequest` 命中后披露，完整 Reference 内容仅在 `skillReferenceRequest` 命中后披露。
 - `SkillReference` 包含 `id`、`title`、`content` 和可选 `description`，表示隶属于单个 Skill 的参考资料正文。
 - `ToolCallRecord.phase` 用于标记工具调用所属阶段，后端 SSE 会将该阶段透传给前端。
-- `IAgentRuntime` 接口定义了 Agent Runtime 的唯一调用契约 `run(input, onToolCall?) → AgentRunResult`，后端只依赖此接口，不感知具体实现。
+- `IAgentRuntime` 接口定义普通生成入口 `run(input, onToolCall?) → AgentRunResult` 和 workflow 入口 `runWorkflowTask(input, onToolCall?) → AgentWorkflowTaskResult`，后端只依赖此接口，不感知具体实现。
 - `AgentRuntimeFactoryConfig` 定义工厂函数所需的最小配置（模型 API 连接参数），与具体模型客户端实现无关。
 - `AgentRuntimeFactory` 是工厂函数签名，后端持有此类型引用；替换 Agent 实现只需换一行 import。
 

@@ -15,7 +15,7 @@
 - `session_skills`：会话与 skill 的启用关系。
 - `agent_workflows`：session 内一次可恢复的 Agent Workflow 过程。
 - `workflow_steps`：Agent Workflow 中可观测、可失败重试和可确认的阶段记录。
-- `workflow_artifacts`：Agent Workflow 中产生的过程产物，例如澄清表单、Markdown 方案、候选 A2UI messages 和校验报告。
+- `workflow_artifacts`：Agent Workflow 中产生的过程产物，例如澄清表单、决策表单、Markdown 方案、候选 A2UI messages 和校验报告。
 - `agent_runs`：一次模型生成或修复过程。
 - `tool_calls`：校验、组件详情披露等工具调用记录。
 - `a2ui_events`：已提交的 A2UI 消息批次。
@@ -32,6 +32,36 @@
 - 一个 session 可以保留多次 Agent Workflow 历史，但同一时刻只能有一个处于 active、running、awaiting confirmation 或 retryable 状态的 workflow。
 - Agent run 和用户可见 message 可以关联到 workflow 和 workflow step，便于恢复完整 workflow timeline。
 - Candidate A2UI 只能作为 workflow artifact 保存；用户确认提交前不得写入 A2UI events 或 surface snapshots。
+- `workflow_steps.type` 目标集合为 `plan`、`generate_a2ui`、`validate`、`preview` 和 `commit`。
+- `workflow_steps.stage_state` 是目标字段，用于保存领域等待态：`awaiting_clarification`、`awaiting_plan_confirmation`、`awaiting_preview_confirmation` 或 `null`。该字段不应放入 `metadata`。
+- `workflow_artifacts.kind` 目标集合为 `clarification_form`、`decision_form`、`plan_markdown`、`candidate_a2ui_messages` 和 `validation_report`。
+- `workflow_artifacts` 只保存 Parsed Agent Result 或后端校验后的稳定产物，raw Agent Output 不得写入 artifact content。
+- `decision_form.metadata` 至少保存 `source: "askUserDecision"`、`agentRunId` 和 `toolCallId`，形成 `decision_form artifact -> tool_call` 的单向关联。
+- `candidate_a2ui_messages` 只能在 `validate` 通过后保存；validate 失败时只保存 `validation_report`。
+
+## 3.1 Agent Workflow 目标状态机
+
+> 状态：planned。当前代码仍在从旧 step 模型迁移。
+
+目标阶段：
+
+```text
+plan -> generate_a2ui -> validate -> preview -> commit
+```
+
+`plan` 阶段内部等待态：
+
+- `running + null`：Agent 正在理解需求或生成 plan。
+- `awaiting_confirmation + awaiting_clarification`：等待用户提交 clarification form。
+- `awaiting_confirmation + awaiting_plan_confirmation`：等待用户确认、修改或拒绝 plan。
+- `completed + null`：plan 已确认，可以进入 `generate_a2ui`。
+
+`preview` 阶段内部等待态：
+
+- `awaiting_confirmation + awaiting_preview_confirmation`：等待用户确认、修改或拒绝 preview。
+- 用户选择 `revise` 后回到新的 `plan` 轮次，不覆盖旧 artifact。
+
+`commit` 阶段提交 exact stored `candidate_a2ui_messages` artifact，必须创建正式 A2UI event、surface snapshot，并完成 workflow。
 
 ## 4. 提交事务
 

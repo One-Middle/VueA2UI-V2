@@ -83,11 +83,25 @@ export const workflowRepository = {
     });
   },
 
+  /** 按 ID 查询未删除的 WorkflowStep。 */
+  findStepById(id: string) {
+    return prisma.workflowStep.findFirst({
+      where: { id, deletedAt: null },
+    });
+  },
+
   /** 查询 Workflow 中指定 kind 的最新 artifact。 */
   findLatestArtifact(workflowId: string, kind: string) {
     return prisma.workflowArtifact.findFirst({
       where: { workflowId, kind, deletedAt: null },
       orderBy: { version: "desc" },
+    });
+  },
+
+  /** 按 ID 查询未删除的 WorkflowArtifact。 */
+  findArtifactById(id: string) {
+    return prisma.workflowArtifact.findFirst({
+      where: { id, deletedAt: null },
     });
   },
 

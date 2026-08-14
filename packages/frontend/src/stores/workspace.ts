@@ -26,6 +26,7 @@ import type {
   A2UIServerMessage,
   SurfaceState,
   WorkflowArtifactDto,
+  WorkflowDecisionOption,
   WorkflowStepDto,
 } from "@a2ui-platform/shared";
 import { defineStore } from "pinia";
@@ -449,35 +450,50 @@ export const useWorkspaceStore = defineStore("workspace", {
       }
     },
 
-    /** 确认当前 plan，并启动 Candidate A2UI 生成。 */
-    async confirmWorkflowPlan() {
+    /** 提交 workflow clarification form。 */
+    async submitWorkflowClarification(
+      artifactId: string,
+      answers: Record<string, unknown>,
+      additionalText?: string,
+    ) {
       if (!this.activeSessionId) throw new Error("请先选择会话");
       const result = await api.sendWorkflowAction(this.activeSessionId, {
-        action: "confirm_plan",
-        message: "确认方案",
+        action: "submit_clarification",
+        artifactId,
+        message: additionalText || "提交澄清答案",
+        payload: {
+          answers,
+          additionalText,
+        },
       });
       this.upsertWorkflow(result.workflow);
       if (result.message && !this.messages.some((message) => message.id === result.message!.id)) {
         this.messages.push(result.message);
-      }
-      if (result.agentRun) {
-        this.upsertAgentRun(result.agentRun);
-        this.isGenerating = true;
       }
     },
 
-    /** 确认提交当前 Candidate A2UI。 */
-    async confirmWorkflowCommit(candidateArtifactId?: string) {
+    /** 提交 workflow decision form 的三选一结果。 */
+    async submitWorkflowDecision(
+      artifactId: string,
+      selectedOption: WorkflowDecisionOption,
+      comment?: string,
+    ) {
       if (!this.activeSessionId) throw new Error("请先选择会话");
       const result = await api.sendWorkflowAction(this.activeSessionId, {
-        action: "confirm_commit",
-        artifactId: candidateArtifactId,
-        message: "确认提交",
+        action: "submit_decision",
+        artifactId,
+        message: selectedOption === "revise" ? comment : selectedOption === "confirm" ? "确认" : "拒绝",
+        payload: selectedOption === "confirm"
+          ? { selectedOption }
+          : selectedOption === "revise"
+            ? { selectedOption, comment: comment ?? "" }
+            : { selectedOption, comment },
       });
       this.upsertWorkflow(result.workflow);
       if (result.message && !this.messages.some((message) => message.id === result.message!.id)) {
         this.messages.push(result.message);
       }
+      this.isGenerating = selectedOption !== "reject" && result.workflow.status !== "completed";
     },
 
     /** 重试当前失败的 workflow step。 */

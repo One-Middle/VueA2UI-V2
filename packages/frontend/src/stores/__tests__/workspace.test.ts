@@ -1,4 +1,4 @@
-import type { MessageDto, SessionDetailResponse, SessionDto, SurfaceSnapshotDto } from "@a2ui-platform/shared";
+import type { AgentWorkflowDetailDto, MessageDto, SessionDetailResponse, SessionDto, SurfaceSnapshotDto } from "@a2ui-platform/shared";
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as api from "../../services/api";
@@ -14,6 +14,7 @@ vi.mock("../../services/api", () => ({
   listWorkflows: vi.fn(() => Promise.resolve({ items: [] })),
   listA2UIEvents: vi.fn(() => Promise.resolve({ items: [], pageInfo: { nextCursor: null, hasMore: false } })),
   listSnapshots: vi.fn(() => Promise.resolve({ items: [], pageInfo: { nextCursor: null, hasMore: false } })),
+  sendWorkflowAction: vi.fn(),
 }));
 
 vi.mock("../../services/stream", () => ({
@@ -252,6 +253,52 @@ describe("workspace store session restore", () => {
       },
     });
   });
+
+  it("submits clarification form with submit_clarification payload", async () => {
+    vi.mocked(api.sendWorkflowAction).mockResolvedValue({
+      workflow: makeWorkflow(),
+      message: makeMessage("message-clarification"),
+    });
+
+    const workspace = useWorkspaceStore();
+    workspace.activeSessionId = "session-a";
+
+    await workspace.submitWorkflowClarification("artifact-clarification", { goal: "dashboard" }, "更多背景");
+
+    expect(api.sendWorkflowAction).toHaveBeenCalledWith("session-a", {
+      action: "submit_clarification",
+      artifactId: "artifact-clarification",
+      message: "更多背景",
+      payload: {
+        answers: { goal: "dashboard" },
+        additionalText: "更多背景",
+      },
+    });
+    expect(workspace.messages[0]).toMatchObject({ id: "message-clarification" });
+  });
+
+  it("submits decision form with submit_decision payload", async () => {
+    vi.mocked(api.sendWorkflowAction).mockResolvedValue({
+      workflow: makeWorkflow(),
+      message: makeMessage("message-decision"),
+    });
+
+    const workspace = useWorkspaceStore();
+    workspace.activeSessionId = "session-a";
+
+    await workspace.submitWorkflowDecision("artifact-decision", "revise", "调整布局");
+
+    expect(api.sendWorkflowAction).toHaveBeenCalledWith("session-a", {
+      action: "submit_decision",
+      artifactId: "artifact-decision",
+      message: "调整布局",
+      payload: {
+        selectedOption: "revise",
+        comment: "调整布局",
+      },
+    });
+    expect(workspace.messages[0]).toMatchObject({ id: "message-decision" });
+  });
 });
 
 function makeSessionDetail(sessionId: string, surfaceId: string): SessionDetailResponse {
@@ -314,6 +361,44 @@ function makeSnapshot(sessionId: string, surfaceId: string): SurfaceSnapshotDto 
         },
       },
     },
+  };
+}
+
+function makeWorkflow(): AgentWorkflowDetailDto {
+  return {
+    id: "workflow-a",
+    sessionId: "session-a",
+    status: "active",
+    currentStepType: "plan",
+    title: "Workflow",
+    intent: "generate_a2ui",
+    completedReason: null,
+    failureReason: null,
+    metadata: {},
+    startedAt: "2026-01-01T00:00:00.000Z",
+    completedAt: null,
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+    steps: [],
+    artifacts: [],
+    agentRuns: [],
+  };
+}
+
+function makeMessage(id: string): MessageDto {
+  return {
+    id,
+    sessionId: "session-a",
+    agentRunId: null,
+    workflowId: "workflow-a",
+    workflowStepId: null,
+    role: "user",
+    kind: "chat",
+    content: id,
+    attachments: [],
+    a2uiEventIds: [],
+    metadata: {},
+    createdAt: "2026-01-01T00:00:00.000Z",
   };
 }
 
