@@ -38,6 +38,7 @@ export interface ModelClientConfig {
 // ─── ModelClient ────────────────────────────────────────────
 
 import { logger } from "../logger.js";
+import { startModelIOTrace, type ModelTraceContext } from "./model-io-logger.js";
 
 export class ModelClient {
   private config: ModelClientConfig;
@@ -51,7 +52,10 @@ export class ModelClient {
    * @param messages 对话消息数组
    * @returns 模型响应（内容 + 可选 token 用量）
    */
-  async generate(messages: ChatMessage[]): Promise<ModelResponse> {
+  async generate(
+    messages: ChatMessage[],
+    traceContext?: ModelTraceContext,
+  ): Promise<ModelResponse> {
     const { baseUrl, apiKey, model, temperature, maxTokens, timeoutMs } =
       this.config;
 
@@ -73,6 +77,7 @@ export class ModelClient {
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     const startTime = Date.now();
+    const trace = startModelIOTrace({ model, messages, traceContext });
 
     try {
       const response = await fetch(url, {
@@ -121,18 +126,25 @@ export class ModelClient {
         `LLM 响应 → tokens=${result.usage?.totalTokens ?? "?"}, 内容长度=${result.content.length}, 耗时=${elapsed}ms`
       );
 
+      trace.complete(result, elapsed);
       return result;
     } catch (err) {
+      const elapsed = Date.now() - startTime;
       if (err instanceof DOMException && err.name === "AbortError") {
-        throw new Error(`模型 API 调用超时（${timeoutMs}ms）`);
+        const wrapped = new Error(`模型 API 调用超时（${timeoutMs}ms）`);
+        trace.fail(wrapped, elapsed);
+        throw wrapped;
       }
       // 重新抛出已处理的错误
       if (err instanceof Error && err.message.startsWith("模型 API")) {
+        trace.fail(err, elapsed);
         throw err;
       }
-      throw new Error(
+      const wrapped = new Error(
         `模型 API 调用异常：${err instanceof Error ? err.message : String(err)}`,
       );
+      trace.fail(wrapped, elapsed);
+      throw wrapped;
     } finally {
       clearTimeout(timeoutId);
     }

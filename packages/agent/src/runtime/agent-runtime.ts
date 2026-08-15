@@ -131,7 +131,11 @@ export class AgentRuntime implements IAgentRuntime {
           modelResponse = await this.modelClient.generate([
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt },
-          ]);
+          ], {
+            sessionId: input.sessionId,
+            phase: "repair",
+            attempt,
+          });
           addUsage(modelResponse.usage);
           logger.debug(
             `模型回复 → attempt=${attempt}/${MAX_ATTEMPTS}, 长度=${modelResponse.content.length}\n${truncate(modelResponse.content, 2000)}`,
@@ -141,6 +145,7 @@ export class AgentRuntime implements IAgentRuntime {
           const disclosureResult =
             await this.generateWithProgressiveDisclosure(
               context,
+              input.sessionId,
               attempt,
               disclosedComponents,
               disclosedSkills,
@@ -317,7 +322,14 @@ export class AgentRuntime implements IAgentRuntime {
       const modelResponse = await this.modelClient.generate([
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
-      ]);
+      ], {
+        sessionId: input.sessionId,
+        workflowId: input.workflowId,
+        workflowStepId: input.workflowStepId,
+        task: input.task,
+        phase: "workflow_task",
+        attempt: 1,
+      });
       const rawOutputPreview = modelResponse.content.slice(0, 1000);
       const parsedResult = parseWorkflowTaskOutput(modelResponse.content);
       const workflowToolCalls: ToolCallRecord[] = [];
@@ -520,6 +532,7 @@ export class AgentRuntime implements IAgentRuntime {
    */
   private async generateWithProgressiveDisclosure(
     context: AgentContext,
+    sessionId: string,
     attempt: number,
     disclosedComponents: Set<string>,
     disclosedSkills: Set<string>,
@@ -561,7 +574,12 @@ export class AgentRuntime implements IAgentRuntime {
       lastResponse = await this.modelClient.generate([
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
-      ]);
+      ], {
+        sessionId,
+        phase: forceFinalOutput ? "initial_generation" : "progressive_disclosure",
+        attempt,
+        round,
+      });
       addUsage(lastResponse.usage);
       logger.debug(
         `模型回复 → attempt=${attempt}/${MAX_ATTEMPTS}, round=${round}, 长度=${lastResponse.content.length}\n${truncate(lastResponse.content, 2000)}`,

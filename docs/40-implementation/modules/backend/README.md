@@ -38,6 +38,7 @@
 不负责：
 
 - 不直接调用模型 API，模型调用由 `packages/agent` 内部完成。
+- 不直接保存或暴露 Model IO trace；本地 JSONL 由 Agent 模块在 backend 进程中写入 `logs/model-io/`。
 - 不生成 A2UI 草稿。
 - 不实现前端渲染。
 - 不执行 Renderer action 的业务副作用。

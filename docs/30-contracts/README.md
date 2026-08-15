@@ -32,3 +32,9 @@ plan -> generate_a2ui -> validate -> preview -> commit
 - 未实现内容必须明确标注为 planned，不得混入当前已实现契约正文。
 - 修改本目录后，同步更新受影响的 `20-design/` 和 `40-implementation/` 文档。
 - 不允许在多个模块重复定义同一跨模块类型。
+## Model IO Logging 契约索引
+
+Model IO Logging 是本地开发诊断契约，当前不暴露 HTTP API、SSE 事件或数据库表。
+
+- 开关、`traceContext` 和 JSONL 记录结构见 [Shared 类型契约](./shared-types.md#33-model-io-logging-契约)。
+- 设计边界见 [Agent 模块边界](../20-design/agent/README.md#model-io-logging-设计) 与 [Backend 模块边界](../20-design/backend/README.md#model-io-logging-边界)。

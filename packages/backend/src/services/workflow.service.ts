@@ -1,11 +1,21 @@
 /**
- * Agent Workflow 鎸佷箙鍖栫紪鎺掓湇鍔°€? *
- * 鑱岃矗锛? * - 鍒涘缓銆佹帹杩涖€佸け璐ャ€佸彇娑堝拰瀹屾垚 session 涓嬬殑 workflow銆? * - 鍒涘缓骞舵洿鏂?workflow step锛屼繚瀛?workflow artifact銆? * - 鍦?service 灞傚畧浣忓悓涓€ session 鍙厑璁镐竴涓繘琛屼腑 workflow 鐨勭害鏉熴€? * - 鎺ㄩ€?workflow 绾?SSE 浜嬩欢锛屼緵鍓嶇鎭㈠ timeline銆? *
- * 寮曠敤锛? * - workflow.repository
+ * Agent Workflow 持久化编排服务。
+ *
+ * 职责：
+ * - 创建、推进、失败、取消和完成 session 下的 workflow。
+ * - 创建并更新 workflow step，保存 workflow artifact。
+ * - 在 service 层守住同一 session 只允许一个进行中 workflow 的约束。
+ * - 推送 workflow 经 SSE 事件，供前端恢复 timeline。
+ *
+ * 引用：
+ * - workflow.repository
  * - stream.service
  * - utils/errors
- * 琚紩鐢細
- * - 鍚庣画 WorkflowService API 涓?sendMessage 缂栨帓鍏ュ彛銆? * 娉ㄦ剰锛? * - 鏈湇鍔℃殏涓嶈皟鐢?Agent Runtime锛屼篃涓嶆彁浜?A2UI event/snapshot銆? */
+ * 被引用：
+ * - 后续 WorkflowService API 与 sendMessage 编排入口。
+ * 注意：
+ * - 本服务暂不调用 Agent Runtime，也不提交 A2UI event/snapshot。
+ */
 import type {
   A2UIServerMessage,
   A2UIEventDto,
@@ -45,7 +55,7 @@ import { skillResolverService } from "./skill-resolver.service.js";
 import { snapshotService } from "./snapshot.service.js";
 import { streamService } from "./stream.service.js";
 
-/** 鍒涘缓 Agent Workflow 鐨勮緭鍏ュ弬鏁般€?*/
+/** 创建 Agent Workflow 的输入参数。 */
 export type CreateWorkflowInput = {
   sessionId: string;
   title?: string;
@@ -190,8 +200,11 @@ export type ConfirmCandidateCommitInput = {
 };
 
 /**
- * 灏嗘湭鐭ュ€煎畨鍏ㄨ浆鎹负 JsonObject銆? *
- * 浠呭綋鍊间负闈炴暟缁勭殑鏅€氬璞℃椂杩斿洖鍘熷€硷紝鍚﹀垯杩斿洖绌哄璞°€? * 鐢ㄤ簬瀹夊叏灞曞紑 Prisma 杩斿洖鐨?Json 瀛楁銆? */
+ * 将未知值安全转换为 JsonObject。
+ *
+ * 仅当值为非数组的普通对象时返回原值，否则返回空对象。
+ * 用于安全展开 Prisma 返回的 Json 字段。
+ */
 function toJsonObject(value: unknown): JsonObject {
   return value && typeof value === "object" && !Array.isArray(value) ? value as JsonObject : {};
 }
@@ -266,7 +279,7 @@ async function createWorkflowTaskRun(input: {
 }) {
   const session = await sessionRepository.findById(input.sessionId);
   if (!session) {
-    throw conflict("Session 涓嶅瓨鍦紝鏃犳硶鍒涘缓 workflow AgentRun", "SESSION_NOT_FOUND", {
+    throw conflict("Session 不存在，无法创建 workflow AgentRun", "SESSION_NOT_FOUND", {
       sessionId: input.sessionId,
     });
   }
@@ -399,8 +412,10 @@ function extractSurfaceIds(messages: A2UIServerMessage[]): string[] {
 }
 
 /**
- * 灏?Prisma AgentWorkflow 瀹炰綋杞崲涓?AgentWorkflowDto銆? *
- * Date 瀛楁杞负 ISO 瀛楃涓诧紝metadata 閫氳繃 toJsonObject 瀹夊叏杞崲銆? */
+ * 将 Prisma AgentWorkflow 实体转换为 AgentWorkflowDto。
+ *
+ * Date 字段转为 ISO 字符串，metadata 通过 toJsonObject 安全转换。
+ */
 function toWorkflowDto(workflow: {
   id: string;
   sessionId: string;
@@ -434,7 +449,8 @@ function toWorkflowDto(workflow: {
 }
 
 /**
- * 灏?Prisma WorkflowStep 瀹炰綋杞崲涓?WorkflowStepDto銆? */
+ * 将 Prisma WorkflowStep 实体转换为 WorkflowStepDto。
+ */
 function toStepDto(step: {
   id: string;
   workflowId: string;
@@ -478,7 +494,8 @@ function toStepDto(step: {
 }
 
 /**
- * 灏?Prisma WorkflowArtifact 瀹炰綋杞崲涓?WorkflowArtifactDto銆? */
+ * 将 Prisma WorkflowArtifact 实体转换为 WorkflowArtifactDto。
+ */
 function toArtifactDto(artifact: {
   id: string;
   workflowId: string;
@@ -579,14 +596,15 @@ function toWorkflowDetailDto(workflow: {
 
 export const workflowService = {
   /**
-   * 鍒涘缓 session 涓嬬殑鏂?Agent Workflow銆?   *
-   * @param input - 鍒涘缓鍙傛暟锛屽寘鍚?sessionId銆佸彲閫夋爣棰樺拰鎰忓浘
-   * @returns 鏂板缓鐨?workflow 璁板綍
+   * 创建 session 下的新 Agent Workflow。
+   *
+   * @param input - 创建参数，包含 sessionId、可选标题和意图
+   * @returns 新建的 workflow 记录
    */
   async createWorkflow(input: CreateWorkflowInput) {
     const activeWorkflow = await workflowRepository.findActiveBySessionId(input.sessionId);
     if (activeWorkflow) {
-      throw conflict("褰撳墠浼氳瘽宸叉湁杩涜涓殑 Agent Workflow", "ACTIVE_WORKFLOW_EXISTS", {
+      throw conflict("当前会话已有进行中的 Agent Workflow", "ACTIVE_WORKFLOW_EXISTS", {
         sessionId: input.sessionId,
         workflowId: activeWorkflow.id,
       });
@@ -610,9 +628,10 @@ export const workflowService = {
   },
 
   /**
-   * 鍒涘缓 workflow step銆?   *
-   * @param input - step 鍒涘缓鍙傛暟
-   * @returns 鏂板缓鐨?workflow step
+   * 创建 workflow step。
+   *
+   * @param input - step 创建参数
+   * @returns 新建的 workflow step
    */
   async createStep(input: CreateWorkflowStepInput) {
     const step = await workflowRepository.createStep({
@@ -639,9 +658,10 @@ export const workflowService = {
   },
 
   /**
-   * 鏇存柊 workflow step 骞舵帹閫?timeline 浜嬩欢銆?   *
-   * @param input - step 鏇存柊鍙傛暟
-   * @returns 鏇存柊鍚庣殑 workflow step
+   * 更新 workflow step 并推送 timeline 事件。
+   *
+   * @param input - step 更新参数
+   * @returns 更新后的 workflow step
    */
   async updateStep(input: UpdateWorkflowStepInput) {
     const step = await workflowRepository.updateStep(input.stepId, {
@@ -666,9 +686,10 @@ export const workflowService = {
   },
 
   /**
-   * 鍒涘缓 workflow artifact銆?   *
-   * @param input - artifact 鍒涘缓鍙傛暟
-   * @returns 鏂板缓鐨?workflow artifact
+   * 创建 workflow artifact。
+   *
+   * @param input - artifact 创建参数
+   * @returns 新建的 workflow artifact
    */
   async createArtifact(input: CreateWorkflowArtifactInput) {
     const artifact = await workflowRepository.createArtifact({
@@ -692,9 +713,10 @@ export const workflowService = {
   },
 
   /**
-   * 瀹屾垚 workflow銆?   *
-   * @param input - 瀹屾垚鍙傛暟
-   * @returns 鏇存柊鍚庣殑 workflow
+   * 完成 workflow。
+   *
+   * @param input - 完成参数
+   * @returns 更新后的 workflow
    */
   async completeWorkflow(input: CompleteWorkflowInput) {
     const workflow = await workflowRepository.updateWorkflow(input.workflowId, {
@@ -713,9 +735,10 @@ export const workflowService = {
   },
 
   /**
-   * 鏍囪 workflow 澶辫触銆?   *
-   * @param input - 澶辫触鍙傛暟
-   * @returns 鏇存柊鍚庣殑 workflow
+   * 标记 workflow 失败。
+   *
+   * @param input - 失败参数
+   * @returns 更新后的 workflow
    */
   async failWorkflow(input: FailWorkflowInput) {
     const workflow = await workflowRepository.updateWorkflow(input.workflowId, {
@@ -734,10 +757,11 @@ export const workflowService = {
   },
 
   /**
-   * 鍙栨秷 workflow銆?   *
+   * 取消 workflow。
+   *
    * @param workflowId - Workflow ID
    * @param sessionId - Session ID
-   * @returns 鏇存柊鍚庣殑 workflow
+   * @returns 更新后的 workflow
    */
   async cancelWorkflow(workflowId: string, sessionId: string) {
     const workflow = await workflowRepository.updateWorkflow(workflowId, {
@@ -755,9 +779,10 @@ export const workflowService = {
   },
 
   /**
-   * 鏌ヨ session 鐨?workflow 鍘嗗彶銆?   *
-   * @param sessionId - 浼氳瘽 ID
-   * @returns workflow 鍘嗗彶锛屽寘鍚?steps 涓?artifacts
+   * 查询 session 的 workflow 历史。
+   *
+   * @param sessionId - 会话 ID
+   * @returns workflow 历史，包含 steps 与 artifacts
    */
   getSessionWorkflows(sessionId: string) {
     return workflowRepository.findWorkflowsBySessionId(sessionId)
@@ -765,9 +790,10 @@ export const workflowService = {
   },
 
   /**
-   * 鏌ヨ鍗曚釜 workflow 璇︽儏銆?   *
+   * 查询单个 workflow 详情。
+   *
    * @param workflowId - Workflow ID
-   * @returns workflow 璇︽儏锛屼笉瀛樺湪鏃惰繑鍥?null
+   * @returns workflow 详情，不存在时返回 null
    */
   async getWorkflowById(workflowId: string) {
     const workflow = await workflowRepository.findWorkflowById(workflowId);
@@ -775,17 +801,20 @@ export const workflowService = {
   },
 
   /**
-   * 鏌ヨ session 褰撳墠杩涜涓殑 workflow銆?   *
-   * @param sessionId - 浼氳瘽 ID
-   * @returns 褰撳墠 active workflow锛屼笉瀛樺湪鏃惰繑鍥?null
+   * 查询 session 当前进行中的 workflow。
+   *
+   * @param sessionId - 会话 ID
+   * @returns 当前 active workflow，不存在时返回 null
    */
   getActiveWorkflow(sessionId: string) {
     return workflowRepository.findActiveBySessionId(sessionId);
   },
 
   /**
-   * 鍚姩绗竴娈电敤鎴峰彲瑙佽鍒掓祦绋嬨€?   *
-   * @param input - 鍖呭惈 session銆亀orkflow 鍜岀敤鎴峰師濮嬮渶姹?   * @returns 褰撳墠 workflow 璇︽儏
+   * 启动第一阶段用户可见规划流程。
+   *
+   * @param input - 包含 session、workflow 和用户原始需求
+   * @returns 当前 workflow 详情
    */
   async startInitialPlanning(input: StartPlanningInput) {
     const now = new Date();
@@ -841,7 +870,7 @@ export const workflowService = {
           additionalInstructions: {
             id: "additional_instructions",
             type: "textarea",
-            label: "鍏朵粬鑷劧璇█琛ュ厖",
+            label: "其他自然语言补充",
             required: false,
           },
         } as unknown as Prisma.InputJsonValue,
@@ -966,9 +995,10 @@ export const workflowService = {
   },
 
   /**
-   * 鍦?confirm_plan 闃舵纭褰撳墠 plan銆?   *
-   * @param input - 纭鍙傛暟
-   * @returns 褰撳墠 workflow 璇︽儏
+   * 在 confirm_plan 阶段确认当前 plan。
+   *
+   * @param input - 确认参数
+   * @returns 当前 workflow 详情
    */
   /**
    * 提交 plan 阶段的 clarification form，并重新运行真实 Agent plan task。
@@ -1344,7 +1374,7 @@ export const workflowService = {
   async confirmPlan(input: ConfirmPlanInput) {
     const latestConfirmStep = await workflowRepository.findLatestStep(input.workflowId, "confirm_plan");
     if (!latestConfirmStep || latestConfirmStep.status !== "awaiting_confirmation") {
-      throw conflict("褰撳墠 workflow 娌℃湁绛夊緟纭鐨?plan", "PLAN_CONFIRMATION_NOT_AVAILABLE", {
+      throw conflict("当前 workflow 没有等待确认的 plan", "PLAN_CONFIRMATION_NOT_AVAILABLE", {
         workflowId: input.workflowId,
       });
     }
@@ -1382,9 +1412,10 @@ export const workflowService = {
   },
 
   /**
-   * 鍦ㄧ‘璁ら樁娈电敤鑷劧璇█璇锋眰淇敼 plan銆?   *
-   * @param input - 淇敼璇锋眰鍙傛暟
-   * @returns 褰撳墠 workflow 璇︽儏
+   * 在确认阶段用自然语言请求修改 plan。
+   *
+   * @param input - 修改请求参数
+   * @returns 当前 workflow 详情
    */
   /**
    * 从 preview revise 回到新的 plan iteration。
@@ -1835,10 +1866,12 @@ export const workflowService = {
     return workflow ? toWorkflowDetailDto(workflow) : null;
   },
   /**
-   * 璁板綍 Candidate A2UI 鐢熸垚鎴愬姛锛屽苟鎺ㄨ繘鍒?preview 闃舵銆?   *
-   * 娉ㄦ剰锛氳繖閲屽彧淇濆瓨 candidate artifact锛屼笉鎻愪氦姝ｅ紡 A2UI event 鎴?surface snapshot銆?   *
-   * @param input - Candidate 鐢熸垚鎴愬姛鍙傛暟
-   * @returns 褰撳墠 workflow 璇︽儏
+   * 记录 Candidate A2UI 生成成功，并推进到 preview 阶段。
+   *
+   * 注意：这里只保存 candidate artifact，不提交正式 A2UI event 或 surface snapshot。
+   *
+   * @param input - Candidate 生成成功参数
+   * @returns 当前 workflow 详情
    */
   /**
    * 执行已确认 plan 的 Candidate A2UI 生成与校验流程。
@@ -2239,7 +2272,7 @@ export const workflowService = {
   async recordCandidateSuccess(input: RecordCandidateSuccessInput) {
     const generateStep = await workflowRepository.findLatestStep(input.workflowId, "generate_a2ui");
     if (!generateStep || generateStep.id !== input.generateStepId) {
-      throw conflict("褰撳墠 workflow 娌℃湁鍙畬鎴愮殑 Candidate 鐢熸垚闃舵", "CANDIDATE_GENERATION_STEP_NOT_AVAILABLE", {
+      throw conflict("当前 workflow 没有可完成的 Candidate 生成阶段", "CANDIDATE_GENERATION_STEP_NOT_AVAILABLE", {
         workflowId: input.workflowId,
         generateStepId: input.generateStepId,
       });
@@ -2330,14 +2363,15 @@ export const workflowService = {
   },
 
   /**
-   * 璁板綍 Candidate A2UI 鐢熸垚澶辫触锛屼繚瀛?validation report 骞舵爣璁板け璐?step銆?   *
-   * @param input - Candidate 鐢熸垚澶辫触鍙傛暟
-   * @returns 褰撳墠 workflow 璇︽儏
+   * 记录 Candidate A2UI 生成失败，保存 validation report 并标记失败 step。
+   *
+   * @param input - Candidate 生成失败参数
+   * @returns 当前 workflow 详情
    */
   async recordCandidateFailure(input: RecordCandidateFailureInput) {
     const generateStep = await workflowRepository.findLatestStep(input.workflowId, "generate_a2ui");
     if (!generateStep || generateStep.id !== input.generateStepId) {
-      throw conflict("褰撳墠 workflow 娌℃湁鍙け璐ヨ褰曠殑 Candidate 鐢熸垚闃舵", "CANDIDATE_GENERATION_STEP_NOT_AVAILABLE", {
+      throw conflict("当前 workflow 没有可失败记录的 Candidate 生成阶段", "CANDIDATE_GENERATION_STEP_NOT_AVAILABLE", {
         workflowId: input.workflowId,
         generateStepId: input.generateStepId,
       });
@@ -2380,10 +2414,12 @@ export const workflowService = {
   },
 
   /**
-   * 纭鎻愪氦褰撳墠 preview 涓殑 Candidate A2UI銆?   *
-   * 娉ㄦ剰锛氳繖閲屼粎鍋?WorkflowStageGate 鏍￠獙骞惰褰曠‘璁?commit step锛屼笉鎵ц姝ｅ紡 A2UI 浜嬪姟鎻愪氦銆?   *
-   * @param input - Candidate 鎻愪氦纭鍙傛暟
-   * @returns 宸茬‘璁ょ殑 candidate artifact 涓?commit step
+   * 确认提交当前 preview 中的 Candidate A2UI。
+   *
+   * 注意：这里仅做 WorkflowStageGate 校验并记录确认 commit step，不执行正式 A2UI 事务提交。
+   *
+   * @param input - Candidate 提交确认参数
+   * @returns 已确认的 candidate artifact 与 commit step
    */
   /**
    * 提交 exact stored candidate artifact，创建正式 A2UI event 与 current snapshot。
@@ -2601,7 +2637,7 @@ export const workflowService = {
   async confirmCandidateCommit(input: ConfirmCandidateCommitInput) {
     const latestPreviewStep = await workflowRepository.findLatestStep(input.workflowId, "preview");
     if (!latestPreviewStep || latestPreviewStep.status !== "awaiting_confirmation") {
-      throw conflict("褰撳墠 workflow 娌℃湁绛夊緟纭鎻愪氦鐨?preview", "PREVIEW_CONFIRMATION_NOT_AVAILABLE", {
+      throw conflict("当前 workflow 没有等待确认提交的 preview", "PREVIEW_CONFIRMATION_NOT_AVAILABLE", {
         workflowId: input.workflowId,
       });
     }
@@ -2609,7 +2645,7 @@ export const workflowService = {
     const previewMetadata = toJsonObject(latestPreviewStep.metadata);
     const candidateArtifact = await workflowRepository.findLatestArtifact(input.workflowId, "candidate_a2ui_messages");
     if (!candidateArtifact || (input.candidateArtifactId && candidateArtifact.id !== input.candidateArtifactId)) {
-      throw conflict("褰撳墠 workflow 娌℃湁鍙彁浜ょ殑 Candidate A2UI", "CANDIDATE_ARTIFACT_NOT_AVAILABLE", {
+      throw conflict("当前 workflow 没有可提交的 Candidate A2UI", "CANDIDATE_ARTIFACT_NOT_AVAILABLE", {
         workflowId: input.workflowId,
         candidateArtifactId: input.candidateArtifactId ?? previewMetadata["candidateArtifactId"] ?? null,
       });

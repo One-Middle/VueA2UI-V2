@@ -50,6 +50,7 @@ packages/agent/src/
     context-builder.ts
   model/
     model-client.ts
+    model-io-logger.ts
   prompts/
     prompt-composer.ts
   runtime/
@@ -90,6 +91,7 @@ packages/agent/src/
 | `src/context/context-builder.ts` | 汇总用户输入、历史消息、上传文件、已启用 Skill、当前 snapshot 和 Catalog 摘要。 |
 | `src/prompts/prompt-composer.ts` | 生成初始、修复和披露后的 prompt。 |
 | `src/model/model-client.ts` | 封装 OpenAI-compatible API 调用、超时和错误处理。 |
+| `src/model/model-io-logger.ts` | 根据 `MODEL_IO_LOG` 输出模型输入输出摘要、debug 预览和本地 JSONL trace。 |
 | `src/tools/validate-a2ui.ts` | A2UI schema、Catalog、引用和安全约束校验入口。 |
 | `src/tools/catalog-schema.ts` | Basic Catalog 定义、摘要和详情格式化工具。 |
 | `src/skills/registry.ts` | 内置 Skill 元数据源。 |
@@ -117,6 +119,23 @@ packages/agent/src/
 6. 模型输出最终 JSON envelope 后，`parseModelOutput` 提取 assistant 文本和 A2UI messages。
 7. `validateA2UI` 校验消息；失败时进入 repair prompt，生成和修复总共最多 3 次。
 8. 校验通过且有 A2UI messages 时返回 `COMMITTED`；校验通过但无 A2UI messages 时返回 `TEXT_ONLY`；仍失败则返回 `FAILED`。
+
+## 7.1 Model IO Logging
+
+`ModelClient.generate(messages, traceContext?)` 统一接入 Model IO Logging（模型输入输出日志），因此普通 `run()`、Workflow `runWorkflowTask()`、修复和渐进披露路径都会经过同一个模型 IO 记录点。
+
+环境变量：
+
+- `MODEL_IO_LOG=off`：关闭模型 IO 日志。
+- `MODEL_IO_LOG=summary`：终端输出 request / response / error 摘要。
+- `MODEL_IO_LOG=debug`：终端输出摘要和截断后的输入输出预览。
+- `MODEL_IO_LOG=full`：终端输出摘要，并写入 `logs/model-io/YYYY-MM-DD.jsonl`。
+
+实现约束：
+
+- `traceContext` 是可选诊断上下文，缺失字段不影响模型调用。
+- JSONL 写入前会执行基础密钥脱敏。
+- 日志失败只输出 warn，不改变模型调用成功或失败语义。
 
 ## 8. 渐进式披露规则
 

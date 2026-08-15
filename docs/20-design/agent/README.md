@@ -27,3 +27,21 @@
 - 使用 `packages/shared` 的 Agent、A2UI、DTO 和校验类型。
 - raw Agent Output 只用于 debug / audit 摘要，不作为业务结果返回给前端主流程。
 - Runtime 输出的是 Parsed Agent Result；WorkflowService 决定该结果在当前 gate 下是否合法。
+## Model IO Logging 设计
+
+Model IO Logging（模型输入输出日志）是 Agent 模块的本地开发诊断能力，目标是让开发者在后端终端和本地 JSONL trace 文件中查看模型调用的输入、输出、耗时和 token 用量。
+
+设计边界：
+
+- 日志入口放在 `ModelClient.generate()`，覆盖普通 `run()`、Workflow `runWorkflowTask()` 和渐进披露等所有模型调用路径。
+- 日志由 `MODEL_IO_LOG=off|summary|debug|full` 控制，和普通 `LOG_LEVEL` 分离。
+- `summary` 只输出终端摘要；`debug` 输出截断后的 prompt / response 预览；`full` 额外写入 `logs/model-io/YYYY-MM-DD.jsonl`。
+- 每次模型调用生成一个 `requestId`，终端日志和 JSONL 记录共用该 ID。
+- `traceContext` 显式传入，可包含 `sessionId`、`agentRunId`、`workflowId`、`workflowStepId`、`task`、`phase`、`attempt` 和 `round`；缺失字段写为 `null`，不阻塞日志输出。
+- `full` 模式保存完整 messages 和 response 前必须做基础密钥脱敏。
+
+不负责：
+
+- 不作为生产审计日志。
+- 不进入 API、SSE 或数据库主流程。
+- 不替代 `ToolCallRecord`、`AgentRunDto` 或 workflow artifact。

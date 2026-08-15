@@ -190,6 +190,96 @@ export interface DecisionForm {
 - `AgentRuntimeFactoryConfig` 定义工厂函数所需的最小配置（模型 API 连接参数），与具体模型客户端实现无关。
 - `AgentRuntimeFactory` 是工厂函数签名，后端持有此类型引用；替换 Agent 实现只需换一行 import。
 
+## 3.3 Model IO Logging 契约
+
+Model IO Logging（模型输入输出日志）是本地开发诊断契约，不属于 HTTP API、SSE、数据库 schema 或用户可见 artifact 契约。
+
+### 开关
+
+```ts
+export type ModelIOLogMode = "off" | "summary" | "debug" | "full";
+```
+
+环境变量：
+
+```env
+MODEL_IO_LOG=off
+```
+
+语义：
+
+- `off`：不输出模型输入输出日志。
+- `summary`：后端终端输出模型调用摘要。
+- `debug`：后端终端输出摘要和截断后的输入输出预览。
+- `full`：后端终端输出摘要，并写入脱敏后的完整 JSONL trace。
+
+`MODEL_IO_LOG` 只控制模型输入输出日志；普通应用日志仍由 `LOG_LEVEL` 控制。
+
+### Trace Context
+
+`traceContext` 是模型调用的可选诊断上下文。缺失字段必须按 `null` 处理，不得导致模型调用失败。
+
+```ts
+export interface ModelTraceContext {
+  sessionId?: string | null;
+  agentRunId?: string | null;
+  workflowId?: string | null;
+  workflowStepId?: string | null;
+  task?: string | null;
+  phase?: string | null;
+  attempt?: number | null;
+  round?: number | null;
+}
+```
+
+建议 `phase` 值：
+
+- `initial_generation`
+- `repair`
+- `workflow_task`
+- `progressive_disclosure`
+
+### JSONL Trace
+
+`full` 模式写入 `logs/model-io/YYYY-MM-DD.jsonl`。每一行表示一次模型调用，必须包含同一个 `requestId`，用于从终端日志定位到 JSONL 记录。
+
+```ts
+export interface ModelIOTraceRecord {
+  requestId: string;
+  timestamp: string;
+  model: string;
+  traceContext: Required<ModelTraceContext>;
+  request: {
+    messages: Array<{
+      role: "system" | "user" | "assistant";
+      content: string;
+    }>;
+    messageCount: number;
+    roleStats: Record<string, { count: number; chars: number }>;
+  };
+  response: null | {
+    content: string;
+    chars: number;
+    usage?: {
+      promptTokens: number;
+      completionTokens: number;
+      totalTokens: number;
+    };
+  };
+  durationMs: number;
+  error: null | {
+    message: string;
+    stack?: string;
+  };
+}
+```
+
+脱敏约束：
+
+- `full` 模式写入 JSONL 前必须做基础密钥脱敏。
+- 至少脱敏 `Authorization: Bearer ...`、`Bearer ...`、`sk-...`、`apiKey`、`api_key`、`authorization`、`Authorization` 以及 `.env` 风格的 `KEY`、`TOKEN`、`SECRET` 字段。
+- JSONL 文件只用于本地开发排查，不得提交到版本库。
+
 ## 4. 维护规则
 
 - 新增类型时，为 export 类型和接口补充中文 JSDoc。
