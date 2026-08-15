@@ -10,7 +10,14 @@
  */
 
 import type { A2UIServerMessage, JsonObject, SurfaceSnapshotData } from "./a2ui";
-import type { SkillReference, WorkflowDecisionOption, WorkflowStageState, WorkflowStepType } from "./api";
+import type {
+  AgentRunTraceSummaryDto,
+  AgentTraceEventDto,
+  SkillReference,
+  WorkflowDecisionOption,
+  WorkflowStageState,
+  WorkflowStepType,
+} from "./api";
 import type { AgentRunPhase } from "./sse";
 
 /** A2UI 校验过程中发现的单个问题。 */
@@ -93,6 +100,8 @@ export interface AgentWorkflowTaskInput extends AgentRunInput {
   workflowId: string;
   /** Workflow step ID，用于 debug metadata 和审计关联。 */
   workflowStepId: string;
+  /** 持久化的 AgentRun ID，用于 trace event 关联（backend 创建 run 后回填）。 */
+  agentRunId?: string;
   /** 当前 task 的类型。 */
   task:
     | "plan"
@@ -207,6 +216,8 @@ export interface AgentWorkflowTaskResult {
   rawOutputPreview: string;
   attemptCount: number;
   tokenUsage?: JsonObject;
+  /** ReAct 循环 trace 摘要，由 backend 写入 agent_runs.metadata.traceSummary。 */
+  traceSummary?: AgentRunTraceSummaryDto;
 }
 
 /** Agent 运行结果，包含三种状态：已提交、纯文本、失败。 */
@@ -285,6 +296,7 @@ export interface IAgentRuntime {
   runWorkflowTask(
     input: AgentWorkflowTaskInput,
     onToolCall?: (record: ToolCallRecord) => void,
+    onTraceEvent?: (event: AgentTraceEventDto) => void,
   ): Promise<AgentWorkflowTaskResult>;
 }
 

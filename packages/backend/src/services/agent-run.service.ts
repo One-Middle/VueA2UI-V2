@@ -25,6 +25,7 @@ import type {
   AgentRunDto,
   AgentRunInput,
   AgentRunResult,
+  AgentRunTraceSummaryDto,
   IAgentRuntime,
   JsonObject,
   MessageDto,
@@ -894,6 +895,7 @@ export const agentRunService = {
         validationResult: unknown;
         createdAt: Date;
       }) => buildA2UIEventDto(e, sessionId)),
+      traceSummary: toTraceSummary(run.metadata),
     };
   },
 };
@@ -1048,4 +1050,14 @@ function buildSnapshotDto(
     summary: s.summary,
     createdAt: s.createdAt.toISOString(),
   };
+}
+
+/**
+ * 从 AgentRun metadata 中提取 trace summary（可能为 null）。
+ */
+function toTraceSummary(metadata: unknown): AgentRunTraceSummaryDto | null {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return null;
+  const raw = (metadata as Record<string, unknown>)["traceSummary"];
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  return raw as unknown as AgentRunTraceSummaryDto;
 }

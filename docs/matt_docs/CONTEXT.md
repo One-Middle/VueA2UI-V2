@@ -16,6 +16,15 @@ A2UI renderer 支持的一组基础组件能力集合。
 **Agent Runtime**:
 受控执行 Agent 推理、工具调用、解析、校验和结果返回的运行层。它不直接访问数据库，也不直接提交正式 A2UI 状态。
 
+**AgentExecutor**:
+执行单次受控 Agent 任务的运行对象。它负责 ReAct 循环、模型动作解析、工具调用、观察结果追加、草稿修复和结构化结果返回；它不是数据库中的 AgentRun 记录，也不负责 Workflow 状态持久化。
+
+**Agent Observation**:
+AgentExecutor 循环中由系统产生的观察事实，例如工具结果、解析错误、校验失败或最终草稿校验结果。Observation 只能由系统生成，模型不能伪造或直接输出。
+
+**Agent Trace Event**:
+AgentExecutor 在单次运行过程中产生的脱敏进度事件，用于展示 iteration、reasoningSummary、tool call、observation 和 final validation 摘要。它服务于实时调试和恢复，不等同于完整模型输入输出日志。
+
 **Agent Output**:
 Agent 或模型运行时产生的原始输出。它不是 API 输出，也不是前端主流程可直接消费的业务结果；必须先经过解析、归一化、校验和 WorkflowStageGate 约束。
 

@@ -15,9 +15,11 @@
 import type {
   AgentRunInput,
   AgentRunResult,
+  AgentTraceEventDto,
   AgentWorkflowTaskInput,
   AgentWorkflowTaskResult,
   IAgentRuntime,
+  ParsedAgentResult,
   ToolCallRecord,
   ValidateA2UIResult,
   A2UIServerMessage,
@@ -36,6 +38,11 @@ import {
   formatCatalogComponentDetails,
   getComponentDef,
 } from "../tools/catalog-schema.js";
+import { WorkflowAgentExecutor } from "./workflow-agent-executor.js";
+import { WorkflowAgentContextBuilder } from "./workflow-agent-context-builder.js";
+import { ToolRegistry } from "./tool-registry.js";
+import { ReactPromptComposer } from "./react-prompt-composer.js";
+import type { AgentFinalArtifact, ReactAgentRunResult } from "./react-agent-types.js";
 import { logger, shortId, truncate } from "../logger.js";
 
 /** 最大生成 + 修复尝试次数 */
@@ -313,120 +320,106 @@ export class AgentRuntime implements IAgentRuntime {
   async runWorkflowTask(
     input: AgentWorkflowTaskInput,
     onToolCall?: (record: ToolCallRecord) => void,
+    onTraceEvent?: (event: AgentTraceEventDto) => void,
   ): Promise<AgentWorkflowTaskResult> {
-    const startedAt = Date.now();
     const context = this.contextBuilder.buildContext(input);
-    const { systemPrompt, userPrompt } = this.composeWorkflowTaskPrompt(input, context);
 
-    try {
-      const modelResponse = await this.modelClient.generate([
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ], {
-        sessionId: input.sessionId,
+    // 构建 executor 输入：goal / facts / capabilities / limits
+    const reactInput = new WorkflowAgentContextBuilder().build({
+      runId: input.agentRunId ?? input.workflowStepId,
+      input,
+    });
+
+    // 注入 ToolRegistry：skill 内容来自已构建上下文，不查询数据库
+    const toolRegistry = new ToolRegistry(reactInput.capabilities, {
+      getSkillContent: (skillIdOrName) => {
+        const skill = context.enabledSkillList.find(
+          (s) => s.id === skillIdOrName || s.name === skillIdOrName,
+        );
+        if (!skill) return null;
+        return {
+          id: skill.id,
+          name: skill.name,
+          content: skill.content,
+          references: (skill.references ?? []).map((ref) => ({
+            id: ref.id,
+            title: ref.title,
+            content: ref.content,
+          })),
+        };
+      },
+      currentSnapshot: input.currentSnapshot,
+    });
+
+    const executor = new WorkflowAgentExecutor({
+      modelClient: this.modelClient,
+      promptComposer: new ReactPromptComposer(),
+      toolRegistry,
+      onTraceEvent,
+    });
+
+    const result = await executor.execute(reactInput);
+
+    return this.toWorkflowTaskResult(result, input, onToolCall);
+  }
+
+  /**
+   * 把 executor 结果映射回现有的 AgentWorkflowTaskResult。
+   *
+   * 从 trace summary 提取工具调用记录，把最终产物或失败映射为 ParsedAgentResult。
+   */
+  private toWorkflowTaskResult(
+    result: ReactAgentRunResult,
+    input: AgentWorkflowTaskInput,
+    onToolCall: ((record: ToolCallRecord) => void) | undefined,
+  ): AgentWorkflowTaskResult {
+    const toolCalls: ToolCallRecord[] = [];
+    for (const iteration of result.trace.iterations) {
+      if (iteration.actionType === "tool_call" && iteration.toolName) {
+        const record: ToolCallRecord = {
+          toolCallId: `${input.workflowStepId}:${iteration.toolName}:${iteration.index}`,
+          toolName: iteration.toolName,
+          status: "succeeded",
+          attemptIndex: iteration.index,
+          phase: "GENERATE_DRAFT",
+          inputSummary: iteration.reasoningSummary
+            ? { reasoningSummary: iteration.reasoningSummary }
+            : {},
+          output: iteration.observationSummary ?? {},
+          durationMs: iteration.durationMs,
+        };
+        toolCalls.push(record);
+        onToolCall?.(record);
+      }
+    }
+
+    const parsedResult: ParsedAgentResult =
+      result.status === "completed"
+        ? mapFinalArtifactToParsedResult(result.final)
+        : {
+            kind: "failure",
+            reason: result.failure.reason,
+            recoverable: result.failure.recoverable,
+            ...(result.failure.details ? { details: result.failure.details } : {}),
+          };
+
+    return {
+      parsedResult,
+      debugMetadata: {
         workflowId: input.workflowId,
         workflowStepId: input.workflowStepId,
+        gate: input.gate,
+        stepType: input.stepType ?? input.gate,
+        stageState: input.stageState ?? null,
         task: input.task,
-        phase: "workflow_task",
-        attempt: 1,
-      });
-      const rawOutputPreview = modelResponse.content.slice(0, 1000);
-      const parsedResult = parseWorkflowTaskOutput(modelResponse.content);
-      const workflowToolCalls: ToolCallRecord[] = [];
-
-      if (parsedResult.kind === "clarification_request") {
-        const toolCall: ToolCallRecord = {
-          toolCallId: `${input.workflowStepId}:askClarification:1`,
-          toolName: "askClarification",
-          status: "succeeded",
-          attemptIndex: 1,
-          phase: "GENERATE_DRAFT",
-          inputSummary: {
-            gate: input.gate,
-            task: input.task,
-            fieldCount: parsedResult.form.fields.length,
-          },
-          output: {
-            fieldIds: parsedResult.form.fields.map((field) => field.id),
-          },
-          durationMs: Date.now() - startedAt,
-        };
-        workflowToolCalls.push(toolCall);
-        onToolCall?.(toolCall);
-      }
-
-      if (parsedResult.kind === "plan_markdown" || parsedResult.kind === "decision_form") {
-        const form = parsedResult.kind === "plan_markdown"
-          ? parsedResult.decisionForm
-          : parsedResult.form;
-        const toolCall: ToolCallRecord = {
-          toolCallId: `${input.workflowStepId}:askUserDecision:1`,
-          toolName: "askUserDecision",
-          status: "succeeded",
-          attemptIndex: 1,
-          phase: "GENERATE_DRAFT",
-          inputSummary: {
-            gate: input.gate,
-            task: input.task,
-            target: form.target,
-            optionIds: form.options.map((option) => option.id),
-          },
-          output: {
-            title: form.title,
-            target: form.target,
-            targetArtifactId: form.targetArtifactId ?? null,
-          },
-          durationMs: Date.now() - startedAt,
-        };
-        workflowToolCalls.push(toolCall);
-        onToolCall?.(toolCall);
-      }
-
-      return {
-        parsedResult,
-        debugMetadata: {
-          workflowId: input.workflowId,
-          workflowStepId: input.workflowStepId,
-          gate: input.gate,
-          stepType: input.stepType ?? input.gate,
-          stageState: input.stageState ?? null,
-          task: input.task,
-          availableTools: input.availableTools ?? [],
-          rawOutputPreview,
-        },
-        toolCalls: workflowToolCalls,
-        rawOutputPreview,
-        attemptCount: 1,
-        tokenUsage: modelResponse.usage
-          ? {
-              promptTokens: modelResponse.usage.promptTokens,
-              completionTokens: modelResponse.usage.completionTokens,
-              totalTokens: modelResponse.usage.totalTokens,
-            }
-          : undefined,
-      };
-    } catch (err) {
-      const reason = err instanceof Error ? err.message : String(err);
-      return {
-        parsedResult: {
-          kind: "failure",
-          reason,
-          recoverable: true,
-        },
-        debugMetadata: {
-          workflowId: input.workflowId,
-          workflowStepId: input.workflowStepId,
-          gate: input.gate,
-          stepType: input.stepType ?? input.gate,
-          stageState: input.stageState ?? null,
-          task: input.task,
-          availableTools: input.availableTools ?? [],
-        },
-        toolCalls: [],
-        rawOutputPreview: "",
-        attemptCount: 1,
-      };
-    }
+        availableTools: input.availableTools ?? [],
+      },
+      toolCalls,
+      rawOutputPreview: "",
+      attemptCount: result.trace.iterations.length,
+      tokenUsage: result.usage,
+      traceSummary: result.trace,
+    };
   }
 
   private composeWorkflowTaskPrompt(
@@ -1025,5 +1018,29 @@ export class AgentRuntime implements IAgentRuntime {
           : {}),
       }),
     };
+  }
+}
+
+/**
+ * 把 executor 的最终产物映射为 shared 的 ParsedAgentResult。
+ */
+function mapFinalArtifactToParsedResult(artifact: AgentFinalArtifact): ParsedAgentResult {
+  switch (artifact.kind) {
+    case "clarification_form":
+      return { kind: "clarification_request", form: artifact.form };
+    case "decision_form":
+      return { kind: "decision_form", form: artifact.form };
+    case "plan_markdown":
+      return {
+        kind: "plan_markdown",
+        markdown: artifact.markdown,
+        decisionForm: artifact.decisionForm,
+      };
+    case "candidate_a2ui_messages":
+      return {
+        kind: "candidate_a2ui_messages",
+        messages: artifact.messages,
+        ...(artifact.assistantMessage ? { assistantMessage: artifact.assistantMessage } : {}),
+      };
   }
 }

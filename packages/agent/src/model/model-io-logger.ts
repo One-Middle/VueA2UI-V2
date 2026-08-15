@@ -43,6 +43,8 @@ type TraceResult =
 
 const INPUT_PREVIEW_LIMIT = 1000;
 const OUTPUT_PREVIEW_LIMIT = 2000;
+const PREVIEW_SEPARATOR = "=".repeat(88);
+const PREVIEW_SUB_SEPARATOR = "-".repeat(88);
 
 /**
  * 解析 MODEL_IO_LOG 环境变量。
@@ -207,7 +209,7 @@ function recordTrace(input: {
   safeRun(() => {
     logResultSummary(input);
     if (input.mode === "debug" && "response" in input.result) {
-      logResponsePreview(input.requestId, input.result.response.content);
+      logResponsePreview(input.requestId, input.traceContext, input.result.response.content);
     }
     if (input.mode === "full") {
       writeTraceJsonl(input);
@@ -225,6 +227,10 @@ function logRequestSummary(input: {
   const roleStats = summarizeRoles(input.messages);
   const totalChars = Object.values(roleStats).reduce((sum, item) => sum + item.chars, 0);
   const context = [
+    input.traceContext.sessionId ? `sessionId=${input.traceContext.sessionId}` : null,
+    input.traceContext.agentRunId ? `agentRunId=${input.traceContext.agentRunId}` : null,
+    input.traceContext.workflowId ? `workflowId=${input.traceContext.workflowId}` : null,
+    input.traceContext.workflowStepId ? `workflowStepId=${input.traceContext.workflowStepId}` : null,
     input.traceContext.phase ? `phase=${input.traceContext.phase}` : null,
     input.traceContext.task ? `task=${input.traceContext.task}` : null,
     input.traceContext.attempt ? `attempt=${input.traceContext.attempt}` : null,
@@ -237,7 +243,12 @@ function logRequestSummary(input: {
   console.log(`◆ [MODEL_IO] roles ${input.requestId} -> ${formatRoleStats(roleStats)}`);
 
   if (input.mode === "debug") {
-    console.log(`◆ [MODEL_IO] input preview ${input.requestId}\n${formatInputPreview(input.messages)}`);
+    console.log(formatPreviewBlock({
+      direction: "INPUT",
+      requestId: input.requestId,
+      traceContext: input.traceContext,
+      body: formatInputPreview(input.messages),
+    }));
   }
 }
 
@@ -261,14 +272,57 @@ function logResultSummary(input: {
   );
 }
 
-function logResponsePreview(requestId: string, content: string): void {
-  console.log(`◆ [MODEL_IO] output preview ${requestId}\n${truncateForModelIO(content, OUTPUT_PREVIEW_LIMIT)}`);
+function logResponsePreview(requestId: string, traceContext: NormalizedTraceContext, content: string): void {
+  console.log(formatPreviewBlock({
+    direction: "OUTPUT",
+    requestId,
+    traceContext,
+    body: truncateForModelIO(content, OUTPUT_PREVIEW_LIMIT),
+  }));
 }
 
 function formatInputPreview(messages: ChatMessage[]): string {
   return messages
-    .map((message) => `[${message.role}]\n${truncateForModelIO(message.content, INPUT_PREVIEW_LIMIT)}`)
-    .join("\n\n");
+    .map((message, index) => [
+      `${PREVIEW_SUB_SEPARATOR}`,
+      `MESSAGE ${index + 1}/${messages.length} START role=${message.role}`,
+      `${PREVIEW_SUB_SEPARATOR}`,
+      truncateForModelIO(message.content, INPUT_PREVIEW_LIMIT),
+      `${PREVIEW_SUB_SEPARATOR}`,
+      `MESSAGE ${index + 1}/${messages.length} END role=${message.role}`,
+    ].join("\n"))
+    .join("\n");
+}
+
+function formatPreviewBlock(input: {
+  direction: "INPUT" | "OUTPUT";
+  requestId: string;
+  traceContext: NormalizedTraceContext;
+  body: string;
+}): string {
+  const context = formatTraceContext(input.traceContext);
+  return [
+    PREVIEW_SEPARATOR,
+    `MODEL_IO ${input.direction} START requestId=${input.requestId}${context ? ` ${context}` : ""}`,
+    PREVIEW_SEPARATOR,
+    input.body,
+    PREVIEW_SEPARATOR,
+    `MODEL_IO ${input.direction} END requestId=${input.requestId}`,
+    PREVIEW_SEPARATOR,
+  ].join("\n");
+}
+
+function formatTraceContext(context: NormalizedTraceContext): string {
+  return [
+    context.sessionId ? `sessionId=${context.sessionId}` : null,
+    context.agentRunId ? `agentRunId=${context.agentRunId}` : null,
+    context.workflowId ? `workflowId=${context.workflowId}` : null,
+    context.workflowStepId ? `workflowStepId=${context.workflowStepId}` : null,
+    context.phase ? `phase=${context.phase}` : null,
+    context.task ? `task=${context.task}` : null,
+    context.attempt ? `attempt=${context.attempt}` : null,
+    context.round ? `round=${context.round}` : null,
+  ].filter(Boolean).join(" ");
 }
 
 function formatRoleStats(stats: RoleStats): string {

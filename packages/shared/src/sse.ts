@@ -12,6 +12,7 @@
 import type {
   A2UIEventDto,
   AgentRunDto,
+  AgentTraceEventDto,
   AgentWorkflowDto,
   MessageDto,
   SurfaceSnapshotDto,
@@ -39,6 +40,7 @@ export type ServerSentEventName =
   | "a2ui_messages"
   | "surface_snapshot"
   | "agent_run_failed"
+  | "agent_trace_event"
   | "workflow_started"
   | "workflow_step_updated"
   | "workflow_artifact_created"
@@ -102,6 +104,11 @@ export type PlatformSseEvent =
         agentRun: Pick<AgentRunDto, "id" | "status" | "attemptCount" | "failureReason">;
         message: MessageDto;
       };
+    }
+  | {
+      /** Agent 运行 trace 事件（ReAct 循环实时进展） */
+      event: "agent_trace_event";
+      data: AgentTraceEventDto;
     }
   | {
       /** Agent Workflow 开始事件 */

@@ -130,4 +130,12 @@ export const workflowRepository = {
   createArtifact(data: Prisma.WorkflowArtifactCreateInput) {
     return prisma.workflowArtifact.create({ data });
   },
+
+  /** 更新 WorkflowArtifact 字段（如标记 candidate 失效）。 */
+  updateArtifact(id: string, data: Prisma.WorkflowArtifactUpdateInput) {
+    return prisma.workflowArtifact.update({
+      where: { id },
+      data,
+    });
+  },
 };

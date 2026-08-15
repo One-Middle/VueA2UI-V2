@@ -13,6 +13,7 @@
 
 import type {
   AgentRunDto,
+  AgentTraceEventDto,
   AgentWorkflowDetailDto,
   AgentWorkflowDto,
   A2UIEventDto,
@@ -69,6 +70,7 @@ export const useWorkspaceStore = defineStore("workspace", {
     enabledSkillIds: [] as string[],
     agentRuns: [] as AgentRunDto[],
     runtimeToolCalls: [] as ToolCallDto[],
+    runtimeTraceEvents: [] as AgentTraceEventDto[],
     workflows: [] as AgentWorkflowDetailDto[],
     a2uiEvents: [] as WorkspaceA2UIEvent[],
     surfaceSnapshots: [] as WorkspaceSurfaceSnapshot[],
@@ -105,6 +107,7 @@ export const useWorkspaceStore = defineStore("workspace", {
       this.enabledSkillIds = [];
       this.agentRuns = [];
       this.runtimeToolCalls = [];
+      this.runtimeTraceEvents = [];
       this.workflows = [];
       this.a2uiEvents = [];
       this.surfaceSnapshots = [];
@@ -158,6 +161,7 @@ export const useWorkspaceStore = defineStore("workspace", {
       this.enabledSkillIds = [];
       this.agentRuns = [];
       this.runtimeToolCalls = [];
+      this.runtimeTraceEvents = [];
       this.workflows = [];
       this.a2uiEvents = [];
       this.surfaceSnapshots = [];
@@ -198,6 +202,7 @@ export const useWorkspaceStore = defineStore("workspace", {
           this.enabledSkillIds = [];
           this.agentRuns = [];
           this.runtimeToolCalls = [];
+          this.runtimeTraceEvents = [];
           this.workflows = [];
           this.a2uiEvents = [];
           this.surfaceSnapshots = [];
@@ -770,6 +775,11 @@ export const useWorkspaceStore = defineStore("workspace", {
           }
           // 生成结束
           this.isGenerating = false;
+        },
+
+        agent_trace_event: (data: AgentTraceEventDto) => {
+          if (!isCurrent() || data.sessionId !== sessionId) return;
+          this.runtimeTraceEvents.push(data);
         },
 
         onError: (_error: Error) => {

@@ -18,6 +18,7 @@ import {
   createModelIORequestId,
   redactSecrets,
   resolveModelIOLogMode,
+  startModelIOTrace,
   summarizeRoles,
   truncateForModelIO,
 } from "../model-io-logger.js";
@@ -72,5 +73,45 @@ describe("model-io-logger", () => {
       /^mi_20260814_/,
     );
     vi.restoreAllMocks();
+  });
+
+  it("debug 模式用清晰分隔符打印模型输入输出", () => {
+    const originalMode = process.env.MODEL_IO_LOG;
+    process.env.MODEL_IO_LOG = "debug";
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+
+    try {
+      const trace = startModelIOTrace({
+        model: "test-model",
+        messages: [
+          { role: "system", content: "system prompt" },
+          { role: "user", content: "user prompt" },
+        ],
+        traceContext: {
+          agentRunId: "run-1",
+          workflowStepId: "step-1",
+          phase: "workflow_task",
+          task: "plan",
+          attempt: 2,
+        },
+      });
+
+      trace.complete({ content: "{\"type\":\"give_up\"}" }, 12);
+
+      const output = logSpy.mock.calls.map((call) => String(call[0])).join("\n");
+      expect(output).toContain("MODEL_IO INPUT START");
+      expect(output).toContain("MODEL_IO OUTPUT START");
+      expect(output).toContain("MESSAGE 1/2 START role=system");
+      expect(output).toContain("agentRunId=run-1");
+      expect(output).toContain("workflowStepId=step-1");
+      expect(output).toContain("attempt=2");
+    } finally {
+      if (originalMode === undefined) {
+        delete process.env.MODEL_IO_LOG;
+      } else {
+        process.env.MODEL_IO_LOG = originalMode;
+      }
+      logSpy.mockRestore();
+    }
   });
 });

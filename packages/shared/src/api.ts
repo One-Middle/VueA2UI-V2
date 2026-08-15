@@ -734,6 +734,60 @@ export interface ExportSessionDto {
   surfaceSnapshots: SurfaceSnapshotDto[];
 }
 
+/** Agent 模型动作类型（trace 摘要维度）。 */
+export type AgentTraceActionType = "tool_call" | "final_draft" | "give_up";
+
+/** ReAct 循环中单条实时 trace 事件，通过 SSE 推送给前端。 */
+export interface AgentTraceEventDto {
+  /** 会话 ID */
+  sessionId: string;
+  /** Agent 运行 ID */
+  agentRunId: string;
+  /** 关联 Workflow ID（可能为 null） */
+  workflowId: string | null;
+  /** 关联 Workflow Step ID（可能为 null） */
+  workflowStepId: string | null;
+  /** 所在迭代轮次索引 */
+  iterationIndex: number;
+  /** 事件类型 */
+  type: "iteration_started" | "model_action" | "tool_call" | "observation" | "final_validation";
+  /** 审计用推理摘要（非隐藏思维链） */
+  reasoningSummary?: string;
+  /** 模型动作类型 */
+  actionType?: AgentTraceActionType;
+  /** 工具名称 */
+  toolName?: string;
+  /** 最终产物种类 */
+  finalKind?: string;
+  /** 附加摘要载荷 */
+  summary?: JsonObject;
+  /** 创建时间（ISO 8601） */
+  createdAt: string;
+}
+
+/** Agent 运行结束时持久化的 trace 摘要，用于 AgentRun detail API 恢复。 */
+export interface AgentRunTraceSummaryDto {
+  /** 迭代列表 */
+  iterations: Array<{
+    /** 迭代索引 */
+    index: number;
+    /** 审计用推理摘要 */
+    reasoningSummary?: string;
+    /** 模型动作类型 */
+    actionType?: AgentTraceActionType;
+    /** 工具名称 */
+    toolName?: string;
+    /** 最终产物种类 */
+    finalKind?: string;
+    /** 观察结果摘要 */
+    observationSummary?: JsonObject;
+    /** 最终校验摘要 */
+    finalValidation?: JsonObject;
+    /** 耗时（毫秒） */
+    durationMs: number;
+  }>;
+}
+
 /** Agent Run 详情响应。 */
 export interface AgentRunDetailResponse {
   /** Agent 运行 DTO */
@@ -744,6 +798,8 @@ export interface AgentRunDetailResponse {
   assistantMessage: MessageDto | null;
   /** 关联的 A2UI 事件列表 */
   a2uiEvents: A2UIEventDto[];
+  /** ReAct 循环 trace 摘要（可能为 null） */
+  traceSummary: AgentRunTraceSummaryDto | null;
 }
 
 // ─── 会话 Skill 关联表 DTO ──────────────────────────────

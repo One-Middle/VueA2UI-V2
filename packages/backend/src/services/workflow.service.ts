@@ -50,6 +50,7 @@ import { sessionRepository } from "../repositories/session.repository.js";
 import { surfaceSnapshotRepository } from "../repositories/surface-snapshot.repository.js";
 import { toolCallRepository } from "../repositories/tool-call.repository.js";
 import { workflowRepository } from "../repositories/workflow.repository.js";
+import { logger } from "../logger.js";
 import { conflict } from "../utils/errors.js";
 import { skillResolverService } from "./skill-resolver.service.js";
 import { snapshotService } from "./snapshot.service.js";
@@ -209,6 +210,21 @@ function toJsonObject(value: unknown): JsonObject {
   return value && typeof value === "object" && !Array.isArray(value) ? value as JsonObject : {};
 }
 
+/**
+ * 判断 candidate artifact 是否属于最新确认的 plan 且未被标记失效。
+ *
+ * 用于 submitDecision 与 commitExactCandidate 的双重 freshness guard。
+ */
+function isCandidateFresh(
+  candidate: { id: string; metadata: unknown },
+  latestPlan: { id: string } | null,
+): boolean {
+  const metadata = toJsonObject(candidate.metadata);
+  if (metadata["invalidated"] === true) return false;
+  if (!latestPlan) return false;
+  return metadata["planArtifactId"] === latestPlan.id;
+}
+
 function buildAgentRuntime(): IAgentRuntime {
   return createAgentRuntime({
     baseUrl: config.openai.baseUrl,
@@ -332,32 +348,69 @@ async function runWorkflowTask(input: {
   const agentInput = await buildAgentInput(input.sessionId, input.userMessage);
   const runtime = buildAgentRuntime();
   const toolCallTasks: Array<Promise<void>> = [];
-  const result = await runtime.runWorkflowTask(
-    {
-      ...agentInput,
-      workflowId: input.workflowId,
-      workflowStepId: input.workflowStepId,
-      gate: input.gate,
-      stepType: input.gate,
-      stageState: input.stageState ?? null,
-      task: input.task,
-      availableTools: input.availableTools ?? [
-        "askClarification",
-        "askUserDecision",
-        "getSkillContent",
-        "getSkillReferenceContent",
-        "getCatalogComponentDetails",
-      ],
-      clarificationAnswers: input.clarificationAnswers,
-      previousPlanMarkdown: input.previousPlanMarkdown,
-      previousCandidate: input.previousCandidate,
-      revisionText: input.revisionText,
-      workflowContext: input.workflowContext,
-    },
-    (record) => {
-      toolCallTasks.push(recordRuntimeToolCall(run.id, input.sessionId, record));
-    },
-  );
+  let result: AgentWorkflowTaskResult;
+  try {
+    result = await runtime.runWorkflowTask(
+      {
+        ...agentInput,
+        workflowId: input.workflowId,
+        workflowStepId: input.workflowStepId,
+        agentRunId: run.id,
+        gate: input.gate,
+        stepType: input.gate,
+        stageState: input.stageState ?? null,
+        task: input.task,
+        availableTools: input.availableTools ?? [
+          "askClarification",
+          "askUserDecision",
+          "getSkillContent",
+          "getSkillReferenceContent",
+          "getCatalogComponentDetails",
+        ],
+        clarificationAnswers: input.clarificationAnswers,
+        previousPlanMarkdown: input.previousPlanMarkdown,
+        previousCandidate: input.previousCandidate,
+        revisionText: input.revisionText,
+        workflowContext: input.workflowContext,
+      },
+      (record) => {
+        toolCallTasks.push(recordRuntimeToolCall(run.id, input.sessionId, record));
+      },
+      (event) => {
+        streamService.send(input.sessionId, {
+          event: "agent_trace_event",
+          data: event,
+        });
+      },
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    logger.error({ err, runId: run.id, workflowId: input.workflowId, workflowStepId: input.workflowStepId }, "Workflow Agent runtime 执行异常");
+    result = {
+      parsedResult: {
+        kind: "failure",
+        reason: `Workflow Agent runtime 执行异常：${message}`,
+        recoverable: true,
+        details: {
+          errorType: "runtime_exception",
+          task: input.task,
+          gate: input.gate,
+        },
+      },
+      debugMetadata: {
+        task: input.task,
+        gate: input.gate,
+        runtimeException: {
+          message,
+          stack: err instanceof Error ? err.stack ?? null : null,
+        },
+      },
+      toolCalls: [],
+      rawOutputPreview: "",
+      attemptCount: 1,
+      tokenUsage: {},
+    };
+  }
   await Promise.all(toolCallTasks);
 
   await agentRunRepository.update(run.id, {
@@ -372,6 +425,13 @@ async function runWorkflowTask(input: {
         rawOutputPreview: result.rawOutputPreview,
       },
       parsedResultKind: result.parsedResult.kind,
+      ...(result.traceSummary
+        ? {
+            traceSummary: JSON.parse(
+              JSON.stringify(result.traceSummary),
+            ) as Prisma.InputJsonValue,
+          }
+        : {}),
     },
     completedAt: new Date(),
   });
@@ -1461,6 +1521,17 @@ export const workflowService = {
       },
     });
 
+    // 标记旧 candidate 失效：保留历史但禁止 commit
+    if (latestCandidate) {
+      await workflowRepository.updateArtifact(latestCandidate.id, {
+        metadata: {
+          ...(toJsonObject(latestCandidate.metadata)),
+          invalidated: true,
+          supersededByRevisionMessageId: input.revisionMessageId,
+        },
+      });
+    }
+
     const planStep = await this.createStep({
       workflowId: input.workflowId,
       sessionId: input.sessionId,
@@ -2330,6 +2401,7 @@ export const workflowService = {
     }
 
     const latestCandidate = await workflowRepository.findLatestArtifact(input.workflowId, "candidate_a2ui_messages");
+    const latestPlan = await workflowRepository.findLatestArtifact(input.workflowId, "plan_markdown");
     const version = (latestCandidate?.version ?? 0) + 1;
     const candidateArtifact = await this.createArtifact({
       workflowId: input.workflowId,
@@ -2346,6 +2418,7 @@ export const workflowService = {
       metadata: {
         agentRunId: input.agentRunId,
         tokenUsage: input.tokenUsage ?? {},
+        planArtifactId: latestPlan?.id ?? null,
       },
     });
 
@@ -2438,8 +2511,19 @@ export const workflowService = {
       version: number;
       contentText: string | null;
       contentJson: unknown;
+      metadata: unknown;
     };
   }): Promise<void> {
+    // 最终 freshness guard：提交前再次确认 candidate 属于最新确认的 plan
+    const latestPlan = await workflowRepository.findLatestArtifact(input.workflowId, "plan_markdown");
+    if (!isCandidateFresh(input.candidateArtifact, latestPlan)) {
+      throw conflict("Candidate 已失效，不属于最新确认的 plan", "CANDIDATE_STALE", {
+        workflowId: input.workflowId,
+        candidateArtifactId: input.candidateArtifact.id,
+        latestPlanArtifactId: latestPlan?.id ?? null,
+      });
+    }
+
     const content = toJsonObject(input.candidateArtifact.contentJson);
     const validation = toJsonObject(content["validation"]);
     const messages = content["messages"];
@@ -2648,6 +2732,16 @@ export const workflowService = {
       throw conflict("当前 workflow 没有可提交的 Candidate A2UI", "CANDIDATE_ARTIFACT_NOT_AVAILABLE", {
         workflowId: input.workflowId,
         candidateArtifactId: input.candidateArtifactId ?? previewMetadata["candidateArtifactId"] ?? null,
+      });
+    }
+
+    // 早期 freshness guard：candidate 必须属于最新确认的 plan 且未被失效
+    const latestPlan = await workflowRepository.findLatestArtifact(input.workflowId, "plan_markdown");
+    if (!isCandidateFresh(candidateArtifact, latestPlan)) {
+      throw conflict("Candidate 已失效，不属于最新确认的 plan", "CANDIDATE_STALE", {
+        workflowId: input.workflowId,
+        candidateArtifactId: candidateArtifact.id,
+        latestPlanArtifactId: latestPlan?.id ?? null,
       });
     }
 
