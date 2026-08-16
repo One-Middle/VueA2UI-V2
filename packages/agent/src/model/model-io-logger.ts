@@ -169,6 +169,12 @@ export function startModelIOTrace(input: {
         traceContext,
         result: { response, durationMs },
       });
+      writeAgentIoDump({
+        sessionId: traceContext.sessionId,
+        model: input.model,
+        messages: input.messages,
+        output: response.content,
+      });
     },
     fail(error, durationMs) {
       recordTrace({
@@ -178,6 +184,13 @@ export function startModelIOTrace(input: {
         messages: input.messages,
         traceContext,
         result: { error, durationMs },
+      });
+      writeAgentIoDump({
+        sessionId: traceContext.sessionId,
+        model: input.model,
+        messages: input.messages,
+        output: null,
+        error: error instanceof Error ? error.message : String(error),
       });
     },
   };
@@ -215,6 +228,87 @@ function recordTrace(input: {
       writeTraceJsonl(input);
     }
   });
+}
+
+/**
+ * 解析 AGENT_ROUND_DUMP 环境变量是否开启原汁原味的模型 IO 追写。
+ *
+ * 与 MODEL_IO_LOG 相互独立：即使 MODEL_IO_LOG=off，只要该开关开启也会追写。
+ *
+ * @param raw - 原始环境变量值
+ * @returns 是否为开启值（1 / true / on / yes）
+ */
+export function isAgentIoDumpEnabled(raw = process.env.AGENT_ROUND_DUMP): boolean {
+  const value = raw?.trim().toLowerCase();
+  return value === "1" || value === "true" || value === "on" || value === "yes";
+}
+
+/**
+ * 每次模型调用完成后，把原始 messages 与原始回复追写一段到会话级纯文本文件。
+ *
+ * 注意：只做原样记录与基础密钥脱敏，不做统计或截断；写文件失败只告警，不影响模型调用主流程。
+ */
+function writeAgentIoDump(input: {
+  sessionId: string | null;
+  model: string;
+  messages: ChatMessage[];
+  output: string | null;
+  error?: string | null;
+}): void {
+  if (!isAgentIoDumpEnabled()) return;
+
+  safeRun(() => {
+    const filePath = getAgentIoDumpFilePath(input.sessionId);
+    mkdirSync(dirname(filePath), { recursive: true });
+    appendFileSync(filePath, formatAgentIoDumpText(input), "utf8");
+    console.log(`◆ [AGENT_ROUND_DUMP] appended -> ${filePath}`);
+  });
+}
+
+/** 把一次模型调用格式化为一段可读的纯文本。 */
+function formatAgentIoDumpText(input: {
+  model: string;
+  messages: ChatMessage[];
+  output: string | null;
+  error?: string | null;
+}): string {
+  const separator = "═".repeat(40);
+  const subSeparator = "─".repeat(40);
+  const lines: string[] = [
+    separator,
+    `[${formatLocalTimestamp()}] model=${input.model}`,
+    subSeparator,
+  ];
+
+  for (const message of input.messages) {
+    lines.push(`● ${message.role}`);
+    lines.push(redactSecrets(message.content));
+    lines.push("");
+  }
+
+  if (input.output !== null) {
+    lines.push("● assistant（输出）");
+    lines.push(redactSecrets(input.output));
+  } else if (input.error) {
+    lines.push("● 错误");
+    lines.push(input.error);
+  }
+
+  return `${lines.join("\n")}\n\n`;
+}
+
+/** 生成本地时间戳（YYYY-MM-DD HH:mm:ss）。 */
+function formatLocalTimestamp(): string {
+  const now = new Date();
+  const pad = (n: number): string => String(n).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+}
+
+/** 计算会话级 dump 文件路径：logs/agent-io/<sessionId>.txt。 */
+function getAgentIoDumpFilePath(sessionId: string | null): string {
+  const root = findWorkspaceRoot(process.cwd());
+  const safe = sessionId ?? "unknown";
+  return join(root, "logs", "agent-io", `${safe}.txt`);
 }
 
 function logRequestSummary(input: {
