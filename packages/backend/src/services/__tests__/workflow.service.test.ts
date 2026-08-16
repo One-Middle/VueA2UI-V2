@@ -37,6 +37,7 @@ vi.mock("../../repositories/workflow.repository.js", () => ({
     updateStep: vi.fn(),
     createArtifact: vi.fn(),
     findWorkflowById: vi.fn(),
+    findById: vi.fn(),
     findLatestStep: vi.fn(),
     findStepById: vi.fn(),
     findLatestArtifact: vi.fn(),
@@ -560,5 +561,80 @@ describe("workflowService new workflow contract", () => {
     });
 
     expect(validateA2UI).toBeDefined();
+  });
+
+  it("passes workflow metadata resourceLedger snapshot into the runtime", async () => {
+    const snapshot = {
+      skills: [{ key: "skill:skill-1", skillId: "skill-1", name: "课程表规范" }],
+      skillReferences: [],
+    };
+    vi.mocked(workflowRepository.findById).mockResolvedValue(workflowRecord({
+      metadata: { resourceLedger: snapshot },
+    }) as never);
+
+    const runWorkflowTask = vi.fn().mockResolvedValue({
+      parsedResult: {
+        kind: "clarification_request",
+        form: {
+          fields: [{ id: "q1", label: "目标", type: "text", required: true, reason: "规划" }],
+        },
+      },
+      debugMetadata: {},
+      toolCalls: [],
+      rawOutputPreview: "",
+      attemptCount: 1,
+    });
+    vi.mocked(createAgentRuntime).mockReturnValue({ run: vi.fn(), runWorkflowTask } as never);
+
+    await workflowService.startInitialPlanning({
+      sessionId: "session-a",
+      workflowId: "workflow-a",
+      userMessage: "做一个销售看板",
+    });
+
+    expect(runWorkflowTask).toHaveBeenCalledWith(
+      expect.objectContaining({ resourceLedger: snapshot }),
+      expect.any(Function),
+      expect.any(Function),
+    );
+  });
+
+  it("writes the returned resourceLedger snapshot back to workflow metadata", async () => {
+    const returned = {
+      skills: [{ key: "skill:skill-1", skillId: "skill-1", name: "课程表规范" }],
+      skillReferences: [],
+    };
+    vi.mocked(workflowRepository.findById).mockResolvedValue(workflowRecord({
+      metadata: { keepMe: "x" },
+    }) as never);
+
+    vi.mocked(createAgentRuntime).mockReturnValue({
+      run: vi.fn(),
+      runWorkflowTask: vi.fn().mockResolvedValue({
+        parsedResult: {
+          kind: "clarification_request",
+          form: {
+            fields: [{ id: "q1", label: "目标", type: "text", required: true, reason: "规划" }],
+          },
+        },
+        debugMetadata: {},
+        toolCalls: [],
+        rawOutputPreview: "",
+        attemptCount: 1,
+        resourceLedger: returned,
+      }),
+    } as never);
+
+    await workflowService.startInitialPlanning({
+      sessionId: "session-a",
+      workflowId: "workflow-a",
+      userMessage: "做一个销售看板",
+    });
+
+    // 保留 metadata 中无关字段，同时写回 resourceLedger
+    expect(workflowRepository.updateWorkflow).toHaveBeenCalledWith(
+      "workflow-a",
+      expect.objectContaining({ metadata: { keepMe: "x", resourceLedger: returned } }),
+    );
   });
 });

@@ -71,6 +71,13 @@ export const workflowRepository = {
     });
   },
 
+  /** 查询单个 Workflow 记录（不含 steps/artifacts 关联），用于读取 metadata 等轻量场景。 */
+  findById(id: string) {
+    return prisma.agentWorkflow.findFirst({
+      where: { id, deletedAt: null },
+    });
+  },
+
   /** 查询 Workflow 中指定类型的最新 step。 */
   findLatestStep(workflowId: string, type?: string) {
     return prisma.workflowStep.findFirst({

@@ -27,6 +27,7 @@ import type {
   JsonObject,
   MessageDto,
   ParsedAgentResult,
+  ResourceLedgerSnapshot,
   SurfaceSnapshotDto,
   ToolCallRecord,
   ValidateA2UIResult,
@@ -346,6 +347,12 @@ async function runWorkflowTask(input: {
   });
 
   const agentInput = await buildAgentInput(input.sessionId, input.userMessage);
+
+  // 读取上一 task 遗留的 Resource Ledger Snapshot，供 Runtime hydrate 后复用已披露资源。
+  const workflow = await workflowRepository.findById(input.workflowId);
+  const workflowMetadata = toJsonObject(workflow?.metadata);
+  const resourceLedger = workflowMetadata["resourceLedger"] as ResourceLedgerSnapshot | undefined;
+
   const runtime = buildAgentRuntime();
   const toolCallTasks: Array<Promise<void>> = [];
   let result: AgentWorkflowTaskResult;
@@ -372,6 +379,7 @@ async function runWorkflowTask(input: {
         previousCandidate: input.previousCandidate,
         revisionText: input.revisionText,
         workflowContext: input.workflowContext,
+        ...(resourceLedger ? { resourceLedger } : {}),
       },
       (record) => {
         toolCallTasks.push(recordRuntimeToolCall(run.id, input.sessionId, record));
@@ -435,6 +443,17 @@ async function runWorkflowTask(input: {
     },
     completedAt: new Date(),
   });
+
+  // 把 Runtime 返回的更新后 Resource Ledger Snapshot 写回 workflow metadata，
+  // 供同一 workflow 的下一次 task 复用；保留 metadata 中其余无关字段。
+  if (result.resourceLedger) {
+    await workflowRepository.updateWorkflow(input.workflowId, {
+      metadata: {
+        ...workflowMetadata,
+        resourceLedger: result.resourceLedger as unknown as Prisma.InputJsonValue,
+      },
+    });
+  }
 
   return { runId: run.id, result };
 }

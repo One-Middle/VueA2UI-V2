@@ -8,11 +8,17 @@
  * 不负责：调用模型、执行工具、读取数据库；prompt 压缩与文案优化留待后续版本。
  */
 
+import type { JsonObject } from "@a2ui-platform/shared";
 import type {
   AgentDraft,
   AgentObservation,
   ReactAgentRunInput,
 } from "./react-agent-types.js";
+import {
+  listSkills,
+  listSkillReferences,
+  type ResourceLedger,
+} from "./resource-ledger.js";
 
 /** system prompt 与 user prompt 的合成结果。 */
 export interface ReactPrompt {
@@ -24,9 +30,11 @@ export interface ReactPrompt {
  * 合成一次 ReAct 迭代所需的 system / user prompt。
  *
  * system prompt 在单次运行内保持稳定（除授权工具与期望产物外不变化）；
- * user prompt 每轮根据最新 observation 与 currentDraft 重新生成。
+ * user prompt 每轮根据最新 observation、currentDraft 与 Resource Ledger 重新生成。
  */
 export class ReactPromptComposer {
+  constructor(private readonly resourceLedger?: ResourceLedger) {}
+
   /**
    * 合成 system + user prompt。
    *
@@ -96,14 +104,17 @@ export class ReactPromptComposer {
       }
     }
 
+    this.appendWorkingResources(parts);
+
     parts.push("## 观察（Observations）");
     if (observations.length === 0) {
       parts.push("（无）");
     } else {
       observations.forEach((obs, i) => {
         parts.push(`[${i + 1}] (${obs.kind}) ${obs.message}`);
-        if (obs.details) {
-          parts.push(`    详情: ${JSON.stringify(obs.details)}`);
+        const details = renderObservationDetails(obs.details);
+        if (details.length > 0) {
+          parts.push(details);
         }
       });
     }
@@ -125,7 +136,11 @@ export class ReactPromptComposer {
     if (input.capabilities.skillReferences && input.capabilities.skillReferences.length > 0) {
       parts.push("- skillReferences:");
       for (const ref of input.capabilities.skillReferences) {
-        parts.push(`  - ${ref.skillName}/${ref.title} (${ref.skillId})`);
+        parts.push("  -");
+        parts.push(`    skillId: ${ref.skillId}`);
+        parts.push(`    skillName: ${ref.skillName}`);
+        parts.push(`    referenceId: ${ref.referenceId ?? ref.title}`);
+        parts.push(`    referenceTitle: ${ref.title}`);
       }
     }
     parts.push("");
@@ -138,6 +153,131 @@ export class ReactPromptComposer {
 
     return parts.join("\n");
   }
+
+  /** 从 Resource Ledger 追加 Working Resources 分区：Skill 在前，Reference 在后，各自保留披露顺序。 */
+  private appendWorkingResources(parts: string[]): void {
+    if (!this.resourceLedger) {
+      return;
+    }
+
+    const skills = listSkills(this.resourceLedger);
+    const references = listSkillReferences(this.resourceLedger);
+    if (skills.length === 0 && references.length === 0) {
+      return;
+    }
+
+    parts.push("## Working Resources（已获取的资源）");
+
+    for (const skill of skills) {
+      parts.push(`### Skill: ${skill.name}`);
+      parts.push(`skillId: ${skill.skillId}`);
+      parts.push("");
+      parts.push(skill.content);
+      parts.push("");
+    }
+
+    for (const reference of references) {
+      parts.push(`### Skill Reference: ${reference.skillName} / ${reference.title}`);
+      parts.push(`skillId: ${reference.skillId}`);
+      parts.push(`referenceId: ${reference.referenceId}`);
+      parts.push("");
+      parts.push(reference.content);
+      parts.push("");
+    }
+
+    parts.push("");
+  }
+}
+
+// ─── Observation 详情渲染（白名单小字段，禁止盲目序列化任意详情） ───────
+
+/** 允许出现在 observation 详情中的顶层字段（小而结构化，描述「收到了什么 / 校验结果」）。 */
+const OBSERVATION_DETAIL_SCALARS = new Set([
+  "valid",
+  "warningCount",
+  "skillId",
+  "skillName",
+  "referenceId",
+  "id",
+  "title",
+  "name",
+  "type",
+  "tool",
+  "finalKind",
+]);
+
+/**
+ * 把 observation 详情渲染为 prompt 文本。
+ *
+ * 只渲染白名单内的小字段，避免把 Skill / Reference 正文等大块内容注入观察历史。
+ *
+ * @param details - 观察详情（可为空）
+ * @returns 渲染后的多行文本；无白名单字段时返回空字符串。
+ */
+function renderObservationDetails(details: JsonObject | undefined): string {
+  if (!details) {
+    return "";
+  }
+
+  const lines: string[] = [];
+
+  for (const key of OBSERVATION_DETAIL_SCALARS) {
+    const value = details[key];
+    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+      lines.push(`    ${key}: ${String(value)}`);
+    }
+  }
+
+  if (Array.isArray(details["errors"])) {
+    const rendered = details["errors"]
+      .filter(isRecord)
+      .map((e) => {
+        const code = typeof e["code"] === "string" ? e["code"] : "";
+        const path = typeof e["path"] === "string" ? ` @${e["path"]}` : "";
+        const message = typeof e["message"] === "string" ? e["message"] : "";
+        return `${code}${path}: ${message}`.trim();
+      })
+      .filter((text) => text.length > 0);
+    if (rendered.length > 0) {
+      lines.push(`    errors: ${rendered.join("; ")}`);
+    }
+  }
+
+  const references = renderReferenceLike(details["references"]);
+  if (references.length > 0) {
+    lines.push(`    references: ${references.join(", ")}`);
+  }
+
+  const alreadyDisclosed = renderReferenceLike(details["alreadyDisclosed"]);
+  if (alreadyDisclosed.length > 0) {
+    lines.push(`    alreadyDisclosed: ${alreadyDisclosed.join(", ")}`);
+  }
+
+  if (typeof details["componentDetails"] === "string") {
+    lines.push(`    componentDetails:\n${details["componentDetails"]}`);
+  }
+
+  return lines.join("\n");
+}
+
+/** 渲染 reference 风格数组（id:title），只保留白名单小字段，不含正文。 */
+function renderReferenceLike(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .filter(isRecord)
+    .map((item) => {
+      const id = typeof item["id"] === "string" ? item["id"] : "";
+      const title = typeof item["title"] === "string" ? item["title"] : "";
+      return id ? `${id}:${title}` : title;
+    })
+    .filter((text) => text.length > 0);
+}
+
+/** 判断值是否为非数组的普通对象（JsonObject）。 */
+function isRecord(value: unknown): value is JsonObject {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 /** 身份与使命。 */
@@ -183,16 +323,18 @@ function buildJsonProtocol(): string {
   return [
     "## JSON 输出协议",
     "- 你的每次回复必须是且仅是一个 JSON object，不要输出任何其他文字或 Markdown。",
+    "- 你的回复第一个非空字符必须是 {，最后一个非空字符必须是 }。",
+    "- 不要输出 ```json 代码块、Markdown、解释文字、前缀或后缀。",
     "- 三种动作结构如下：",
     '  tool_call: { "type": "tool_call", "reasoningSummary": "调用某个工具的原因", "tool": "工具名", "arguments": { } }',
     '  final_draft: { "type": "final_draft", "reasoningSummary": "产出最终草稿的原因", "finalKind": "期望产物种类之一", "draft": { } }',
     '  give_up: { "type": "give_up", "reasoningSummary": "放弃的原因", "reason": "无法继续的说明", "recoverable": true }',
-    "- reasoningSummary 是简短的可审计推理摘要，不要输出隐藏思维链。",
+    "- reasoningSummary 是简短的可审计推理摘要。",
     "- 每轮最多调用一个工具。",
     "- 最终草稿的 draft 内容结构：",
     '  - clarification_form 的 draft: { "title": "…", "description": "…", "fields": [{"id","label","type","required","reason","options?"}] }',
     '  - decision_form 的 draft: { "title": "…", "prompt": "…", "guidance": "…", "target": "plan_markdown|candidate_a2ui_messages", "options": [{"id","label"}] }',
-    '  - plan_markdown 的 draft: { "markdown": "## 页面目标\\n…" }',
+    '  - plan_markdown 的 draft: { "markdown": "## 页面目标\\n...\\n## 风险\\n...", "decisionForm": { "title": "确认方案", "prompt": "是否确认按此方案生成 A2UI？", "guidance": "确认后进入生成阶段；选择修改会返回方案修订。", "target": "plan_markdown", "options": [{"id":"confirm","label":"确认"},{"id":"revise","label":"修改"},{"id":"reject","label":"放弃"}] } }',
     '  - candidate_a2ui_messages 的 draft: { "messages": [A2UI 服务端消息…] }',
   ].join("\n");
 }
@@ -205,6 +347,8 @@ function buildToolPolicy(): string {
     "- 调用未授权工具会被系统拒绝。",
     "- askClarification 与 askUserDecision 会结束本轮运行并等待用户输入。",
     "- validateA2UI 用于校验 A2UI 消息。",
+    '- getSkillReferenceContent arguments 必须是：{ "skill": "已启用 Skill 的 id 或 name", "references": ["reference id、reference title，或 *"] }。',
+    "- 调用工具和skill时先确认你是否已经调用过并获得足够信息，避免重复调用。",
   ].join("\n");
 }
 

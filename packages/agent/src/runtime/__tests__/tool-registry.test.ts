@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { ToolRegistry } from "../tool-registry.js";
+import {
+  createResourceLedger,
+  hasSkill,
+  hasSkillReference,
+  listSkillReferences,
+  listSkills,
+  type ResourceLedger,
+} from "../resource-ledger.js";
 import type { AgentCapabilities } from "../react-agent-types.js";
 
 const CATALOG_ID = "https://a2ui.org/specification/v0.9/catalogs/basic/catalog.json";
@@ -21,7 +29,10 @@ function createCapabilities(overrides: Partial<AgentCapabilities> = {}): AgentCa
   };
 }
 
-function createRegistry(capabilities: AgentCapabilities): ToolRegistry {
+function createRegistry(
+  capabilities: AgentCapabilities,
+  ledger: ResourceLedger = createResourceLedger(),
+): ToolRegistry {
   return new ToolRegistry(capabilities, {
     getSkillContent: (idOrName) => ({
       id: idOrName,
@@ -29,6 +40,7 @@ function createRegistry(capabilities: AgentCapabilities): ToolRegistry {
       content: "skill content",
       references: [{ id: "ref-1", title: "视觉规范", content: "reference content" }],
     }),
+    resourceLedger: ledger,
   });
 }
 
@@ -162,6 +174,123 @@ describe("ToolRegistry", () => {
     expect(result.status).toBe("completed");
     if (result.status === "completed") {
       expect(result.observation.kind).toBe("tool_result");
+    }
+  });
+
+  it("getSkillContent 首次披露写入 ledger，observation 不含正文", async () => {
+    const ledger = createResourceLedger();
+    const registry = createRegistry(createCapabilities(), ledger);
+
+    const result = await registry.execute("getSkillContent", { skill: "skill-1" });
+
+    expect(result.status).toBe("completed");
+    expect(hasSkill(ledger, "skill-1")).toBe(true);
+    if (result.status === "completed") {
+      const serialized = JSON.stringify(result.observation.details ?? {});
+      // 正文与 reference 正文均不应出现在 observation 详情中
+      expect(serialized).not.toContain("skill content");
+      expect(serialized).not.toContain("reference content");
+    }
+  });
+
+  it("getSkillContent 重复请求返回 completed 且不重复披露", async () => {
+    const ledger = createResourceLedger();
+    const registry = createRegistry(createCapabilities(), ledger);
+
+    await registry.execute("getSkillContent", { skill: "skill-1" });
+    const result = await registry.execute("getSkillContent", { skill: "skill-1" });
+
+    expect(result.status).toBe("completed");
+    expect(listSkills(ledger)).toHaveLength(1);
+    if (result.status === "completed") {
+      expect(result.observation.message).toContain("Working Resources");
+    }
+  });
+
+  it("getSkillReferenceContent 首次披露 reference，observation 不含正文", async () => {
+    const ledger = createResourceLedger();
+    const registry = createRegistry(createCapabilities(), ledger);
+
+    const result = await registry.execute("getSkillReferenceContent", {
+      skill: "skill-1",
+      references: ["ref-1"],
+    });
+
+    expect(result.status).toBe("completed");
+    expect(hasSkillReference(ledger, "skill-1", "ref-1")).toBe(true);
+    if (result.status === "completed") {
+      const serialized = JSON.stringify(result.observation.details ?? {});
+      expect(serialized).not.toContain("reference content");
+    }
+  });
+
+  it("getSkillReferenceContent 重复请求返回 completed 且不重复披露", async () => {
+    const ledger = createResourceLedger();
+    const registry = createRegistry(createCapabilities(), ledger);
+
+    await registry.execute("getSkillReferenceContent", {
+      skill: "skill-1",
+      references: ["ref-1"],
+    });
+    const result = await registry.execute("getSkillReferenceContent", {
+      skill: "skill-1",
+      references: ["ref-1"],
+    });
+
+    expect(result.status).toBe("completed");
+    expect(listSkillReferences(ledger)).toHaveLength(1);
+    if (result.status === "completed") {
+      expect(result.observation.message).toContain("Working Resources");
+    }
+  });
+
+  it("getSkillReferenceContent 通配符 * 披露全部 reference", async () => {
+    const ledger = createResourceLedger();
+    const registry = createRegistry(createCapabilities(), ledger);
+
+    const result = await registry.execute("getSkillReferenceContent", {
+      skill: "skill-1",
+      references: ["*"],
+    });
+
+    expect(result.status).toBe("completed");
+    expect(listSkillReferences(ledger)).toHaveLength(1);
+    expect(hasSkillReference(ledger, "skill-1", "ref-1")).toBe(true);
+  });
+
+  it("getSkillReferenceContent 部分重复时只披露新增 reference", async () => {
+    const ledger = createResourceLedger();
+    const registry = new ToolRegistry(createCapabilities(), {
+      getSkillContent: () => ({
+        id: "skill-1",
+        name: "Skill",
+        content: "skill content",
+        references: [
+          { id: "ref-1", title: "视觉规范", content: "reference-1 content" },
+          { id: "ref-2", title: "交互规范", content: "reference-2 content" },
+        ],
+      }),
+      resourceLedger: ledger,
+    });
+
+    // 先披露 ref-1，再批量请求 ref-1 + ref-2
+    await registry.execute("getSkillReferenceContent", {
+      skill: "skill-1",
+      references: ["ref-1"],
+    });
+    const result = await registry.execute("getSkillReferenceContent", {
+      skill: "skill-1",
+      references: ["ref-1", "ref-2"],
+    });
+
+    expect(result.status).toBe("completed");
+    // 只新增 ref-2
+    expect(listSkillReferences(ledger)).toHaveLength(2);
+    if (result.status === "completed") {
+      const serialized = JSON.stringify(result.observation.details ?? {});
+      expect(serialized).toContain("ref-2");
+      expect(serialized).not.toContain("reference-2 content");
+      expect(result.observation.message).toContain("跳过");
     }
   });
 });

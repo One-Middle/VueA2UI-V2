@@ -22,6 +22,18 @@ A2UI renderer 支持的一组基础组件能力集合。
 **Agent Observation**:
 AgentExecutor 循环中由系统产生的观察事实，例如工具结果、解析错误、校验失败或最终草稿校验结果。Observation 只能由系统生成，模型不能伪造或直接输出。
 
+**Resource Ledger**:
+Agent Workflow 中跨 task 共享的结构化资源账本，记录 Agent Runtime 已披露给模型的 Skill 和 Skill Reference。它表示当前 workflow 已掌握什么资源，不等同于 trace，也不直接记录工具事件。
+
+**Resource Ledger Snapshot**:
+Resource Ledger 的可持久化 JSON 快照，存放在 AgentWorkflow metadata 中。Snapshot 只保存 resource key 和元信息，不保存 Skill 或 Skill Reference 正文；下一次 Workflow task 运行前由 Agent Runtime 重新补全正文。
+
+**Working Resources**:
+PromptComposer 从 Resource Ledger 注入本轮 prompt 的已获取资源分区。它包含已披露 Skill 和 Skill Reference 的正文，供模型直接使用，避免从 Agent Observation 历史中重复展开大块内容。
+
+**Hydration**:
+Agent Runtime 根据 Resource Ledger Snapshot 和当前 enabledSkills 重新恢复运行时 Resource Ledger 的过程。Hydration 找不到的资源会被静默丢弃并记录到 debug metadata，不作为 Agent Observation 注入模型。
+
 **Agent Trace Event**:
 AgentExecutor 在单次运行过程中产生的脱敏进度事件，用于展示 iteration、reasoningSummary、tool call、observation 和 final validation 摘要。它服务于实时调试和恢复，不等同于完整模型输入输出日志。
 

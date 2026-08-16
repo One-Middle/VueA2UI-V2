@@ -8,12 +8,12 @@
 skill: "A2UI v0.9 组件消息生成"
 id: "a2ui-generation-standards"
 title: "A2UI 标准生成规则"
-description: "生成 UI 前必须请求；包含符合 Renderer 的完整消息结构、组件树、dataModel、List、表单、事件、JSRuntime、安全边界、bad case 和输出检查。"
+description: "包含符合 Renderer 的完整消息结构、组件树、dataModel、List、表单、事件、JSRuntime、安全边界、bad case 和输出检查。"
 ---
 
 # A2UI 标准生成规则
 
-本 Reference 是生成、修改或修复 A2UI v0.9 UI 的标准规则。创建或修改 UI 前必须掌握本 Reference。
+本 Reference 定义生成、修改或修复 A2UI v0.9 UI 的标准规则。
 
 ## 1. 完整消息结构
 
@@ -268,8 +268,6 @@ Renderer 有两套方式控制组件视觉，必须区分使用：
 
 ## 9. 输出前检查
 
-- 是否已经请求并遵循 a2ui-generation-standards？
-- 复杂 UI 是否请求 high-quality-a2ui-good-cases 作为质量标杆？
 - 新 UI 是否包含 createSurface、必要的 updateDataModel 和 updateComponents？
 - catalogId、surfaceId、root 是否正确？
 - 所有 child/children/template 引用是否真实存在？

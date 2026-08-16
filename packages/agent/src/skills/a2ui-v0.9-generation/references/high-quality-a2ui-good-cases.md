@@ -8,7 +8,7 @@
 skill: "A2UI v0.9 组件消息生成"
 id: "high-quality-a2ui-good-cases"
 title: "高质量 A2UI Good Case"
-description: "复杂 UI 或需要质量标杆时请求；包含 Live Commerce（亮色电商）、Finance Brief（黑金金融）、Work Board（清爽工具）三个完整 good case，覆盖三种视觉范式。"
+description: "适用于复杂 UI 或质量标杆场景；包含 Live Commerce（亮色电商）、Finance Brief（黑金金融）、Work Board（清爽工具）三个完整 good case，覆盖三种视觉范式。"
 ---
 
 # 高质量 A2UI Good Case

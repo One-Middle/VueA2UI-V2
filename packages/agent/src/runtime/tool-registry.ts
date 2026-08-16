@@ -35,6 +35,13 @@ import {
   formatCatalogComponentDetails,
   getComponentDef,
 } from "../tools/catalog-schema.js";
+import {
+  hasSkill,
+  hasSkillReference,
+  recordSkill,
+  recordSkillReferences,
+  type ResourceLedger,
+} from "./resource-ledger.js";
 import type {
   AgentCapabilities,
   AgentFinalArtifact,
@@ -56,6 +63,8 @@ export interface ToolRegistryDependencies {
   getSkillContent: (skillIdOrName: string) => SkillContentRecord | null;
   /** 当前 Surface 快照，用于 validateA2UI 增量校验。 */
   currentSnapshot?: SurfaceSnapshotData | null;
+  /** 当前 workflow task 的 Resource Ledger，用于记录已披露资源并做去重。 */
+  resourceLedger: ResourceLedger;
 }
 
 /** 受控工具注册表。 */
@@ -138,13 +147,29 @@ export class ToolRegistry {
       });
     }
 
+    // 重复请求：资源已在 Working Resources 中，返回 completed 而非失败，不再重复披露正文
+    if (hasSkill(this.deps.resourceLedger, record.id)) {
+      return completed({
+        kind: "tool_result",
+        message: `Skill "${record.name}" 已在 Working Resources 中，无需重复获取。`,
+        details: { skillId: record.id, name: record.name },
+      });
+    }
+
+    // 首次披露：正文写入 ledger，由 PromptComposer 注入 Working Resources；
+    // observation 只回 skill 元信息与 reference 摘要，不含 skill 正文与 reference 正文。
+    recordSkill(this.deps.resourceLedger, {
+      id: record.id,
+      name: record.name,
+      content: record.content,
+    });
+
     return completed({
       kind: "tool_result",
-      message: `已获取 Skill "${record.name}" 的完整内容。`,
+      message: `已获取 Skill "${record.name}" 的完整内容，已加入 Working Resources。`,
       details: {
-        id: record.id,
+        skillId: record.id,
         name: record.name,
-        content: record.content,
         references: record.references.map((r) => ({ id: r.id, title: r.title })),
       },
     });
@@ -185,17 +210,47 @@ export class ToolRegistry {
       });
     }
 
+    // 去重：只披露尚未进入 Working Resources 的 reference
+    const alreadyMatched = matched.filter((r) =>
+      hasSkillReference(this.deps.resourceLedger, record.id, r.id),
+    );
+    const newlyMatched = matched.filter(
+      (r) => !hasSkillReference(this.deps.resourceLedger, record.id, r.id),
+    );
+    const newlyDisclosed = recordSkillReferences(
+      this.deps.resourceLedger,
+      { id: record.id, name: record.name },
+      newlyMatched,
+    );
+
+    if (newlyDisclosed.length === 0) {
+      return completed({
+        kind: "tool_result",
+        message: `请求的 Skill Reference 均已在 Working Resources 中，无需重复获取。`,
+        details: {
+          references: alreadyMatched.map((r) => ({ id: r.id, title: r.title })),
+        },
+      });
+    }
+
     return completed({
       kind: "tool_result",
-      message: `已获取 ${matched.length} 个 Skill Reference 内容。`,
+      message:
+        alreadyMatched.length > 0
+          ? `已获取 ${newlyDisclosed.length} 个 Skill Reference 内容，跳过 ${alreadyMatched.length} 个已在 Working Resources 的 reference。`
+          : `已获取 ${newlyDisclosed.length} 个 Skill Reference 内容，已加入 Working Resources。`,
       details: {
-        references: matched.map((r) => ({
-          skillId: record.id,
-          skillName: record.name,
-          id: r.id,
+        references: newlyDisclosed.map((r) => ({
+          skillId: r.skillId,
+          skillName: r.skillName,
+          id: r.referenceId,
           title: r.title,
-          content: r.content,
         })),
+        ...(alreadyMatched.length > 0
+          ? {
+              alreadyDisclosed: alreadyMatched.map((r) => ({ id: r.id, title: r.title })),
+            }
+          : {}),
       },
     });
   }

@@ -18,6 +18,7 @@ import type {
   WorkflowStageState,
   WorkflowStepType,
 } from "./api";
+import type { ResourceLedgerSnapshot } from "./resource-ledger";
 import type { AgentRunPhase } from "./sse";
 
 /** A2UI 校验过程中发现的单个问题。 */
@@ -123,6 +124,8 @@ export interface AgentWorkflowTaskInput extends AgentRunInput {
   revisionText?: string | null;
   /** 历史 candidate 或额外 workflow artifact 摘要。 */
   workflowContext?: JsonObject;
+  /** 上一 task 遗留的 Resource Ledger Snapshot，运行前由 Runtime hydrate 恢复正文。 */
+  resourceLedger?: ResourceLedgerSnapshot;
 }
 
 /** Workflow 内 Agent 可以调用的受控工具名称。 */
@@ -218,6 +221,8 @@ export interface AgentWorkflowTaskResult {
   tokenUsage?: JsonObject;
   /** ReAct 循环 trace 摘要，由 backend 写入 agent_runs.metadata.traceSummary。 */
   traceSummary?: AgentRunTraceSummaryDto;
+  /** 本次 task 结束后的 Resource Ledger Snapshot，由 backend 写回 AgentWorkflow metadata。 */
+  resourceLedger?: ResourceLedgerSnapshot;
 }
 
 /** Agent 运行结果，包含三种状态：已提交、纯文本、失败。 */

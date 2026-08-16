@@ -42,6 +42,7 @@ import { WorkflowAgentExecutor } from "./workflow-agent-executor.js";
 import { WorkflowAgentContextBuilder } from "./workflow-agent-context-builder.js";
 import { ToolRegistry } from "./tool-registry.js";
 import { ReactPromptComposer } from "./react-prompt-composer.js";
+import { dehydrateResourceLedger, hydrateResourceLedger, type DroppedResource, type ResourceLedger } from "./resource-ledger.js";
 import type { AgentFinalArtifact, ReactAgentRunResult } from "./react-agent-types.js";
 import { logger, shortId, truncate } from "../logger.js";
 
@@ -330,7 +331,15 @@ export class AgentRuntime implements IAgentRuntime {
       input,
     });
 
-    // 注入 ToolRegistry：skill 内容来自已构建上下文，不查询数据库
+    // 从上一 task 的 snapshot 与当前 enabledSkills hydrate 运行时 Resource Ledger。
+    // hydration 丢弃的资源只记入 debug 诊断，不作为 observation 注入模型。
+    const { ledger, dropped } = hydrateResourceLedger(
+      input.resourceLedger,
+      input.enabledSkills,
+    );
+
+    // 注入 ToolRegistry：skill 内容来自已构建上下文，不查询数据库；
+    // resourceLedger 在多次 ReAct 迭代间共享，用于披露去重。
     const toolRegistry = new ToolRegistry(reactInput.capabilities, {
       getSkillContent: (skillIdOrName) => {
         const skill = context.enabledSkillList.find(
@@ -349,29 +358,33 @@ export class AgentRuntime implements IAgentRuntime {
         };
       },
       currentSnapshot: input.currentSnapshot,
+      resourceLedger: ledger,
     });
 
     const executor = new WorkflowAgentExecutor({
       modelClient: this.modelClient,
-      promptComposer: new ReactPromptComposer(),
+      promptComposer: new ReactPromptComposer(ledger),
       toolRegistry,
       onTraceEvent,
     });
 
     const result = await executor.execute(reactInput);
 
-    return this.toWorkflowTaskResult(result, input, onToolCall);
+    return this.toWorkflowTaskResult(result, input, onToolCall, ledger, dropped);
   }
 
   /**
    * 把 executor 结果映射回现有的 AgentWorkflowTaskResult。
    *
-   * 从 trace summary 提取工具调用记录，把最终产物或失败映射为 ParsedAgentResult。
+   * 从 trace summary 提取工具调用记录，把最终产物或失败映射为 ParsedAgentResult，
+   * 并把运行时 Resource Ledger 脱水为 snapshot，把 hydration 丢弃资源写入 debug metadata。
    */
   private toWorkflowTaskResult(
     result: ReactAgentRunResult,
     input: AgentWorkflowTaskInput,
     onToolCall: ((record: ToolCallRecord) => void) | undefined,
+    ledger: ResourceLedger,
+    dropped: DroppedResource[],
   ): AgentWorkflowTaskResult {
     const toolCalls: ToolCallRecord[] = [];
     for (const iteration of result.trace.iterations) {
@@ -413,12 +426,19 @@ export class AgentRuntime implements IAgentRuntime {
         stageState: input.stageState ?? null,
         task: input.task,
         availableTools: input.availableTools ?? [],
+        resourceLedgerDropped: dropped.map((d): JsonObject => ({
+          key: d.key,
+          kind: d.kind,
+          skillId: d.skillId,
+          ...(d.referenceId ? { referenceId: d.referenceId } : {}),
+        })),
       },
       toolCalls,
       rawOutputPreview: "",
       attemptCount: result.trace.iterations.length,
       tokenUsage: result.usage,
       traceSummary: result.trace,
+      resourceLedger: dehydrateResourceLedger(ledger),
     };
   }
 

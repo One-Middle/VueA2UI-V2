@@ -3,6 +3,7 @@ import type { ModelClient, ModelResponse } from "../../model/model-client.js";
 import { ReactPromptComposer } from "../react-prompt-composer.js";
 import { ToolRegistry } from "../tool-registry.js";
 import { WorkflowAgentExecutor } from "../workflow-agent-executor.js";
+import { createResourceLedger, hasSkill, type ResourceLedger } from "../resource-ledger.js";
 import type {
   AgentCapabilities,
   AgentTraceEvent,
@@ -58,7 +59,10 @@ class FakeModelClient {
   }
 }
 
-function createToolRegistry(capabilities: AgentCapabilities): ToolRegistry {
+function createToolRegistry(
+  capabilities: AgentCapabilities,
+  ledger: ResourceLedger = createResourceLedger(),
+): ToolRegistry {
   return new ToolRegistry(capabilities, {
     getSkillContent: (idOrName) => ({
       id: idOrName,
@@ -66,14 +70,20 @@ function createToolRegistry(capabilities: AgentCapabilities): ToolRegistry {
       content: "skill content",
       references: [],
     }),
+    resourceLedger: ledger,
   });
 }
 
-function createExecutor(model: FakeModelClient, capabilities: AgentCapabilities, onTraceEvent?: (event: AgentTraceEvent) => void) {
+function createExecutor(
+  model: FakeModelClient,
+  capabilities: AgentCapabilities,
+  onTraceEvent?: (event: AgentTraceEvent) => void,
+  ledger: ResourceLedger = createResourceLedger(),
+) {
   return new WorkflowAgentExecutor({
     modelClient: model as unknown as ModelClient,
-    promptComposer: new ReactPromptComposer(),
-    toolRegistry: createToolRegistry(capabilities),
+    promptComposer: new ReactPromptComposer(ledger),
+    toolRegistry: createToolRegistry(capabilities, ledger),
     onTraceEvent,
   });
 }
@@ -262,5 +272,31 @@ describe("WorkflowAgentExecutor", () => {
     expect(types).toContain("tool_call");
     // trace 事件携带 session/run 关联字段
     expect(events.every((e) => e.sessionId === "session-1" && e.agentRunId === "run-1")).toBe(true);
+  });
+
+  it("同一 Resource Ledger 在多次 ReAct 迭代间共享（重复披露被去重）", async () => {
+    const ledger = createResourceLedger();
+    const model = new FakeModelClient([
+      JSON.stringify({
+        type: "tool_call",
+        reasoningSummary: "首次获取 skill",
+        tool: "getSkillContent",
+        arguments: { skill: "skill-1" },
+      }),
+      JSON.stringify({
+        type: "tool_call",
+        reasoningSummary: "重复获取 skill",
+        tool: "getSkillContent",
+        arguments: { skill: "skill-1" },
+      }),
+      JSON.stringify({ type: "give_up", reasoningSummary: "r", reason: "放弃", recoverable: true }),
+    ]);
+    const executor = createExecutor(model, createInput().capabilities, undefined, ledger);
+
+    await executor.execute(createInput());
+
+    // 两次 getSkillContent 命中同一 ledger，只记录一次
+    expect(hasSkill(ledger, "skill-1")).toBe(true);
+    expect(model.callCount).toBe(3);
   });
 });
