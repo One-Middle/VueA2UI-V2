@@ -44,6 +44,7 @@ export {
   isActionScriptDeclaration,
   isPropertyScriptValue,
   validateJsonPointer,
+  validateScriptDataPath,
 } from "./validation";
 export type {
   ActionScriptActions,

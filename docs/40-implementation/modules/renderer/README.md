@@ -82,14 +82,17 @@ packages/renderer/src/
       CheckBoxComponent.vue
       ChoicePickerComponent.vue
       ColumnComponent.vue
+      ContainerComponent.vue
       DateTimeInputComponent.vue
       DividerComponent.vue
+      GridComponent.vue
       IconComponent.vue
       ImageComponent.vue
       ListComponent.vue
       ModalComponent.vue
       RowComponent.vue
       SliderComponent.vue
+      SpacerComponent.vue
       TabsComponent.vue
       TextComponent.vue
       TextFieldComponent.vue
@@ -146,16 +149,16 @@ packages/renderer/src/
 - `{ path: "/some/value" }` 会从当前 `DataContext` 读取 dataModel。
 - `List` 可用 `{ path, componentId }` 遍历数组，并为每个 item 创建相对路径作用域。
 - 表单类组件在绑定值为 `{ path }` 时可写回 dataModel。
-- 属性脚本使用 `{ script: { code, deps, fallback } }`，只注入 `dataModel.get`。
-- `action.script` 可读写当前 surface 的 dataModel，并通过 `actions.emit` 派发标准 action。
+- 属性脚本使用 `{ script: { code, deps, fallback } }`，只注入 `dataModel.get`；`deps` 和 `dataModel.get(path)` 都按当前 `DataContext` 解析路径。
+- `action.script` 可读写当前 surface 的 dataModel，并通过 `actions.emit` 派发标准 action；`dataModel.get/set(path)` 同样支持当前组件作用域下的相对路径。
 - 默认脚本执行路径是 `new Function` + AST guard；SES `Compartment` 实现保留在配置中可切换。
 - `action.functionCall` 当前只识别、不执行、不派发。
 
 ## 9. Basic Catalog
 
-当前已注册 18 个 Basic Catalog 组件：
+当前已注册 21 个 Basic Catalog 组件：
 
-`Text`、`Image`、`Icon`、`Video`、`AudioPlayer`、`Divider`、`Row`、`Column`、`List`、`Card`、`Tabs`、`Modal`、`Button`、`TextField`、`CheckBox`、`ChoicePicker`、`Slider`、`DateTimeInput`。
+`Text`、`Image`、`Icon`、`Video`、`AudioPlayer`、`Divider`、`Row`、`Column`、`Grid`、`Container`、`Spacer`、`List`、`Card`、`Tabs`、`Modal`、`Button`、`TextField`、`CheckBox`、`ChoicePicker`、`Slider`、`DateTimeInput`。
 
 各组件字段消费状态、通用视觉属性支持范围和已知缺口维护在 [Renderer Basic Catalog 能力矩阵](./basic-catalog-capabilities.md)。
 
@@ -165,6 +168,7 @@ packages/renderer/src/
 - `pnpm --filter @a2ui-platform/renderer test`
 - 合法消息应稳定渲染。
 - `updateDataModel` 根替换、深层路径更新和动态 List item 作用域应有回归测试。
+- List item 内属性脚本和 `action.script` 的相对 `dataModel.get/set`、相对 `deps` 应有回归测试。
 - unknown component、missing child、绑定错误应有可见 fallback 或 error。
 - `action.event` 应派发标准 A2UI client message。
 - `action.script` 应受 JSRuntime 限制，且复用标准 action 派发链路。

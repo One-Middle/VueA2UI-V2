@@ -28,15 +28,16 @@
 - 通过 `packages/shared` 共享 DTO、事件和 Agent 结果类型。
 - WorkflowService 负责判断“这件事现在能不能做”，Agent 负责理解“用户这句话想干什么”。
 - `AgentTool` 与 `WorkflowAction` 必须保持分离。
+
 ## Model IO Logging 边界
 
 Backend（后端服务）承载 Agent Runtime 的运行进程，因此 Model IO Logging 的终端输出会出现在启动 backend 的终端窗口中。
 
 Backend 负责：
 
-- 通过 `.env` 读取 `MODEL_IO_LOG`，让 Agent 模块决定是否输出模型输入输出日志。
-- 作为本地开发进程承载 `logs/model-io/YYYY-MM-DD.jsonl` 的写入位置。
-- 在本地调试时保留终端日志、JSONL trace 与 Agent run / workflow 上下文之间的可追踪性。
+- 通过 `.env` 读取 `MODEL_IO_LOG` 与 `AGENT_ROUND_DUMP`，让 Agent 模块决定是否输出模型输入输出日志或原始追写。
+- 作为本地开发进程承载 `logs/model-io/YYYY-MM-DD.jsonl` 与 `logs/agent-io/<sessionId>.txt` 的写入位置。
+- 在本地调试时保留终端日志、JSONL trace、原始追写与 Agent run / workflow 上下文之间的可追踪性。
 
 Backend 不负责：
 

@@ -10,7 +10,8 @@
 - 用户输入、文件上传入口和会话操作入口。
 - HTTP API 调用和 SSE 接收。
 - 渲染 Agent Workflow timeline、主工作区产物和工具调用产生的特殊 UI block。
-- 在会话流中展示 `clarification_form` 和 `decision_form` 对应的交互表单。
+- 在会话流中展示 `clarification_form` 和 `decision_form` 对应的交互表单，并通过 `workflow/actions` 提交澄清、决策、重试或取消。
+- 消费 `agent_trace_event` 实时展示 ReAct 循环进度。
 - 通过 Renderer 预览已校验 candidate A2UI。
 
 ## 不负责

@@ -44,6 +44,10 @@ import { ToolRegistry } from "./tool-registry.js";
 import { ReactPromptComposer } from "./react-prompt-composer.js";
 import { dehydrateResourceLedger, hydrateResourceLedger, type DroppedResource, type ResourceLedger } from "./resource-ledger.js";
 import type { AgentFinalArtifact, ReactAgentRunResult } from "./react-agent-types.js";
+import {
+  formatPlanHeadingList,
+  PLAN_MARKDOWN_SKELETON,
+} from "./plan-contract.js";
 import { logger, shortId, truncate } from "../logger.js";
 
 /** 最大生成 + 修复尝试次数 */
@@ -449,6 +453,8 @@ export class AgentRuntime implements IAgentRuntime {
     const systemPrompt = [
       "你是 A2UI Agent Workflow 中的 planning Agent。",
       "你的职责是根据用户需求和上下文生成真实的 workflow 产物，而不是返回占位模板。",
+      "你的回复必须是单个 JSON object；第一个非空字符必须是 {，最后一个非空字符必须是 }。",
+      "禁止输出 Markdown、代码块、解释文字、前缀、后缀、数组、多个 JSON 或自然语言 + JSON。",
       "",
       "你有一个内部工具 askClarification。需要澄清时，只输出 JSON：",
       "{",
@@ -461,12 +467,12 @@ export class AgentRuntime implements IAgentRuntime {
       "    ]",
       "  }",
       "}",
-      "fields 支持 select、radio、checkbox、text、textarea。每个问题必须有 id、label、type、required、reason；选择类问题必须有 options。",
+      "fields 支持 select、radio、checkbox、text、textarea。每个问题必须有 id、label、type、required、reason；选择类问题必须有非空 options，且每个 option 必须包含 label 和 value。",
       "",
       "如果信息足够生成 plan，必须同时请求用户确认。请输出 askUserDecision JSON，并在 markdown 字段中放入 Markdown plan：",
       "{",
       '  "tool": "askUserDecision",',
-      '  "markdown": "## 页面目标\\n...\\n## 布局结构\\n...\\n## 组件清单\\n...\\n## Data Model\\n...\\n## 交互行为\\n...\\n## 假设\\n...\\n## 风险\\n...",',
+      `  "markdown": "${PLAN_MARKDOWN_SKELETON}",`,
       '  "arguments": {',
       '    "title": "确认方案",',
       '    "prompt": "请确认是否按这个方案继续。",',
@@ -479,7 +485,7 @@ export class AgentRuntime implements IAgentRuntime {
       "    ]",
       "  }",
       "}",
-      "Markdown plan 必须包含这些标题：页面目标、布局结构、组件清单、Data Model、交互行为、假设、风险。",
+      `Markdown plan 必须包含这些标题：${formatPlanHeadingList()}。`,
       "除非当前 task 是 generate_a2ui，否则不要生成 A2UI messages。",
     ].join("\n");
 

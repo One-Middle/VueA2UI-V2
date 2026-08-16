@@ -24,7 +24,7 @@ import { JsRuntimeError } from "../errors";
 import { ENABLE_FUNCTION_RUNTIME_AST_GUARD } from "../js-runtime.config";
 import { isJsonObject, isJsonValue, validateJsonValue } from "../json";
 import type { JSRuntime, RunActionScriptInput, RunPropertyScriptInput } from "../types";
-import { validateActionScript, validateJsonPointer, validatePropertyScript } from "../validation";
+import { validateActionScript, validateScriptDataPath, validatePropertyScript } from "../validation";
 
 const BLOCKED_GLOBALS = {
   window: undefined,
@@ -67,7 +67,7 @@ export class FunctionJsRuntime implements JSRuntime {
 
     const result = executeFunctionScript(input.script.code, {
       dataModel: Object.freeze({
-        get: (path: string) => input.dataModel.get(validateJsonPointer(path)),
+        get: (path: string) => input.dataContext.dataModel.get(resolveScriptPath(input, path)),
       }),
       actions: undefined,
       context: undefined,
@@ -88,10 +88,10 @@ export class FunctionJsRuntime implements JSRuntime {
 
     executeFunctionScript(input.script.code, {
       dataModel: Object.freeze({
-        get: (path: string) => input.dataModel.get(validateJsonPointer(path)),
+        get: (path: string) => input.dataContext.dataModel.get(resolveScriptPath(input, path)),
         set: (path: string, value: unknown) => {
           const safeValue = validateJsonValue(value);
-          input.dataModel.set(validateJsonPointer(path), safeValue);
+          input.dataContext.dataModel.set(resolveScriptPath(input, path), safeValue);
         },
       }),
       actions: Object.freeze({
@@ -108,6 +108,10 @@ export class FunctionJsRuntime implements JSRuntime {
       context: deepFreeze(structuredCloneFallback(input.context)),
     });
   }
+}
+
+function resolveScriptPath(input: RunPropertyScriptInput | RunActionScriptInput, path: unknown): string {
+  return input.dataContext.resolvePath(validateScriptDataPath(path));
 }
 
 function assertAstIfEnabled(code: string): void {

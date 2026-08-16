@@ -19,6 +19,11 @@ import {
   listSkillReferences,
   type ResourceLedger,
 } from "./resource-ledger.js";
+import {
+  formatPlanHeadingGuide,
+  formatPlanHeadingList,
+  PLAN_MARKDOWN_SKELETON,
+} from "./plan-contract.js";
 
 /** system prompt 与 user prompt 的合成结果。 */
 export interface ReactPrompt {
@@ -149,6 +154,7 @@ export class ReactPromptComposer {
     parts.push(
       "请基于以上上下文，输出单个 JSON 动作：调用一个授权工具（tool_call）、产出最终草稿（final_draft），或放弃（give_up）。",
     );
+    parts.push("本轮只输出 JSON object；不要写“好的”“下面是”“我将”等自然语言前缀。");
     parts.push("不要输出 observation，不要输出隐藏推理过程，只能通过 reasoningSummary 给出简短审计摘要。");
 
     return parts.join("\n");
@@ -304,7 +310,6 @@ function buildWorkflowContract(): string {
     "## Workflow 契约",
     "- 每次运行只处理一个 workflow task。",
     "- 你必须产出与「期望最终产物种类」匹配的产物。",
-    "- 你不能决定 workflow step 的状态或下一步转移，那由系统负责。",
   ].join("\n");
 }
 
@@ -325,6 +330,8 @@ function buildJsonProtocol(): string {
     "- 你的每次回复必须是且仅是一个 JSON object，不要输出任何其他文字或 Markdown。",
     "- 你的回复第一个非空字符必须是 {，最后一个非空字符必须是 }。",
     "- 不要输出 ```json 代码块、Markdown、解释文字、前缀或后缀。",
+    "- 禁止输出数组、多个 JSON、自然语言 + JSON。",
+    "- 如果要解释原因，只能写在 reasoningSummary 字段里。",
     "- 三种动作结构如下：",
     '  tool_call: { "type": "tool_call", "reasoningSummary": "调用某个工具的原因", "tool": "工具名", "arguments": { } }',
     '  final_draft: { "type": "final_draft", "reasoningSummary": "产出最终草稿的原因", "finalKind": "期望产物种类之一", "draft": { } }',
@@ -334,7 +341,7 @@ function buildJsonProtocol(): string {
     "- 最终草稿的 draft 内容结构：",
     '  - clarification_form 的 draft: { "title": "…", "description": "…", "fields": [{"id","label","type","required","reason","options?"}] }',
     '  - decision_form 的 draft: { "title": "…", "prompt": "…", "guidance": "…", "target": "plan_markdown|candidate_a2ui_messages", "options": [{"id","label"}] }',
-    '  - plan_markdown 的 draft: { "markdown": "## 页面目标\\n...\\n## 风险\\n...", "decisionForm": { "title": "确认方案", "prompt": "是否确认按此方案生成 A2UI？", "guidance": "确认后进入生成阶段；选择修改会返回方案修订。", "target": "plan_markdown", "options": [{"id":"confirm","label":"确认"},{"id":"revise","label":"修改"},{"id":"reject","label":"放弃"}] } }',
+    `  - plan_markdown 的 draft: { "markdown": "${PLAN_MARKDOWN_SKELETON}", "decisionForm": { "title": "确认方案", "prompt": "是否确认按此方案生成 A2UI？", "guidance": "确认后进入生成阶段；选择修改会返回方案修订。", "target": "plan_markdown", "options": [{"id":"confirm","label":"确认"},{"id":"revise","label":"修改"},{"id":"reject","label":"放弃"}] } }`,
     '  - candidate_a2ui_messages 的 draft: { "messages": [A2UI 服务端消息…] }',
   ].join("\n");
 }
@@ -345,9 +352,12 @@ function buildToolPolicy(): string {
     "## 工具使用策略",
     "- 只能调用「本任务授权工具」中列出的工具。",
     "- 调用未授权工具会被系统拒绝。",
-    "- askClarification 与 askUserDecision 会结束本轮运行并等待用户输入。",
-    "- validateA2UI 用于校验 A2UI 消息。",
-    '- getSkillReferenceContent arguments 必须是：{ "skill": "已启用 Skill 的 id 或 name", "references": ["reference id、reference title，或 *"] }。',
+    '- askClarification：需要用户补充信息时使用；会结束本轮运行并等待用户输入。arguments: { "title": "表单标题", "description": "为什么需要补充信息", "fields": [{ "id": "field_id", "label": "问题文案", "type": "text|textarea|select|radio|checkbox", "required": true, "reason": "为什么需要该信息", "options": [{ "label": "选项文案", "value": "option_value" }] }] }。约束：select/radio/checkbox 必须提供非空 options，且每个 option 必须包含 label 和 value；text/textarea 不需要 options。',
+    '- askUserDecision：需要用户确认 plan 或 candidate 时使用；会结束本轮运行并等待用户选择。arguments: { "title": "确认标题", "prompt": "确认问题", "guidance": "选择说明", "target": "plan_markdown|candidate_a2ui_messages", "options": [{ "id": "confirm", "label": "确认" }, { "id": "revise", "label": "修改" }, { "id": "reject", "label": "放弃" }] }。约束：options 必须且只能包含 confirm、revise、reject 三项。',
+    '- getSkillContent：需要获取已启用 Skill 完整内容时使用。arguments: { "skill": "已启用 Skill 的 id 或 name" }。约束：skill 必须是非空字符串。',
+    '- getSkillReferenceContent：需要获取已启用 Skill 的某个 Reference 正文时使用。getSkillReferenceContent arguments: { "skill": "已启用 Skill 的 id 或 name", "references": ["reference id、reference title，或 *"] }。约束：skill 必须是非空字符串，references 必须是非空字符串数组。',
+    '- getCatalogComponentDetails：需要查询组件字段、必填项或枚举时使用。arguments: { "components": ["ComponentName"] }。约束：components 必须是非空字符串数组。',
+    '- validateA2UI：需要校验候选 A2UI 消息时使用。arguments: { "messages": [] }。约束：messages 必须是非空 A2UI server-to-client 消息数组。',
     "- 调用工具和skill时先确认你是否已经调用过并获得足够信息，避免重复调用。",
   ].join("\n");
 }
@@ -357,7 +367,9 @@ function buildQualityGates(): string {
   return [
     "## 最终草稿质量门禁",
     "- final_draft 的 finalKind 必须属于「期望最终产物种类」。",
-    "- plan_markdown 必须包含这些标题：页面目标、布局结构、组件清单、Data Model、交互行为、假设、风险。",
+    `- plan_markdown 必须包含这些标题：${formatPlanHeadingList()}。`,
+    "- 每个标题的内容范围：",
+    formatPlanHeadingGuide(),
     "- decision_form 必须包含 confirm、revise、reject 三个选项。",
     "- clarification_form 必须包含非空 fields。",
     "- candidate_a2ui_messages 会经过强制 validateA2UI 校验。",

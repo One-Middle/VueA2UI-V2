@@ -47,20 +47,21 @@ description: "包含符合 Renderer 的完整消息结构、组件树、dataMode
 - 静态一次性文案可以直接写入组件字段。
 - 列表、筛选、收藏、播放状态、表单输入、进度、统计、选中项、批量操作结果必须进入 dataModel。
 - dataModel 的根路径使用业务域名聚合，例如 /player、/song、/finance、/todo。
-- List 模板内使用相对 path，如 { "path": "title" }；模板外使用绝对 path，如 { "path": "/finance/headline" }。
+- List/Grid 动态模板内使用相对 path，如 { "path": "title" }；模板外使用绝对 path，如 { "path": "/finance/headline" }。
+- 属性 script 与 action.script 中的 dataModel.get/set 路径、deps 路径同样使用 DataContext 作用域：以 / 开头为绝对路径，不以 / 开头为当前组件 basePath 下的相对路径。
 - 需要从状态派生文案、图标、按钮 label 或统计值时，用属性 script；不要手动维护多份容易不一致的静态字段。
 
 ## 4. 交互和 action 标准
 
 - 只需要通知宿主的操作，使用 action.event。
 - 需要点击后先修改本地 dataModel，再通知宿主的操作，使用 action.script。
-- action.script 只能执行短小、同步、确定性的逻辑；通过 dataModel.get 读取，通过 dataModel.set 写入 JSON-compatible 值，通过 actions.emit 派发事件。
+- action.script 只能执行短小、同步、确定性的逻辑；通过 dataModel.get 读取，通过 dataModel.set 写入 JSON-compatible 值，通过 actions.emit 派发事件；在 List/Grid item 模板内可用 dataModel.get('done') 读取当前 item 字段。
 - List 模板中的按钮如需知道当前 item，使用 action.script.context 传入 { path: "id" } 等相对绑定。
 - 按钮不能只有视觉外观；可点击业务按钮必须有 action.event 或 action.script。
 
 ## 5. JSRuntime 安全边界
 
-- 属性 script 必须显式 return，必须声明 deps，必须提供 fallback。
+- 属性 script 必须显式 return，必须声明 deps，必须提供 fallback；List/Grid item 模板内 deps 可使用相对路径，如 deps: ["done"]。
 - 属性 script 只能读取 dataModel，不要写入 dataModel。
 - Button.action.script 可以读取和写入 dataModel，但仍然不能访问 DOM、window、document、fetch、网络、定时器、import、async/await、eval、Function、Promise 或外部 API。
 - 不要生成 <script>、javascript:、HTML 字符串、onClick、onInput、onChange、innerHTML、className 或 css 字段。

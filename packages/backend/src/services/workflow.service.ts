@@ -458,15 +458,6 @@ async function runWorkflowTask(input: {
   return { runId: run.id, result };
 }
 
-function getPlanValidationFailure(markdown: string): string | null {
-  const required = ["页面目标", "布局结构", "组件清单", "Data Model", "交互行为", "假设", "风险"];
-  const missing = required.filter((heading) => {
-    const pattern = new RegExp(`^#{1,6}\\s+${heading}\\s*$`, "im");
-    return !pattern.test(markdown);
-  });
-  return missing.length > 0 ? `Markdown plan 缺少必要标题：${missing.join("、")}` : null;
-}
-
 function resultFailureReason(result: ParsedAgentResult): string {
   return result.kind === "failure" ? result.reason : `当前 gate 不接受 Agent result: ${result.kind}`;
 }
@@ -995,36 +986,6 @@ export const workflowService = {
       return workflow ? toWorkflowDetailDto(workflow) : null;
     }
 
-    const planFailure = getPlanValidationFailure(result.parsedResult.markdown);
-    if (planFailure) {
-      const failedStep = await this.updateStep({
-        workflowId: input.workflowId,
-        sessionId: input.sessionId,
-        stepId: planStep.id,
-        status: "failed",
-        stageState: null,
-        failureReason: planFailure,
-        failureMetadata: {
-          agentRunId: runId,
-          validation: "markdown_plan_required_headings",
-        },
-        completedAt: now,
-        metadata: {
-          ...(toJsonObject(planStep.metadata)),
-          agentRunId: runId,
-        },
-      });
-      await this.failWorkflow({
-        workflowId: input.workflowId,
-        sessionId: input.sessionId,
-        failureReason: planFailure,
-        failedStep: toStepDto(failedStep),
-        retryable: true,
-      });
-      const workflow = await workflowRepository.findWorkflowById(input.workflowId);
-      return workflow ? toWorkflowDetailDto(workflow) : null;
-    }
-
     await this.updateStep({
       workflowId: input.workflowId,
       sessionId: input.sessionId,
@@ -1220,38 +1181,6 @@ export const workflowService = {
         workflowId: input.workflowId,
         sessionId: input.sessionId,
         failureReason,
-        failedStep: toStepDto(failedStep),
-        retryable: true,
-      });
-      const workflow = await workflowRepository.findWorkflowById(input.workflowId);
-      return workflow ? toWorkflowDetailDto(workflow) : null;
-    }
-
-    const planFailure = getPlanValidationFailure(result.parsedResult.markdown);
-    if (planFailure) {
-      const failedStep = await this.updateStep({
-        workflowId: input.workflowId,
-        sessionId: input.sessionId,
-        stepId: planStep.id,
-        status: "failed",
-        stageState: null,
-        failureReason: planFailure,
-        failureMetadata: {
-          agentRunId: runId,
-          validation: "markdown_plan_required_headings",
-        },
-        completedAt: new Date(),
-        metadata: {
-          ...(toJsonObject(planStep.metadata)),
-          agentRunId: runId,
-          submittedClarificationArtifactId: input.artifactId,
-          submittedClarificationMessageId: input.submittedByMessageId,
-        },
-      });
-      await this.failWorkflow({
-        workflowId: input.workflowId,
-        sessionId: input.sessionId,
-        failureReason: planFailure,
         failedStep: toStepDto(failedStep),
         retryable: true,
       });
@@ -1661,32 +1590,6 @@ export const workflowService = {
       return workflow ? toWorkflowDetailDto(workflow) : null;
     }
 
-    const planFailure = getPlanValidationFailure(result.parsedResult.markdown);
-    if (planFailure) {
-      const failedStep = await this.updateStep({
-        workflowId: input.workflowId,
-        sessionId: input.sessionId,
-        stepId: planStep.id,
-        status: "failed",
-        stageState: null,
-        failureReason: planFailure,
-        failureMetadata: {
-          agentRunId: runId,
-          validation: "markdown_plan_required_headings",
-        },
-        completedAt: new Date(),
-      });
-      await this.failWorkflow({
-        workflowId: input.workflowId,
-        sessionId: input.sessionId,
-        failureReason: planFailure,
-        failedStep: toStepDto(failedStep),
-        retryable: true,
-      });
-      const workflow = await workflowRepository.findWorkflowById(input.workflowId);
-      return workflow ? toWorkflowDetailDto(workflow) : null;
-    }
-
     await this.updateStep({
       workflowId: input.workflowId,
       sessionId: input.sessionId,
@@ -1868,36 +1771,6 @@ export const workflowService = {
         workflowId: input.workflowId,
         sessionId: input.sessionId,
         failureReason,
-        failedStep: toStepDto(failedStep),
-        retryable: true,
-      });
-      const workflow = await workflowRepository.findWorkflowById(input.workflowId);
-      return workflow ? toWorkflowDetailDto(workflow) : null;
-    }
-
-    const planFailure = getPlanValidationFailure(result.parsedResult.markdown);
-    if (planFailure) {
-      const failedStep = await this.updateStep({
-        workflowId: input.workflowId,
-        sessionId: input.sessionId,
-        stepId: planStep.id,
-        status: "failed",
-        stageState: null,
-        failureReason: planFailure,
-        failureMetadata: {
-          agentRunId: runId,
-          validation: "markdown_plan_required_headings",
-        },
-        completedAt: new Date(),
-        metadata: {
-          ...(toJsonObject(planStep.metadata)),
-          agentRunId: runId,
-        },
-      });
-      await this.failWorkflow({
-        workflowId: input.workflowId,
-        sessionId: input.sessionId,
-        failureReason: planFailure,
         failedStep: toStepDto(failedStep),
         retryable: true,
       });

@@ -18,7 +18,7 @@
  */
 
 import type { JsonObject, JsonValue } from "@a2ui-platform/shared";
-import type { DataModel } from "../data-model";
+import type { DataContext } from "../data-context";
 
 /** 属性脚本声明。 */
 export interface PropertyScriptDeclaration {
@@ -49,13 +49,13 @@ export interface ActionScriptActions {
 /** 属性脚本执行输入。 */
 export interface RunPropertyScriptInput {
   script: PropertyScriptDeclaration;
-  dataModel: DataModel;
+  dataContext: DataContext;
 }
 
 /** 动作脚本执行输入。 */
 export interface RunActionScriptInput {
   script: ActionScriptDeclaration;
-  dataModel: DataModel;
+  dataContext: DataContext;
   actions: ActionScriptActions;
   context: JsonObject;
 }

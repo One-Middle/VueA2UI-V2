@@ -18,6 +18,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
+import { DataContext } from "../data-context";
 import { DataModel } from "../data-model";
 import { JsRuntimeError, JsRuntimeFactory } from "../js-runtime";
 
@@ -27,7 +28,7 @@ describe("FunctionJsRuntime", () => {
     const dataModel = new DataModel({ count: 2 });
 
     const result = runtime.runPropertyScript({
-      dataModel,
+      dataContext: new DataContext(dataModel),
       script: {
         code: "const count = Number(dataModel.get('/count') ?? 0); return count + 1;",
         deps: ["/count"],
@@ -43,7 +44,7 @@ describe("FunctionJsRuntime", () => {
     const emit = vi.fn();
 
     runtime.runActionScript({
-      dataModel,
+      dataContext: new DataContext(dataModel),
       actions: { emit },
       context: { source: "button" },
       script: {
@@ -59,13 +60,45 @@ describe("FunctionJsRuntime", () => {
     expect(emit).toHaveBeenCalledWith("changed", { count: 3 });
   });
 
+  it("脚本 dataModel.get/set 支持当前 DataContext 相对路径", () => {
+    const runtime = new JsRuntimeFactory().create("function");
+    const dataModel = new DataModel({
+      items: [{ done: false }, { done: true }],
+    });
+    const itemContext = new DataContext(dataModel, "/items/0");
+    const emit = vi.fn();
+
+    const result = runtime.runPropertyScript({
+      dataContext: itemContext,
+      script: {
+        code: "return dataModel.get('done') ? '已完成' : '进行中';",
+        deps: ["done"],
+      },
+    });
+
+    runtime.runActionScript({
+      dataContext: itemContext,
+      actions: { emit },
+      context: {},
+      script: {
+        code: "const next = !Boolean(dataModel.get('done')); dataModel.set('done', next); actions.emit('changed', { done: next });",
+        deps: ["done"],
+      },
+    });
+
+    expect(result).toBe("进行中");
+    expect(dataModel.get("/items/0/done")).toBe(true);
+    expect(dataModel.get("/items/1/done")).toBe(true);
+    expect(emit).toHaveBeenCalledWith("changed", { done: true });
+  });
+
   it("会在 AST 阶段拒绝浏览器全局对象", () => {
     const runtime = new JsRuntimeFactory().create("function");
     const dataModel = new DataModel({});
 
     expect(() =>
       runtime.runPropertyScript({
-        dataModel,
+        dataContext: new DataContext(dataModel),
         script: {
           code: "return window;",
           deps: ["/"],
@@ -80,7 +113,7 @@ describe("FunctionJsRuntime", () => {
 
     expect(() =>
       runtime.runPropertyScript({
-        dataModel,
+        dataContext: new DataContext(dataModel),
         script: {
           code: "return dataModel.get.constructor;",
           deps: ["/"],
@@ -95,7 +128,7 @@ describe("FunctionJsRuntime", () => {
 
     expect(() =>
       runtime.runPropertyScript({
-        dataModel,
+        dataContext: new DataContext(dataModel),
         script: {
           code: "const key = 'constructor'; return dataModel[key];",
           deps: ["/items"],

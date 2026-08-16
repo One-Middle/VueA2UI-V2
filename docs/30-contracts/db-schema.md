@@ -32,18 +32,18 @@
 - 一个 session 可以保留多次 Agent Workflow 历史，但同一时刻只能有一个处于 active、running、awaiting confirmation 或 retryable 状态的 workflow。
 - Agent run 和用户可见 message 可以关联到 workflow 和 workflow step，便于恢复完整 workflow timeline。
 - Candidate A2UI 只能作为 workflow artifact 保存；用户确认提交前不得写入 A2UI events 或 surface snapshots。
-- `workflow_steps.type` 目标集合为 `plan`、`generate_a2ui`、`validate`、`preview` 和 `commit`。
-- `workflow_steps.stage_state` 是目标字段，用于保存领域等待态：`awaiting_clarification`、`awaiting_plan_confirmation`、`awaiting_preview_confirmation` 或 `null`。该字段不应放入 `metadata`。
-- `workflow_artifacts.kind` 目标集合为 `clarification_form`、`decision_form`、`plan_markdown`、`candidate_a2ui_messages` 和 `validation_report`。
+- `workflow_steps.type` 集合为 `plan`、`generate_a2ui`、`validate`、`preview` 和 `commit`。
+- `workflow_steps.stage_state` 是主状态字段，用于保存领域等待态：`awaiting_clarification`、`awaiting_plan_confirmation`、`awaiting_preview_confirmation` 或 `null`。该字段是独立列，不放 `metadata`。
+- `workflow_artifacts.kind` 集合为 `clarification_form`、`decision_form`、`plan_markdown`、`candidate_a2ui_messages` 和 `validation_report`。
 - `workflow_artifacts` 只保存 Parsed Agent Result 或后端校验后的稳定产物，raw Agent Output 不得写入 artifact content。
 - `decision_form.metadata` 至少保存 `source: "askUserDecision"`、`agentRunId` 和 `toolCallId`，形成 `decision_form artifact -> tool_call` 的单向关联。
 - `candidate_a2ui_messages` 只能在 `validate` 通过后保存；validate 失败时只保存 `validation_report`。
+- `agent_workflows.metadata.resourceLedger` 保存跨 task 共享的 Resource Ledger Snapshot（已披露 Skill / Reference 的键与元信息，不含正文）。
+- `agent_runs.metadata.traceSummary` 保存 ReAct 循环 trace 摘要，供 AgentRun detail API 恢复；实时 trace 通过 `agent_trace_event` SSE 推送，不单独建表。
 
-## 3.1 Agent Workflow 目标状态机
+## 3.1 Agent Workflow 状态机
 
-> 状态：planned。当前代码仍在从旧 step 模型迁移。
-
-目标阶段：
+阶段：
 
 ```text
 plan -> generate_a2ui -> validate -> preview -> commit

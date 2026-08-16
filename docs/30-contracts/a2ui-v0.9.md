@@ -87,7 +87,7 @@ Renderer 可通过前端回传：
 }
 ```
 
-`action.script` 用于用户交互触发的受限本地脚本。脚本由 Renderer JSRuntime 在 SES `Compartment` 中同步执行，可读取和写入当前 surface 的 `dataModel`，并通过宿主显式注入的 `actions` 能力分组派发事件：
+`action.script` 用于用户交互触发的受限本地脚本。脚本由 Renderer JSRuntime 同步执行，可读取和写入当前 surface 的 `dataModel`，并通过宿主显式注入的 `actions` 能力分组派发事件：
 
 ```json
 {
@@ -106,6 +106,7 @@ Renderer 可通过前端回传：
 - `action.event` 是当前正式格式，Agent 应按该格式生成，Renderer 按该格式解析并派发。
 - Renderer 回传的 action payload 使用 `kind: "event"`，供后端 action handler 稳定分发。
 - `action.script` 是受限本地脚本 action，Renderer 可执行；脚本不直接调用后端，若需形成正式回传事件，应通过 `actions.emit` 复用标准 `a2ui:action` 派发链路。
+- `action.script` 中的 `dataModel.get/set` 路径使用当前组件 `DataContext` 作用域：`/count` 是绝对路径，List item 模板内的 `done` 会解析为当前 item 的实际路径。
 - `action.functionCall` 只作为未来契约保留，当前 Agent schema 不放行，Renderer 暂不执行。
 - 项目早期代码中存在 `{ "name": "...", "context": {} }` 扁平格式；当前 Renderer 不再兼容该格式，Agent 不应生成。
 
@@ -130,9 +131,9 @@ Frontend 负责监听并转发 Renderer action/error，Backend 负责记录，Ag
 属性脚本约束：
 
 - `code` 必须是同步 JS 函数体，并显式 `return` 一个 JSON-compatible 值。
-- `deps` 必填，最多 32 个 JSON Pointer 路径。
+- `deps` 必填，最多 32 个 DataContext 作用域路径；以 `/` 开头表示绝对路径，不以 `/` 开头表示相对当前组件 `basePath`。Renderer 订阅前会把它规整为绝对 JSON Pointer。
 - `fallback` 可选，用于脚本异常或返回值非法时兜底。
-- 属性脚本只注入 `dataModel.get(path)`，不注入 `dataModel.set`、`actions`、DOM、网络、浏览器存储或计时器能力。
+- 属性脚本只注入 `dataModel.get(path)`，路径规则与 `deps` 一致；不注入 `dataModel.set`、`actions`、DOM、网络、浏览器存储或计时器能力。
 - Renderer 第一版使用主线程 SES，不能阻止死循环；脚本应保持为可信简单逻辑。
 
 样式脚本第一版只允许出现在受控样式白名单字段上，例如 `style.color.script`：
@@ -163,15 +164,19 @@ Frontend 负责监听并转发 Renderer action/error，Backend 负责记录，Ag
 
 ## 5. Basic Catalog
 
-当前 Renderer 已实现的基础组件包括：
+当前 Basic Catalog 共 21 个组件（与 `packages/shared/src/a2ui.ts` 的 `BASIC_CATALOG_COMPONENTS` 一致）：
 
 - `Text`
 - `Image`
 - `Icon`
 - `Video`
 - `AudioPlayer`
+- `Divider`
 - `Row`
 - `Column`
+- `Grid`
+- `Container`
+- `Spacer`
 - `List`
 - `Card`
 - `Tabs`
@@ -182,7 +187,6 @@ Frontend 负责监听并转发 Renderer action/error，Backend 负责记录，Ag
 - `ChoicePicker`
 - `Slider`
 - `DateTimeInput`
-- `Divider`
 
 注意：
 

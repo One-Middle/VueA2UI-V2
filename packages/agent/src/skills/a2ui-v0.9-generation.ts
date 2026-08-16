@@ -31,54 +31,6 @@ export const A2UI_GENERATION_SKILL_DESCRIPTION =
 const BASIC_CATALOG_ID =
   "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json";
 
-const svgDataUri = (svg: string): string =>
-  `data:image/svg+xml,${encodeURIComponent(svg)}`;
-
-// NOTE(skill): 以下 SVG 与 renderer-capability-demo/src/cases.ts 保持同步。
-const LIVE_COMMERCE_COVER = svgDataUri(`
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 520">
-  <defs><linearGradient id="w" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#dff7d4"/><stop offset="1" stop-color="#f8fafc"/></linearGradient><linearGradient id="c" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#d7b47a"/><stop offset="1" stop-color="#f4d99d"/></linearGradient><filter id="b"><feGaussianBlur stdDeviation="18"/></filter></defs>
-  <rect width="720" height="520" fill="#efe6d2"/>
-  <rect x="420" y="24" width="164" height="216" rx="8" fill="url(#w)"/>
-  <path d="M444 36v190M484 36v190M524 36v190M564 36v190M430 96h144M430 156h144" stroke="#b7d8a9" stroke-width="5" opacity="0.55"/>
-  <rect x="32" y="70" width="214" height="142" rx="12" fill="#baa37f"/>
-  <rect x="52" y="92" width="48" height="34" rx="4" fill="#f8fafc" opacity="0.65"/>
-  <rect x="112" y="92" width="46" height="34" rx="4" fill="#f8fafc" opacity="0.58"/>
-  <rect x="170" y="92" width="42" height="34" rx="4" fill="#f8fafc" opacity="0.5"/>
-  <circle cx="286" cy="116" r="34" fill="#efe9dc" stroke="#9c8b70" stroke-width="5"/>
-  <path d="M286 96v22l17 12" stroke="#766853" stroke-width="5" fill="none" stroke-linecap="round"/>
-  <path d="M342 76h38v92h-38z" fill="#f2f6ef"/><path d="M360 76v-38" stroke="#415349" stroke-width="7" stroke-linecap="round"/>
-  <path d="M330 118c28-22 62-22 88 0" fill="#6d8472"/>
-  <rect x="0" y="314" width="720" height="118" fill="url(#c)"/>
-  <rect x="0" y="432" width="720" height="88" fill="#7a6b54" opacity="0.78"/>
-  <ellipse cx="362" cy="374" rx="250" ry="48" fill="#efe1bd" opacity="0.5" filter="url(#b)"/>
-  <path d="M320 170c48-24 104 4 108 62l6 100h-158l8-102c3-27 15-47 36-60z" fill="#f8fafc"/>
-  <path d="M300 214c-38 36-56 78-50 126" stroke="#f8fafc" stroke-width="32" stroke-linecap="round"/>
-  <path d="M428 224c36 30 52 64 56 106" stroke="#f8fafc" stroke-width="32" stroke-linecap="round"/>
-  <circle cx="356" cy="142" r="42" fill="#e6b28a"/>
-  <path d="M318 134c8-44 76-52 96-9-20 4-42 2-62-7-10 13-21 18-34 16z" fill="#172121"/>
-  <path d="M334 178c18 14 42 14 58 0" stroke="#b98060" stroke-width="5" fill="none" stroke-linecap="round"/>
-  <path d="M224 336c50-34 112-36 164 0" fill="#d4b87e"/>
-  <circle cx="258" cy="320" r="18" fill="#6aa84f"/><circle cx="290" cy="312" r="20" fill="#9ac36b"/><circle cx="326" cy="320" r="18" fill="#6aa84f"/>
-  <rect x="458" y="320" width="78" height="52" rx="10" fill="#f7f7f2" stroke="#c7bfa8" stroke-width="4"/>
-  <rect x="538" y="322" width="72" height="46" rx="22" fill="#f2c2b8"/>
-  <rect x="268" y="250" width="124" height="38" rx="10" transform="rotate(12 330 269)" fill="#ffffff"/>
-  <rect x="276" y="255" width="50" height="28" rx="5" transform="rotate(12 301 269)" fill="#d71920"/>
-  <rect x="332" y="262" width="46" height="12" rx="3" transform="rotate(12 355 268)" fill="#93c47d"/>
-</svg>`);
-
-const WATER_THUMB = svgDataUri(`
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160">
-  <rect width="160" height="160" rx="18" fill="#f8fafc"/>
-  <rect x="26" y="70" width="82" height="56" rx="8" fill="#ffffff" stroke="#e5e7eb" stroke-width="4"/>
-  <rect x="30" y="82" width="74" height="26" rx="4" fill="#d71920"/>
-  <text x="39" y="101" fill="#ffffff" font-family="Arial, sans-serif" font-size="16" font-weight="700">山泉</text>
-  <rect x="92" y="34" width="34" height="94" rx="9" fill="#e0f2fe" stroke="#93c5fd" stroke-width="4"/>
-  <rect x="96" y="62" width="26" height="28" rx="4" fill="#d71920"/>
-  <rect x="98" y="24" width="22" height="14" rx="4" fill="#ef4444"/>
-  <circle cx="42" cy="55" r="14" fill="#22c55e"/><circle cx="64" cy="48" r="18" fill="#84cc16"/>
-</svg>`);
-
 /** A2UI v0.9 基础生成 Skill 的完整 Markdown 内容。 */
 export const A2UI_GENERATION_SKILL_CONTENT = [
   "# A2UI v0.9 组件消息生成",
@@ -96,18 +48,23 @@ export const A2UI_GENERATION_SKILL_CONTENT = [
   "",
   "如果用户只是聊天、解释或询问，并没有要求创建或修改 UI，则 a2uiMessages 必须是空数组 []。",
   "",
-  "## 2. 使用范围",
+  "## 2. 必须先请求的 Reference",
+  "",
+  "- 生成、修改或修复 A2UI UI 前，必须先请求 `a2ui-generation-standards`。",
+  "- 复杂 UI、视觉质量要求高或需要标杆示例时，再请求 `high-quality-a2ui-good-cases`。",
+  "",
+  "## 3. 使用范围",
   "",
   "本 Skill 描述 A2UI v0.9 组件消息的生成约束和质量标准。",
   "",
-  "## 3. 最小硬性规则",
+  "## 4. 最小硬性规则",
   "",
   "- 最终 a2uiMessages 只能包含 A2UI v0.9 server-to-client 消息。",
   "- 新 UI 必须按 createSurface -> updateDataModel（如需要）-> updateComponents 的顺序输出。",
   `- createSurface.catalogId 使用 ${BASIC_CATALOG_ID}，surfaceId 固定使用 "main"。`,
   "- 每个组件对象必须包含 id 和 component；必须存在 id 为 root 的根组件。",
   "- A2UI 使用邻接表：child/children/tabItems.child 只能引用组件 id 字符串，不要嵌套组件对象。",
-  "- 动态数据使用 JSON Pointer：{ \"path\": \"/some/data/path\" }；重复内容优先使用 dataModel 数组 + List 模板。",
+  "- 动态数据使用 DataContext 作用域路径：模板外优先用绝对 path，如 { \"path\": \"/some/data/path\" }；List/Grid 模板内可用相对 path，如 { \"path\": \"title\" }；重复内容优先使用 dataModel 数组 + List 模板。",
   "- Button.action 只能使用 action.event 或 action.script；需要本地状态写回时才使用 action.script。",
   "- 受限 JSRuntime 不是浏览器 JavaScript，不能访问 DOM、window、document、fetch、网络、定时器、import、async/await、eval 或外部 API。",
   "- 禁止生成任意 HTML、CSS、className、innerHTML、onClick/onChange 等浏览器字段。",
@@ -156,20 +113,21 @@ const A2UI_GENERATION_STANDARDS_REFERENCE: SkillReference = {
     "- 静态一次性文案可以直接写入组件字段。",
     "- 列表、筛选、收藏、播放状态、表单输入、进度、统计、选中项、批量操作结果必须进入 dataModel。",
     "- dataModel 的根路径使用业务域名聚合，例如 /player、/song、/finance、/todo。",
-    "- List 模板内使用相对 path，如 { \"path\": \"title\" }；模板外使用绝对 path，如 { \"path\": \"/finance/headline\" }。",
+    "- List/Grid 动态模板内使用相对 path，如 { \"path\": \"title\" }；模板外使用绝对 path，如 { \"path\": \"/finance/headline\" }。",
+    "- 属性 script 与 action.script 中的 dataModel.get/set 路径、deps 路径同样使用 DataContext 作用域：以 / 开头为绝对路径，不以 / 开头为当前组件 basePath 下的相对路径。",
     "- 需要从状态派生文案、图标、按钮 label 或统计值时，用属性 script；不要手动维护多份容易不一致的静态字段。",
     "",
     "## 4. 交互和 action 标准",
     "",
     "- 只需要通知宿主的操作，使用 action.event。",
     "- 需要点击后先修改本地 dataModel，再通知宿主的操作，使用 action.script。",
-    "- action.script 只能执行短小、同步、确定性的逻辑；通过 dataModel.get 读取，通过 dataModel.set 写入 JSON-compatible 值，通过 actions.emit 派发事件。",
+    "- action.script 只能执行短小、同步、确定性的逻辑；通过 dataModel.get 读取，通过 dataModel.set 写入 JSON-compatible 值，通过 actions.emit 派发事件；在 List/Grid item 模板内可用 dataModel.get('done') 读取当前 item 字段。",
     "- List 模板中的按钮如需知道当前 item，使用 action.script.context 传入 { path: \"id\" } 等相对绑定。",
     "- 按钮不能只有视觉外观；可点击业务按钮必须有 action.event 或 action.script。",
     "",
     "## 5. JSRuntime 安全边界",
     "",
-    "- 属性 script 必须显式 return，必须声明 deps，必须提供 fallback。",
+    "- 属性 script 必须显式 return，必须声明 deps，必须提供 fallback；List/Grid item 模板内 deps 可使用相对路径，如 deps: [\"done\"]。",
     "- 属性 script 只能读取 dataModel，不要写入 dataModel。",
     "- Button.action.script 可以读取和写入 dataModel，但仍然不能访问 DOM、window、document、fetch、网络、定时器、import、async/await、eval、Function、Promise 或外部 API。",
     "- 不要生成 <script>、javascript:、HTML 字符串、onClick、onInput、onChange、innerHTML、className 或 css 字段。",
@@ -434,7 +392,7 @@ function buildHighQualityA2UIGoodCasesReference(): SkillReference {
     JSON.stringify(buildA2UIMessages(WORK_BOARD_DATA_MODEL, WORK_BOARD_COMPONENTS), null, 2),
     "```",
     "",
-    "为什么好——架构层面：草稿输入和任务列表放入 dataModel；顶部 3 列 Grid 指标卡通过属性 script 从 /todo/items 数组派生统计值；TextField 绑定可编辑 draft；List 模板渲染任务卡；CheckBox 写回 item 状态；新增和清理按钮使用 action.script 做本地数组更新并回传事件。",
+    "为什么好——架构层面：草稿输入和任务列表放入 dataModel；顶部 3 列 Grid 指标卡通过属性 script 从 /todo/items 数组派生统计值；TextField 绑定可编辑 draft；List 模板渲染任务卡；CheckBox 写回 item 状态；item 内属性 script 使用 dataModel.get('done') 和 deps: [\"done\"] 读取当前项；新增和清理按钮使用 action.script 做本地数组更新并回传事件。",
     "",
     "为什么好——视觉层面：整体浅色背景（#f8fafc）+ 白色卡片（backgroundColor: \"#ffffff\", borderRadius: \"12px\", shadow: \"sm\"）；顶部统计区用三色指标卡——紫色（#f5f3ff）表总数、琥珀色（#fffbeb）表进行中、绿色（#f0fdf4）表已完成；数值用对应颜色 fontWeight: \"800\" + usageHint: \"h4\"；添加按钮用 backgroundColor: \"#7c3aed\" 品牌紫强调主操作；底部操作区用 borderTop 分隔线区分层级；列表项用 borderRadius: \"8px\" 微圆角保持清爽。",
   ].join("\n"),
@@ -476,7 +434,7 @@ const LIVE_COMMERCE_DATA_MODEL: JsonObject = {
     cta: "去逛逛",
     viewers: "3000+",
     likes: "1444",
-    cover: LIVE_COMMERCE_COVER,
+    cover: "mock://live-commerce/cover",
   },
   product: {
     sku: "spring-water-5l-4",
@@ -487,7 +445,7 @@ const LIVE_COMMERCE_DATA_MODEL: JsonObject = {
     subsidy: "补贴价",
     sales: "已售3万+",
     benefit: "淘宝秒杀 直降9.6元",
-    thumbnail: WATER_THUMB,
+    thumbnail: "mock://product/water-thumb",
   },
 };
 

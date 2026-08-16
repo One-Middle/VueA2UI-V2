@@ -23,7 +23,7 @@ import type { JsonObject, JsonValue } from "@a2ui-platform/shared";
 import { JsRuntimeError } from "../errors";
 import { isJsonObject, isJsonValue, validateJsonValue } from "../json";
 import type { JSRuntime, RunActionScriptInput, RunPropertyScriptInput } from "../types";
-import { validateActionScript, validateJsonPointer, validatePropertyScript } from "../validation";
+import { validateActionScript, validateScriptDataPath, validatePropertyScript } from "../validation";
 
 let isInitialized = false;
 
@@ -42,7 +42,7 @@ export class SesJsRuntime implements JSRuntime {
     const compartment = new Compartment({
       globals: harden({
         dataModel: harden({
-          get: (path: string) => input.dataModel.get(validateJsonPointer(path)),
+          get: (path: string) => input.dataContext.dataModel.get(resolveScriptPath(input, path)),
         }),
       }),
       __options__: true,
@@ -65,10 +65,10 @@ export class SesJsRuntime implements JSRuntime {
     const compartment = new Compartment({
       globals: harden({
         dataModel: harden({
-          get: (path: string) => input.dataModel.get(validateJsonPointer(path)),
+          get: (path: string) => input.dataContext.dataModel.get(resolveScriptPath(input, path)),
           set: (path: string, value: unknown) => {
             const safeValue = validateJsonValue(value);
-            input.dataModel.set(validateJsonPointer(path), safeValue);
+            input.dataContext.dataModel.set(resolveScriptPath(input, path), safeValue);
           },
         }),
         actions: harden({
@@ -89,6 +89,10 @@ export class SesJsRuntime implements JSRuntime {
 
     compartment.evaluate(wrapScript(input.script.code));
   }
+}
+
+function resolveScriptPath(input: RunPropertyScriptInput | RunActionScriptInput, path: unknown): string {
+  return input.dataContext.resolvePath(validateScriptDataPath(path));
 }
 
 function wrapScript(code: string): string {

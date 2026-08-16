@@ -13,7 +13,7 @@
 - WorkflowService gate 只消费 Parsed Agent Result。
 - `clarification_request` 写入 `clarification_form` artifact，并将 plan step 置为 `awaiting_confirmation + awaiting_clarification`。
 - `plan_markdown + decision_form` 写入 `plan_markdown` 和 `decision_form` artifacts，并将 plan step 置为 `awaiting_confirmation + awaiting_plan_confirmation`。
-- Markdown plan 必须通过最低标题校验。
+- Markdown plan 必须通过 Agent Runtime 的最低标题校验。
 
 ## Acceptance Criteria
 
@@ -21,7 +21,7 @@
 - [x] Agent 请求澄清时不创建独立 `clarify` step。
 - [x] Agent 输出 plan 时不创建独立 `confirm_plan` step。
 - [x] `plan` 阶段不允许生成或保存 A2UI messages。
-- [x] `plan_markdown` 必须包含：页面目标、布局结构、组件清单、Data Model、交互行为、假设、风险。
+- [x] `plan_markdown` 必须包含：页面目标、视觉效果、页面结构、界面元素、数据语义、交互行为。
 - [x] 如果 Agent 未调用 `askUserDecision`，plan step 不能进入 `awaiting_plan_confirmation`。
 - [x] Agent failure、parse failure 或 gate violation 会让当前 step failed，并展示失败原因。
 

@@ -90,6 +90,7 @@ packages/backend/
       skill.repository.ts
       surface-snapshot.repository.ts
       tool-call.repository.ts
+      workflow.repository.ts
     scripts/
       repair-current-snapshots.ts
       sync-builtin-skills.ts
@@ -111,8 +112,9 @@ packages/backend/
 | `src/routes/*.ts` | 参数和 body 校验层，转发到 service。 |
 | `src/services/agent-run.service.ts` | Agent run 核心编排，负责调用 Agent、提交结果、失败处理和 SSE 推送。 |
 | `src/services/message.service.ts` | 保存用户消息，并根据消息意图触发 Agent run 或推进 Agent Workflow。 |
-| `src/services/workflow.service.ts` | 编排 Agent Workflow、WorkflowStageGate、step 状态和 artifact 版本。 |
-| `src/routes/workflows.ts` | 查询 workflow timeline，并接收 `confirm_plan` 等 workflow action。 |
+| `src/services/workflow.service.ts` | 编排 Agent Workflow 全流程：创建 workflow、plan / generate_a2ui / validate / preview / commit step 推进、artifact 版本、失败重试，并调用 `runWorkflowTask` 执行 ReAct task、回写 Resource Ledger。 |
+| `src/routes/workflows.ts` | 查询 workflow timeline / 详情，并接收 `submit_clarification`、`submit_decision`、`retry_step`、`cancel` 等 workflow action。 |
+| `src/repositories/workflow.repository.ts` | AgentWorkflow / WorkflowStep / WorkflowArtifact 三张表的数据访问层。 |
 | `src/services/snapshot.service.ts` | 从 committed A2UI events 回放生成 surface snapshot。 |
 | `src/services/skill-resolver.service.ts` | 合并 session 启用 Skill 和平台默认 Skill，供 Agent 输入使用。 |
 | `src/services/skill.service.ts` | Skill CRUD、Reference metadata、会话启用关系和内置 Skill upsert。 |
@@ -129,8 +131,9 @@ packages/backend/
 | 路由文件 | 主要能力 |
 | --- | --- |
 | `routes/sessions.ts` | 会话创建、列表、详情、更新、软删除。 |
-| `routes/messages.ts` | 消息列表、发送用户消息并触发 Agent run。 |
-| `routes/agent-runs.ts` | Agent run 列表和详情，详情包含 tool calls、assistant message、相关 A2UI events。 |
+| `routes/messages.ts` | 消息列表、发送用户消息并按 UI 生成意图触发 workflow 或 Agent run。 |
+| `routes/agent-runs.ts` | Agent run 列表和详情，详情包含 tool calls、assistant message、相关 A2UI events 和 ReAct trace summary。 |
+| `routes/workflows.ts` | workflow 历史/详情查询，以及 workflow action 提交。 |
 | `routes/files.ts` | `.txt` 文件上传、列表、详情和删除。 |
 | `routes/skills.ts` | Skill CRUD、会话启用和禁用。 |
 | `routes/a2ui.ts` | A2UI events、surface snapshots 和 current snapshot 查询。 |
@@ -147,27 +150,31 @@ packages/backend/
 
 ## 7. Agent run 提交流程
 
-1. `messages` 路由接收用户消息。
-2. `MessageService` 保存 user message，并先检查当前 session 是否存在 active Agent Workflow。
-3. 如果存在 active Agent Workflow，消息会关联到该 workflow，暂不创建新的 Agent run。
-4. 如果 active workflow 当前停在 `confirm_plan`，用户自然语言消息会作为 `requestPlanRevision()` 进入 WorkflowStageGate：旧 plan 保留，新 revision 生成新版 plan 或 clarification form。
-5. 如果不存在 active Agent Workflow，`MessageService` 根据 intent 和消息内容判断是否启动新的 Agent Workflow。
-6. 新 workflow 会立即进入 `startInitialPlanning()`：先创建 `understand` step，再按需求完整度进入 `clarify` 或 `propose` + `confirm_plan`。
-7. `confirm_plan` action 会创建用户可见确认 message，确认 plan，并创建 `generate_a2ui` step。
-8. `AgentRunService.startWorkflowCandidateRun()` 创建 workflow-scoped Agent run，异步调用 Runtime 生成 Candidate A2UI。
-9. Candidate run 成功时只保存 `candidate_a2ui_messages` artifact 并进入 `preview`，失败时保存 `validation_report` artifact。
-10. Candidate run 不调用 `commitRun()`，因此不会创建正式 A2UI event 或 current snapshot。
-11. `confirm_commit` action 会校验当前 `preview` step 和已验证 candidate artifact，然后把 exact stored candidate messages 提交为正式 A2UI event 和 current snapshot。
-12. 提交完成后，workflow 以 `completed` + `committed` 结束，并在 metadata 中记录确认 message、candidate artifact、A2UI event、snapshot 和 assistant message。
-13. 普通非 workflow 消息沿用旧路径，创建 pending Agent run。
-14. `AgentRunService.executeRun()` 将 run 标记为 running，并推送 `agent_run_started`。
-15. 后端读取 current snapshot、最近 20 条消息、ready 文件内容和已解析 Skill。
-16. 后端调用 `createAgentRuntime(config).run(input, onToolCall)`。
-17. Runtime 回传工具调用时，后端写入 `toolCall` 并推送 `agent_run_attempt`。
-18. `COMMITTED` 结果进入同一个 Prisma transaction，创建 assistant message、A2UI event、current snapshot，并更新 run/session。
-19. 在 `commitRun()` 的 Prisma transaction callback 内完成写入、DTO 组装和 `assistant_message`、`a2ui_messages`、`surface_snapshot`、`agent_run_completed` 推送。
-20. `TEXT_ONLY` 只创建 assistant message 和 committed run，不创建 A2UI event 或 snapshot。
-21. `FAILED` 创建 `validation_error` assistant message，标记 run failed，并推送 `agent_run_failed`。
+### 7.1 Agent Workflow 流程
+
+1. `MessageService.createUserMessageAndAgentRun` 收到用户消息，先检查 session 是否已有 active workflow；否则用 UI 生成意图正则或前端 `intent` 判断是否新建 workflow。
+2. 新建 workflow 后立即 `startInitialPlanning()`：创建一个 `plan` step，通过 `runWorkflowTask(task="plan")` 用 ReAct 循环生成 clarification form 或 Markdown plan + decision form。
+3. 若返回 clarification form，step 进入 `awaiting_confirmation + awaiting_clarification`，保存 `clarification_form` artifact。
+4. 若返回 plan，step 进入 `awaiting_confirmation + awaiting_plan_confirmation`，保存 `plan_markdown` 与 `decision_form` artifact（decision 回填 `targetArtifactId`）。
+5. `submit_clarification` action 重新运行 `task="plan"`（带 `clarificationAnswers`），生成新版 plan 或 clarification。
+6. `submit_decision` 在 `plan + awaiting_plan_confirmation` 下：`confirm` 完成 plan 并创建 `generate_a2ui` step；`revise` 走 `requestPlanRevision()` 生成新版 plan；`reject` 停留。
+7. `executeGenerateA2UI()` 通过 `runWorkflowTask(task="generate_a2ui")` 生成 candidate，然后在独立的 `validate` step 里用后端 `validateA2UI` 二次校验，保存 `validation_report` artifact。
+8. 校验通过后保存 `candidate_a2ui_messages` artifact，并 `createPreviewDecision()` 用 `runWorkflowTask(task="preview_decision")` 生成 decision form，进入 `preview + awaiting_preview_confirmation`。
+9. `submit_decision` 在 `preview + awaiting_preview_confirmation` 下：`confirm` 走 `confirmCandidateCommit()` + `commitExactCandidate()` 提交 exact stored candidate；`revise` 走 `requestPreviewRevision()` 回到新的 `plan` 轮次（旧 candidate 标记 `invalidated`）。
+10. `commitExactCandidate()` 在单个 Prisma 事务内创建 assistant message、A2UI event、current snapshot，完成 commit step 和 workflow。
+11. `retry_step` 只支持重试最新失败的 `generate_a2ui` step，创建新 `generate_a2ui` step 并复用已确认 plan 重新生成。
+12. 每个 workflow task 通过 `runWorkflowTask` 的第三个回调把 ReAct trace 事件转发为 `agent_trace_event` SSE；trace summary 写入 `agent_runs.metadata.traceSummary`，Resource Ledger snapshot 写回 `agent_workflows.metadata.resourceLedger`。
+
+### 7.2 普通 Agent Run 流程
+
+1. 非 workflow 消息创建 pending Agent run。
+2. `AgentRunService.executeRun()` 将 run 标记为 running，并推送 `agent_run_started`。
+3. 后端读取 current snapshot、最近 20 条消息、ready 文件内容和已解析 Skill。
+4. 后端调用 `createAgentRuntime(config).run(input, onToolCall)`。
+5. Runtime 回传工具调用时，后端写入 `toolCall` 并推送 `agent_run_attempt`。
+6. `COMMITTED` 结果进入同一个 Prisma transaction，创建 assistant message、A2UI event、current snapshot，并更新 run/session，推送 `assistant_message`、`a2ui_messages`、`surface_snapshot`、`agent_run_completed`。
+7. `TEXT_ONLY` 只创建 assistant message 和 committed run，不创建 A2UI event 或 snapshot。
+8. `FAILED` 创建 `validation_error` assistant message，标记 run failed，并推送 `agent_run_failed`。
 
 ## 8. 事务与一致性约束
 
@@ -175,6 +182,7 @@ packages/backend/
 - current snapshot 通过 `surfaceSnapshotRepository.unsetCurrent()` 后写入新 current snapshot。
 - 当前 SSE 推送位于写入流程之后、同一个 transaction callback 内；维护时不要把推送提前到 message、event、snapshot 写入之前。
 - Agent 失败和 TEXT_ONLY 都不应更新 Renderer 正式状态。
+- workflow 的 candidate 会被校验两次：先由 ReAct executor 的 `finalizeDraft` 强制 `validateA2UI`，再在 backend 的 `validate` step 里二次校验；两处共用同一 `validateA2UI` 工具。
 
 ## 9. 测试与验收
 
@@ -193,6 +201,11 @@ packages/backend/
 - 修改 Agent 编排时，同步更新 Agent 和 Integration 文档。
 - 修改 SSE 事件时，同步更新 Shared `sse.ts`、Frontend `stream.ts` 和 Runtime 面板展示。
 - 修改 Skill 解析或内置 Skill 同步时，同步检查 Agent `registry.ts` 和 `platform-skills.ts`。
+
+已知差异：
+
+- `agent-run.service.ts` 中的 `startWorkflowCandidateRun` / `executeWorkflowCandidateRun` / `commitWorkflowCandidate`，以及 `workflow.service.ts` 中的 `recordCandidateSuccess` / `recordCandidateFailure` / `confirmPlan`，是旧 async candidate run 路径与旧 `confirm_plan` 模型的遗留代码，当前路由已不再调用；candidate 生成统一走 `workflowService.executeGenerateA2UI()`。
+- 普通 Agent run 的 `run()` 与 workflow task 的 `runWorkflowTask()` 共用 `buildAgentInput`，但后者额外携带 `gate` / `stepType` / `stageState` / `task` / `availableTools` 等 workflow 上下文。
 
 ## 11. 相关文档
 

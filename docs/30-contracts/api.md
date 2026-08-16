@@ -29,7 +29,8 @@
 ### Runtime
 
 - `GET /api/runtime/config`
-- `PATCH /api/runtime/config`
+
+> `PATCH /api/runtime/config` 已在 `packages/shared/src/api.ts` 与前端 `api.ts` 中声明，但后端当前只实现了 `GET`，`PATCH` 尚未落地。
 
 ### Sessions
 
@@ -37,6 +38,7 @@
 - `GET /api/sessions`
 - `GET /api/sessions/:sessionId`
 - `PATCH /api/sessions/:sessionId`
+- `DELETE /api/sessions/:sessionId`（软删除）
 
 ### Messages 与 Agent Runs
 
@@ -49,19 +51,19 @@
 
 Workflow DTO 与 action 契约由 `packages/shared/src/api.ts` 维护。
 
-> 状态：planned。以下为新 Agent Workflow 目标 API 契约，当前代码仍在迁移中。
-
 - `GET /api/sessions/:sessionId/workflows`
 - `GET /api/sessions/:sessionId/workflows/:workflowId`
 - `POST /api/sessions/:sessionId/workflow/actions`
 
 `MessageDto` 和 `AgentRunDto` 包含可选 `workflowId` 与 `workflowStepId`，用于把用户可见消息、模型运行记录和 workflow timeline 串起来。
 
-目标 workflow 阶段：
+workflow 阶段：
 
 ```text
 plan -> generate_a2ui -> validate -> preview -> commit
 ```
+
+workflow 的启动由 `POST /api/sessions/:sessionId/messages` 触发：`MessageService` 通过 UI 生成意图正则（`a2ui|ui|页面|界面|组件|生成|创建|修改|调整|改成|预览` 等）或前端传入的 `intent` 判断是否需要创建新 workflow。`SendMessageResponse.workflow` 返回触发或推进的 workflow 摘要。
 
 `WorkflowStepDto.stageState` 是 API DTO 字段，用于表达阶段内等待态：
 
@@ -70,12 +72,14 @@ plan -> generate_a2ui -> validate -> preview -> commit
 - `awaiting_preview_confirmation`
 - `null`
 
-`POST /api/sessions/:sessionId/workflow/actions` 目标 action：
+`POST /api/sessions/:sessionId/workflow/actions` 支持的 action：
 
 - `submit_clarification`
 - `submit_decision`
 - `retry_step`
 - `cancel`
+
+`retry_step` 当前只支持重试最新的失败 `generate_a2ui` step，通过创建新的 `generate_a2ui` step 并复用已确认 plan 重新生成 candidate。
 
 `submit_clarification`：
 
@@ -123,7 +127,7 @@ plan -> generate_a2ui -> validate -> preview -> commit
 artifact 输出规则：
 
 - `clarification_form` 由 Agent 调用 `askClarification` 后生成。
-- `plan_markdown` 由 Agent 生成，并必须通过 Markdown 最低校验。
+- `plan_markdown` 由 Agent 生成，并由 Agent Runtime 按页面目标、视觉效果、页面结构、界面元素、数据语义、交互行为执行 Markdown 最低标题校验。
 - `decision_form` 由 Agent 调用 `askUserDecision` 后生成，只在工具实际调用时展示为特殊 UI block。
 - `candidate_a2ui_messages` 只在 `validate` 通过后保存。
 - `validation_report` 在 validate 成功或失败时都可以保存；失败时不得保存 candidate artifact。
@@ -179,6 +183,7 @@ SSE 事件类型由 `packages/shared/src/sse.ts` 维护。当前核心事件包�
 - `surface_snapshot`
 - `agent_run_completed`
 - `agent_run_failed`
+- `agent_trace_event`
 - `workflow_started`
 - `workflow_step_updated`
 - `workflow_artifact_created`
@@ -200,4 +205,3 @@ SSE 事件类型由 `packages/shared/src/sse.ts` 维护。当前核心事件包�
 - 新增或修改接口时，先更新 `packages/shared/src/api.ts`，再更新后端路由和本文档。
 - 新增或修改 SSE 事件时，先更新 `packages/shared/src/sse.ts`，再更新后端推送和前端消费逻辑。
 - API 文档只描述跨模块契约，不复制后端 service 内部实现。
-

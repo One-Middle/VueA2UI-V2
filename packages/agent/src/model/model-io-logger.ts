@@ -170,7 +170,7 @@ export function startModelIOTrace(input: {
         result: { response, durationMs },
       });
       writeAgentIoDump({
-        sessionId: traceContext.sessionId,
+        runId: traceContext.agentRunId ?? traceContext.sessionId,
         model: input.model,
         messages: input.messages,
         output: response.content,
@@ -186,7 +186,7 @@ export function startModelIOTrace(input: {
         result: { error, durationMs },
       });
       writeAgentIoDump({
-        sessionId: traceContext.sessionId,
+        runId: traceContext.agentRunId ?? traceContext.sessionId,
         model: input.model,
         messages: input.messages,
         output: null,
@@ -244,12 +244,12 @@ export function isAgentIoDumpEnabled(raw = process.env.AGENT_ROUND_DUMP): boolea
 }
 
 /**
- * 每次模型调用完成后，把原始 messages 与原始回复追写一段到会话级纯文本文件。
+ * 每次模型调用完成后，把原始 messages 与原始回复追写一段到纯文本文件。
  *
  * 注意：只做原样记录与基础密钥脱敏，不做统计或截断；写文件失败只告警，不影响模型调用主流程。
  */
 function writeAgentIoDump(input: {
-  sessionId: string | null;
+  runId: string | null;
   model: string;
   messages: ChatMessage[];
   output: string | null;
@@ -258,7 +258,7 @@ function writeAgentIoDump(input: {
   if (!isAgentIoDumpEnabled()) return;
 
   safeRun(() => {
-    const filePath = getAgentIoDumpFilePath(input.sessionId);
+    const filePath = getAgentIoDumpFilePath(input.runId);
     mkdirSync(dirname(filePath), { recursive: true });
     appendFileSync(filePath, formatAgentIoDumpText(input), "utf8");
     console.log(`◆ [AGENT_ROUND_DUMP] appended -> ${filePath}`);
@@ -304,11 +304,35 @@ function formatLocalTimestamp(): string {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
 }
 
-/** 计算会话级 dump 文件路径：logs/agent-io/<sessionId>.txt。 */
-function getAgentIoDumpFilePath(sessionId: string | null): string {
+/** 缓存分组键 -> 文件路径，保证同一次生成追写到同一文件。 */
+const dumpFileByGroup = new Map<string, string>();
+
+/**
+ * 计算 dump 文件路径：logs/agent-io/<生成时间戳>.txt。
+ *
+ * 同一次生成（runId 或 sessionId 相同）复用同一文件，文件名取首次写入时的本地时间。
+ */
+function getAgentIoDumpFilePath(groupKey: string | null): string {
   const root = findWorkspaceRoot(process.cwd());
-  const safe = sessionId ?? "unknown";
-  return join(root, "logs", "agent-io", `${safe}.txt`);
+
+  if (groupKey) {
+    const cached = dumpFileByGroup.get(groupKey);
+    if (cached) return cached;
+  }
+
+  const filePath = join(root, "logs", "agent-io", `${formatFileTimestamp()}.txt`);
+  if (groupKey) {
+    dumpFileByGroup.set(groupKey, filePath);
+  }
+  return filePath;
+}
+
+/** 生成文件名时间戳（YYYY-MM-DD_HH-mm-ss-SSS），含毫秒避免同秒多次生成冲突。 */
+function formatFileTimestamp(): string {
+  const now = new Date();
+  const pad = (n: number): string => String(n).padStart(2, "0");
+  const ms = String(now.getMilliseconds()).padStart(3, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}-${ms}`;
 }
 
 function logRequestSummary(input: {

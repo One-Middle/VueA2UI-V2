@@ -3,7 +3,7 @@
  *
  * 职责：
  * - 校验属性脚本和动作脚本声明结构
- * - 校验脚本长度、同步限制和 dataModel JSON Pointer 路径
+ * - 校验脚本长度、同步限制和 dataModel 作用域路径
  *
  * 不负责：
  * - 做执行路径专属安全检查，例如 new Function 的 AST guard
@@ -46,7 +46,7 @@ export function validatePropertyScript(script: PropertyScriptDeclaration): void 
   if (!Array.isArray(script.deps) || script.deps.length === 0 || script.deps.length > MAX_SCRIPT_DEPS) {
     throw new JsRuntimeError("SCRIPT_DEPS_INVALID", "属性脚本 deps 必须包含 1 到 32 个路径。");
   }
-  script.deps.forEach(validateJsonPointer);
+  script.deps.forEach(validateScriptDataPath);
 }
 
 /** 校验动作脚本声明。 */
@@ -56,7 +56,7 @@ export function validateActionScript(script: ActionScriptDeclaration): void {
     if (!Array.isArray(script.deps) || script.deps.length > MAX_SCRIPT_DEPS) {
       throw new JsRuntimeError("SCRIPT_DEPS_INVALID", "动作脚本 deps 最多允许 32 个路径。");
     }
-    script.deps.forEach(validateJsonPointer);
+    script.deps.forEach(validateScriptDataPath);
   }
 }
 
@@ -69,6 +69,14 @@ export function getPropertyScriptFallback(script: PropertyScriptDeclaration) {
 export function validateJsonPointer(path: unknown): string {
   if (typeof path !== "string" || (path !== "/" && !path.startsWith("/"))) {
     throw new JsRuntimeError("SCRIPT_DEP_INVALID", "dataModel 路径必须是 JSON Pointer 字符串。");
+  }
+  return path;
+}
+
+/** 校验脚本声明中的 dataModel 路径；允许相对路径，由调用方按 DataContext 解析。 */
+export function validateScriptDataPath(path: unknown): string {
+  if (typeof path !== "string" || path.length === 0) {
+    throw new JsRuntimeError("SCRIPT_DEP_INVALID", "dataModel 路径必须是非空字符串。");
   }
   return path;
 }

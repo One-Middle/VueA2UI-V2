@@ -30,32 +30,47 @@ Backend
 
 ## 3. 端到端成功路径
 
+Workflow 路径：
+
 ```text
 MessageInput
   -> workspace.sendMessage()
   -> POST /api/sessions/:sessionId/messages
   -> MessageService 创建 user message
-  -> 如果命中 active workflow 或 A2UI workflow intent，则关联或创建 Agent Workflow
-  -> 新 workflow 进入 understand，再进入 clarify 或 propose + confirm_plan
-  -> confirm_plan 阶段的自然语言消息作为 request_revision，保留旧 plan 并生成新版 plan 或 clarification form
-  -> confirm_plan action 创建确认 message，并启动 workflow-scoped Agent run
-  -> Runtime 使用已确认 plan、current snapshot、enabled Skills、ready files 和最近消息生成 Candidate A2UI
-  -> Candidate 校验通过后保存 candidate_a2ui_messages artifact，并进入 preview
-  -> Candidate 校验失败后保存 validation_report artifact，不创建正式 A2UI event/snapshot
-  -> confirm_commit action 提交 exact stored candidate artifact
-  -> Backend 创建正式 A2UI event + current surface snapshot，并完成 workflow
-  -> 如果是普通非 workflow 消息，则创建 agent run
+  -> 命中 active workflow 或 UI 生成 intent 时，关联或新建 Agent Workflow
+  -> startInitialPlanning() 创建 plan step
+  -> runWorkflowTask(task="plan") 执行 ReAct 循环
+  -> ReAct 产出 clarification_form 或 plan_markdown + decision_form
+  -> SSE agent_trace_event 实时回传循环进度
+  -> Frontend WorkflowPanel 展示 clarification form 或 plan + decision form
+  -> POST workflow/actions { submit_clarification | submit_decision }
+  -> submit_clarification 重新运行 task="plan"（带澄清答案）
+  -> submit_decision(confirm) 完成 plan，创建 generate_a2ui step
+  -> executeGenerateA2UI() -> runWorkflowTask(task="generate_a2ui") 生成 candidate
+  -> backend validate step 二次校验，保存 validation_report + candidate_a2ui_messages artifact
+  -> createPreviewDecision() -> runWorkflowTask(task="preview_decision") 生成 decision form
+  -> Frontend 预览 candidate（PreviewPanel + Renderer）
+  -> submit_decision(confirm) -> commitExactCandidate()
+  -> Backend 在同一事务创建 assistant message + A2UI event + current surface snapshot，完成 workflow
+  -> SSE assistant_message / a2ui_messages / surface_snapshot / workflow_completed
+  -> workspace store -> renderer store -> PreviewPanel MessageProcessor -> A2uiSurface 渲染
+```
+
+普通非 workflow 消息路径：
+
+```text
+MessageInput
+  -> workspace.sendMessage()
+  -> POST /api/sessions/:sessionId/messages
+  -> MessageService 创建 user message + pending Agent run
   -> AgentRunService.executeRun()
   -> createAgentRuntime().run()
-  -> getSkillContent / getSkillReferenceContent / getCatalogComponentDetails
+  -> 渐进披露 getSkillContent / getSkillReferenceContent / getCatalogComponentDetails
   -> validateA2UI
   -> AgentRunService.commitRun()
   -> message + A2UI event + current snapshot
   -> SSE assistant_message / a2ui_messages / surface_snapshot / agent_run_completed
-  -> workspace store
-  -> renderer store
-  -> PreviewPanel MessageProcessor
-  -> A2uiSurface 渲染
+  -> workspace store -> renderer store -> PreviewPanel MessageProcessor -> A2uiSurface 渲染
 ```
 
 ## 4. TEXT_ONLY 路径
@@ -73,6 +88,8 @@ Agent 返回 TEXT_ONLY
 
 ## 5. 失败路径
 
+普通 Agent run 失败：
+
 ```text
 模型输出解析失败或 A2UI 校验失败
   -> Agent repair prompt
@@ -84,6 +101,18 @@ Agent 返回 TEXT_ONLY
   -> Frontend 展示失败消息
   -> 不写 A2UI event / snapshot
   -> Renderer 不变
+```
+
+Workflow task 失败：
+
+```text
+ReAct 循环内模型 give_up 或达到最大迭代次数
+  -> runWorkflowTask 返回 failure ParsedAgentResult
+  -> WorkflowService 标记当前 step failed
+  -> failWorkflow(status=failed_retryable)
+  -> SSE workflow_failed
+  -> Frontend WorkflowPanel 展示失败 step 与重试入口
+  -> candidate 生成失败时保存 validation_report，不创建正式 A2UI event/snapshot
 ```
 
 ## 6. 关键集成点
@@ -98,16 +127,19 @@ Agent 返回 TEXT_ONLY
 ### Backend -> Agent
 
 - Backend 组装 `AgentRunInput`，包含用户消息、最近历史、上传文件内容、enabled skills、current snapshot、Catalog/Renderer 版本和模型配置。
+- workflow task 额外组装 `AgentWorkflowTaskInput`（gate / stepType / stageState / task / availableTools / resourceLedger / agentRunId 等）。
 - Agent 不访问数据库，也不读取任意本地路径。
-- Agent 工具调用通过 `onToolCall` 回传，Backend 写入 `toolCall` 并通过 SSE 推送 `agent_run_attempt`。
-- Backend 只提交 Agent 返回且通过 `validateA2UI` 的 A2UI messages。
+- 普通 run 的工具调用通过 `onToolCall` 回传，Backend 写入 `toolCall` 并通过 SSE 推送 `agent_run_attempt`。
+- workflow task 的 ReAct trace 通过 `onTraceEvent` 回传，Backend 转发为 `agent_trace_event` SSE。
+- Backend 只提交 Agent 返回且通过 `validateA2UI` 的 A2UI messages；workflow 路径提交 exact stored candidate artifact。
 
 ### Backend -> Frontend
 
 - SSE 事件类型由 `packages/shared/src/sse.ts` 定义。
-- 当前事件包括 `heartbeat`、`agent_run_started`、`agent_run_attempt`、`agent_run_completed`、`assistant_message`、`a2ui_messages`、`surface_snapshot`、`agent_run_failed`、`workflow_started`、`workflow_step_updated`、`workflow_artifact_created`、`workflow_completed` 和 `workflow_failed`。
+- 当前事件包括 `heartbeat`、`agent_run_started`、`agent_run_attempt`、`agent_run_completed`、`assistant_message`、`a2ui_messages`、`surface_snapshot`、`agent_run_failed`、`agent_trace_event`、`workflow_started`、`workflow_step_updated`、`workflow_artifact_created`、`workflow_completed` 和 `workflow_failed`。
 - `a2ui_messages` 和 `surface_snapshot` 只在 committed A2UI run 中出现。
-- Workflow artifact 当前用于恢复 clarification forms 和 Markdown plans；正式 preview 和 snapshot 仍等待后续 candidate/commit 阶段接入。
+- `agent_trace_event` 实时推送 ReAct 循环进度（iteration_started / model_action / tool_call / observation / final_validation）。
+- Workflow artifact（clarification form、Markdown plan、decision form、candidate、validation report）用于前端 WorkflowPanel 恢复 timeline 和交互表单。
 
 ### Frontend -> Renderer
 
@@ -143,10 +175,13 @@ Renderer 收到 `replace` 变更时会销毁旧 `SurfaceGroupModel` 状态并全
 
 - 首次输入自然语言后生成可渲染 UI。
 - A2UI workflow intent 首次输入后，会生成 clarification form 或等待确认的 Markdown plan。
-- `confirm_plan` 阶段输入自然语言修改意见，不会启动新 workflow，而是创建新版 plan 或新的 clarification form。
-- `confirm_plan` action 会启动 candidate run；成功时 workflow 进入 `preview`，并且 current snapshot 不变化。
+- `submit_clarification` 提交澄清答案后重新生成新版 plan 或新的 clarification form。
+- `submit_decision(confirm)` 在 plan 阶段会启动 candidate 生成；成功时 workflow 进入 `preview`，并且 current snapshot 不变化。
+- `submit_decision(revise)` 会生成新版 plan 或新的 clarification form，保留旧 artifact。
 - candidate generation 失败时会产生 `validation_report` artifact，不提交正式 A2UI event。
-- `confirm_commit` action 会提交已存 candidate artifact，而不是重新生成结果；提交后 current snapshot 才会变化。
+- `submit_decision(confirm)` 在 preview 阶段提交已存 candidate artifact，而不是重新生成结果；提交后 current snapshot 才会变化。
+- workflow task 运行期间，`agent_trace_event` 实时展示 ReAct 循环进度。
+- 同一 workflow 的多次 task 之间，已披露的 Skill / Reference 通过 Resource Ledger 去重，不重复注入。
 - Agent 请求 Skill、Skill Reference 或组件详情时，Runtime 面板能看到 tool calls。
 - Agent 返回 TEXT_ONLY 时，只出现文本回复，预览不变化。
 - Agent 校验失败后不提交 events 和 snapshot。

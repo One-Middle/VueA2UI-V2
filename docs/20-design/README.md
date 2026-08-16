@@ -20,6 +20,7 @@
 - API DTO。
 - SSE event 类型。
 - Agent Runtime 输入、工具调用和 Parsed Agent Result 类型。
+- Resource Ledger Snapshot 与 ReAct trace DTO 类型。
 - A2UI message 类型。
 - 其他需要跨模块共享的 TypeScript 类型。
 
@@ -38,7 +39,7 @@
 
 ## Agent Workflow 协作边界
 
-目标 workflow 阶段为：
+workflow 阶段为：
 
 ```text
 plan -> generate_a2ui -> validate -> preview -> commit
@@ -46,8 +47,9 @@ plan -> generate_a2ui -> validate -> preview -> commit
 
 职责拆分：
 
-- Agent 负责理解用户输入、生成 clarification form、Markdown plan、candidate A2UI，并在关键环节通过工具请求用户决策。
-- Agent Runtime 负责执行模型、暴露受控 AgentTool、解析 Agent Output，并产出 Parsed Agent Result。
+- Agent 负责理解用户输入、生成 clarification form、Markdown plan、candidate A2UI，并在关键环节通过工具请求用户决策。workflow task 由 ReAct 循环（think → act → observe）驱动，产出 `AgentWorkflowTaskResult`。
+- Agent Runtime 负责执行模型、暴露受控 AgentTool（6 个）、解析 Agent Output、维护 Resource Ledger，并产出 Parsed Agent Result 与 trace 摘要。
+- Resource Ledger 负责在 workflow 的多个 task 之间共享已披露的 Skill / Skill Reference，避免重复注入正文。
 - WorkflowService 负责当前阶段 gate、可见工具、状态推进、持久化 artifact、失败和重试。
 - API 只返回稳定 DTO / SSE payload，不暴露 raw Agent Output 给前端主流程。
 - Frontend 只渲染 parsed/validated artifact 和稳定 DTO。
@@ -58,6 +60,7 @@ plan -> generate_a2ui -> validate -> preview -> commit
 - `submit_clarification` 和 `submit_decision` 是 WorkflowAction，不是 AgentTool。
 - raw Agent Output 只能进入 debug metadata 摘要，例如 `rawOutputPreview`。
 - `workflow_artifacts` 只保存 parsed/validated 后的稳定产物。
+- ReAct trace 事件通过 `agent_trace_event` SSE 实时推送；持久化只保存 trace 摘要到 `agent_runs.metadata.traceSummary`。
 
 ## 端到端链路：Integration
 

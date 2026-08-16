@@ -42,6 +42,7 @@ import {
   recordSkillReferences,
   type ResourceLedger,
 } from "./resource-ledger.js";
+import { getMissingPlanHeadings } from "./plan-contract.js";
 import type {
   AgentCapabilities,
   AgentFinalArtifact,
@@ -340,16 +341,6 @@ export class ToolRegistry {
 
 // ─── 最终产物结构校验（供 executor 的 final draft 校验复用） ─────────
 
-const REQUIRED_PLAN_HEADINGS = [
-  "页面目标",
-  "布局结构",
-  "组件清单",
-  "Data Model",
-  "交互行为",
-  "假设",
-  "风险",
-] as const;
-
 const CLARIFICATION_TYPES = new Set<ClarificationQuestionType>([
   "select",
   "radio",
@@ -501,18 +492,7 @@ export function normalizeDecisionForm(input: Record<string, unknown>): DecisionF
   };
 }
 
-/**
- * 返回 plan markdown 中缺失的必需标题。
- *
- * @param markdown - plan markdown 文本
- * @returns 缺失的标题列表（空数组表示齐全）。
- */
-export function getMissingPlanHeadings(markdown: string): string[] {
-  return REQUIRED_PLAN_HEADINGS.filter((heading) => {
-    const pattern = new RegExp(`^#{1,6}\\s+${escapeRegExp(heading)}\\s*$`, "im");
-    return !pattern.test(markdown);
-  });
-}
+export { getMissingPlanHeadings };
 
 // ─── 内部辅助 ──────────────────────────────────────────────
 
@@ -577,8 +557,4 @@ function failedRecoverable(message: string): ToolExecutionResult {
     observation: { kind: "tool_result", message },
     recoverable: true,
   };
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

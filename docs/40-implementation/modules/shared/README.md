@@ -43,6 +43,7 @@ packages/shared/src/
   api.ts
   index.ts
   logger.ts
+  resource-ledger.ts
   sse.ts
 ```
 
@@ -53,7 +54,8 @@ packages/shared/src/
 | `src/a2ui.ts` | A2UI v0.9 消息、Renderer 回传、脚本声明、Basic Catalog、surface snapshot 类型。 |
 | `src/api.ts` | HTTP API request/response DTO、分页、错误、会话、消息、文件、Skill、Agent run、Tool call、A2UI event、snapshot 和导出类型。 |
 | `src/agent.ts` | AgentRunInput、AgentRunResult、ValidateA2UIResult、ToolCallRecord、IAgentRuntime 和工厂配置。 |
-| `src/sse.ts` | AgentRunPhase、SSE event name 和 PlatformSseEvent 联合类型。 |
+| `src/resource-ledger.ts` | Resource Ledger Snapshot 契约类型（已披露 Skill / Reference 的键与元信息）。 |
+| `src/sse.ts` | AgentRunPhase、SSE event name（含 `agent_trace_event`）和 PlatformSseEvent 联合类型。 |
 | `src/logger.ts` | 共享日志类型或辅助。 |
 | `src/index.ts` | 统一 re-export 入口。 |
 
@@ -66,7 +68,7 @@ packages/shared/src/
 | `A2UIClientMessage` | `src/a2ui.ts` | Renderer 回传 action/error 的 client-to-server 消息联合。 |
 | `A2UIComponentActionDeclaration` | `src/a2ui.ts` | 组件 action 声明，包含 `event`、`script` 和未来保留的 `functionCall`。 |
 | `A2UIPropertyScriptDeclaration` | `src/a2ui.ts` | 组件属性脚本声明，包含 `code`、`deps` 和 `fallback`。 |
-| `BASIC_CATALOG_COMPONENTS` | `src/a2ui.ts` | 当前 Basic Catalog 的 18 个组件名称。 |
+| `BASIC_CATALOG_COMPONENTS` | `src/a2ui.ts` | 当前 Basic Catalog 的 21 个组件名称。 |
 | `SurfaceSnapshotData` | `src/a2ui.ts` | 后端持久化和前端恢复 Renderer 状态的数据结构。 |
 | `SessionDto` / `MessageDto` / `SkillDto` | `src/api.ts` | 前后端主要业务 DTO。 |
 | `AgentRunDto` / `ToolCallDto` | `src/api.ts` | Runtime 面板和后端 run 记录使用的 DTO。 |
@@ -76,6 +78,9 @@ packages/shared/src/
 | `AgentRunResult` | `src/agent.ts` | Agent 返回结果，包含 `COMMITTED`、`TEXT_ONLY`、`FAILED`。 |
 | `ToolCallRecord` | `src/agent.ts` | Agent 工具调用回调记录，后端会持久化为 tool call。 |
 | `PlatformSseEvent` | `src/sse.ts` | 后端推给前端的 SSE 事件联合类型。 |
+| `AgentTraceEventDto` | `src/api.ts` | ReAct 循环单条实时 trace 事件，通过 `agent_trace_event` SSE 推送。 |
+| `AgentRunTraceSummaryDto` | `src/api.ts` | ReAct 循环持久化 trace 摘要，写入 `agent_runs.metadata.traceSummary`。 |
+| `ResourceLedgerSnapshot` | `src/resource-ledger.ts` | 跨 workflow task 共享的已披露资源快照（不含正文）。 |
 
 ## 7. 当前 A2UI 类型边界
 

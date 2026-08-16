@@ -122,4 +122,117 @@ describe("Renderer dataModel 响应式渲染", () => {
     expect(container.querySelectorAll(".a2ui-text-body")).toHaveLength(2);
     expect(container.textContent).toContain("第二项");
   });
+
+  it("动态 List item 内属性脚本支持相对 dataModel.get 和 deps", async () => {
+    const errors: unknown[] = [];
+    const handler = (event: Event) => {
+      errors.push((event as CustomEvent<unknown>).detail);
+    };
+    window.addEventListener("a2ui:error", handler);
+
+    const { container, surface } = mountSurface(
+      {
+        items: [
+          { title: "第一项", done: false },
+          { title: "第二项", done: true },
+        ],
+      },
+      [
+        {
+          id: "root",
+          component: "List",
+          children: [{ path: "/items", componentId: "itemStatus" }],
+        },
+        {
+          id: "itemStatus",
+          component: "Text",
+          text: {
+            script: {
+              code: "return dataModel.get('done') ? '已完成' : '进行中';",
+              deps: ["done"],
+              fallback: "fallback",
+            },
+          },
+        },
+      ]
+    );
+
+    await nextTick();
+    expect(container.textContent).toContain("进行中");
+    expect(container.textContent).toContain("已完成");
+
+    surface.updateDataModel("/items/0/done", true);
+    await nextTick();
+    window.removeEventListener("a2ui:error", handler);
+
+    expect(container.textContent).not.toContain("fallback");
+    expect(container.textContent).not.toContain("进行中");
+    expect(container.textContent).toContain("已完成");
+    expect(errors).toHaveLength(0);
+  });
+
+  it("动态 List item 内 action.script 支持相对 dataModel.get/set", async () => {
+    const actions: unknown[] = [];
+    const handler = (event: Event) => {
+      actions.push((event as CustomEvent<unknown>).detail);
+    };
+    window.addEventListener("a2ui:action", handler);
+
+    const { container, surface } = mountSurface(
+      {
+        items: [
+          { title: "第一项", done: false },
+          { title: "第二项", done: false },
+        ],
+      },
+      [
+        {
+          id: "root",
+          component: "List",
+          children: [{ path: "/items", componentId: "itemButton" }],
+        },
+        {
+          id: "itemButton",
+          component: "Button",
+          label: {
+            script: {
+              code: "return dataModel.get('done') ? '已完成' : '完成';",
+              deps: ["done"],
+              fallback: "完成",
+            },
+          },
+          action: {
+            script: {
+              code: "const next = !Boolean(dataModel.get('done')); dataModel.set('done', next); actions.emit('itemToggled', { title: dataModel.get('title'), done: next, total: (dataModel.get('/items') || []).length });",
+              deps: ["done", "/items"],
+            },
+          },
+        },
+      ]
+    );
+
+    await nextTick();
+    const buttons = container.querySelectorAll("button");
+    expect(buttons).toHaveLength(2);
+
+    buttons[0]?.dispatchEvent(new MouseEvent("click"));
+    await nextTick();
+    window.removeEventListener("a2ui:action", handler);
+
+    expect(surface.dataModel.get("/items/0/done")).toBe(true);
+    expect(surface.dataModel.get("/items/1/done")).toBe(false);
+    expect(buttons[0]?.textContent).toContain("已完成");
+    expect(buttons[1]?.textContent).toContain("完成");
+    expect(actions[0]).toMatchObject({
+      action: {
+        kind: "event",
+        name: "itemToggled",
+        context: {
+          title: "第一项",
+          done: true,
+          total: 2,
+        },
+      },
+    });
+  });
 });

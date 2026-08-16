@@ -83,7 +83,7 @@ const componentContext = computed<ComponentContext | null>(() => {
       try {
         executeActionScript({
           script: action.script,
-          dataModel: dm,
+          dataContext: dataCtx,
           context,
           actions: {
             emit: emitAction,

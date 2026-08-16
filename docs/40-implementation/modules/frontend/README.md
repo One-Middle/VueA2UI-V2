@@ -101,7 +101,7 @@ packages/frontend/src/
 
 - 当前 tab、active session、SSE 状态、会话 hydration 状态和 `_sessionRevision`。
 - sessions、messages、uploadedFiles、skills、enabledSkillIds。
-- agentRuns、runtimeToolCalls、a2uiEvents、surfaceSnapshots。
+- agentRuns、runtimeToolCalls、runtimeTraceEvents、workflows、a2uiEvents、surfaceSnapshots。
 - `isSending` 和 `isGenerating`。
 
 `renderer` store 保存桥接状态：
@@ -126,6 +126,14 @@ packages/frontend/src/
 7. `workspace` 更新业务状态，`renderer.processMessages()` 追加 A2UI messages。
 8. `PreviewPanel` 观察 renderer revision，并用 `MessageProcessor` 消费新增 messages。
 
+### Workflow 交互
+
+1. `WorkflowPanel` 读取 `workspace.workflows` 的当前 workflow 与最新 step/artifact。
+2. 依据 step 的 `status` / `stageState` 展示 clarification form 或 decision form。
+3. `submitWorkflowClarification` / `submitWorkflowDecision` / `retryWorkflowStep` 通过 `sendWorkflowAction` 调 `POST /workflow/actions`，并用返回的 workflow 更新本地状态。
+4. candidate artifact 可通过「恢复候选预览」调用 `renderer.replaceMessages` 在 PreviewPanel 中预览。
+5. `agent_trace_event` SSE 会累积到 `runtimeTraceEvents`，供后续 trace 展示使用。
+
 ### 会话切换与恢复
 
 1. `setActiveSessionId()` 先断开旧 SSE，清空旧业务数据并重置 Renderer。
@@ -147,6 +155,7 @@ packages/frontend/src/
 - `api.ts` 的 `getRuntimeConfig()` 与后端 `GET /api/runtime/config` 对齐。
 - `api.ts` 当前有 `updateRuntimeConfig()`，但后端尚未实现 `PATCH /api/runtime/config`。
 - 前端只把 committed A2UI messages 或 current snapshot 交给 Renderer；Agent 失败消息不会更新 Renderer 正式状态。
+- `agent_trace_event` SSE 事件已累积到 `workspace.runtimeTraceEvents`，但当前面板（Runtime / Workflow）尚未渲染该 trace；仅为后续 trace 展示预留状态。
 
 ## 9. 测试与验收
 

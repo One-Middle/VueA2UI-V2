@@ -24,16 +24,7 @@ import type {
   ParsedAgentResult,
   WorkflowDecisionOption,
 } from "@a2ui-platform/shared";
-
-const REQUIRED_PLAN_HEADINGS = [
-  "页面目标",
-  "布局结构",
-  "组件清单",
-  "Data Model",
-  "交互行为",
-  "假设",
-  "风险",
-] as const;
+import { getMissingPlanHeadings } from "./plan-contract.js";
 
 const CLARIFICATION_TYPES = new Set<ClarificationQuestionType>([
   "select",
@@ -343,13 +334,6 @@ function stripMarkdownFence(text: string): string {
   return fenced?.[1]?.trim() ?? text;
 }
 
-function getMissingPlanHeadings(markdown: string): string[] {
-  return REQUIRED_PLAN_HEADINGS.filter((heading) => {
-    const pattern = new RegExp(`^#{1,6}\\s+${escapeRegExp(heading)}\\s*$`, "im");
-    return !pattern.test(markdown);
-  });
-}
-
 function failure(reason: string, recoverable: boolean, details?: JsonObject): ParsedAgentResult {
   return {
     kind: "failure",
@@ -357,8 +341,4 @@ function failure(reason: string, recoverable: boolean, details?: JsonObject): Pa
     recoverable,
     details,
   };
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

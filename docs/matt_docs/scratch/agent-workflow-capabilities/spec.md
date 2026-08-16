@@ -111,15 +111,14 @@ Markdown plan 必须包含最低标题：
 
 ```text
 页面目标
-布局结构
-组件清单
-Data Model
+视觉效果
+页面结构
+界面元素
+数据语义
 交互行为
-假设
-风险
 ```
 
-缺少关键标题时，`plan` step failed，并展示失败原因。不允许后端模板 fallback 伪造 plan 或 clarification form。
+缺少关键标题时，Agent Runtime 会拒绝该 `plan_markdown`，并把失败原因回传给 Agent 修复。不允许后端模板 fallback 伪造 plan 或 clarification form。
 
 ## Clarification Form
 

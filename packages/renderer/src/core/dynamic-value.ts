@@ -17,7 +17,7 @@ import {
   getPropertyScriptFallback,
   isPropertyScriptValue,
   runPropertyScript,
-  validateJsonPointer,
+  validateScriptDataPath,
   type PropertyScriptDeclaration,
 } from "./js-runtime";
 
@@ -56,7 +56,7 @@ export function resolveDynamicValue(input: ResolveDynamicValueInput): unknown {
       input.registerScriptDeps?.(script.deps);
       return runPropertyScript({
         script,
-        dataModel: input.dataContext.dataModel,
+        dataContext: input.dataContext,
       });
     } catch (error) {
       input.onError?.(toErrorPayload(error, script));
@@ -84,7 +84,7 @@ export function resolveObjectFields(
 
 /** 解析脚本声明中的 deps，并转换为当前 DataContext 下的绝对路径。 */
 export function resolveScriptDeps(deps: string[], dataContext: DataContext): string[] {
-  return deps.map((dep) => dataContext.resolvePath(validateJsonPointer(dep)));
+  return deps.map((dep) => dataContext.resolvePath(validateScriptDataPath(dep)));
 }
 
 function toErrorPayload(

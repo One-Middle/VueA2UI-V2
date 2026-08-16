@@ -9,6 +9,7 @@
 - `packages/shared/src/a2ui.ts`：A2UI v0.9 message、component、surface、Catalog 相关类型。
 - `packages/shared/src/api.ts`：HTTP API request/response DTO。
 - `packages/shared/src/agent.ts`：Agent 输入、结果、校验、tool call 类型。
+- `packages/shared/src/resource-ledger.ts`：Resource Ledger Snapshot 契约，跨 workflow task 共享已披露 Skill / Reference 的元信息。
 - `packages/shared/src/sse.ts`：SSE event 类型。
 - `packages/shared/src/logger.ts`：共享日志类型或工具。
 - `packages/shared/src/index.ts`：统一导出入口。
@@ -22,16 +23,18 @@
 
 ## 3.1 Agent Workflow 共享字段
 
-> 状态：planned。以下为新 Agent Workflow 目标契约，当前代码仍在迁移中。
-
 - `AgentWorkflowDto` 描述 session 内一次可恢复 Agent Workflow 的状态、当前 step、意图、完成/失败原因和时间戳。
 - `WorkflowStepDto` 描述 workflow 中的可观测阶段，`type` 只能是 `plan`、`generate_a2ui`、`validate`、`preview` 或 `commit`。
 - `WorkflowStepDto.status` 描述通用执行状态，集合为 `pending`、`running`、`awaiting_confirmation`、`confirmed`、`completed`、`failed` 和 `skipped`。
-- `WorkflowStepDto.stageState` 描述领域等待态，集合为 `awaiting_clarification`、`awaiting_plan_confirmation`、`awaiting_preview_confirmation` 或 `null`。该字段是主状态字段，不放入 `metadata`。
+- `WorkflowStepDto.stageState` 描述领域等待态，集合为 `awaiting_clarification`、`awaiting_plan_confirmation`、`awaiting_preview_confirmation` 或 `null`。该字段是主状态字段，不放入 `metadata`（`workflow_steps.stage_state` 是其持久化列）。
 - `WorkflowArtifactDto` 描述 workflow 产物，`kind` 包含 `clarification_form`、`decision_form`、`plan_markdown`、`candidate_a2ui_messages` 和 `validation_report`。
 - `MessageDto` 和 `AgentRunDto` 包含可选 `workflowId` 与 `workflowStepId`，用于恢复完整 workflow timeline。
-- `WorkflowActionRequest` 和 `WorkflowActionResponse` 是前端推进 workflow 的通用 action 契约。第一版 action 集合为 `submit_clarification`、`submit_decision`、`retry_step` 和 `cancel`。
-- `PlatformSseEvent` 包含 workflow 级事件：`workflow_started`、`workflow_step_updated`、`workflow_artifact_created`、`workflow_completed` 和 `workflow_failed`。
+- `WorkflowActionRequest` 和 `WorkflowActionResponse` 是前端推进 workflow 的通用 action 契约。当前 action 集合为 `submit_clarification`、`submit_decision`、`retry_step` 和 `cancel`。
+- `PlatformSseEvent` 包含 workflow 级事件：`workflow_started`、`workflow_step_updated`、`workflow_artifact_created`、`workflow_completed`、`workflow_failed`，以及 ReAct 循环实时事件 `agent_trace_event`。
+- `AgentWorkflowTaskInput` 是 workflow task 执行入口的上下文快照，`task` 联合为 `plan`、`revise_plan`、`generate_a2ui`、`validate`、`preview_decision`、`initial_planning`、`generate_candidate`；后端实际只使用 `plan`、`revise_plan`、`generate_a2ui`、`preview_decision` 四种。它还携带 `availableTools`、`resourceLedger`、`agentRunId`、`clarificationAnswers`、`previousPlanMarkdown`、`previousCandidate`、`revisionText` 等跨 task 上下文。
+- `AgentToolName` 是 workflow 内 Agent 可调用的受控工具集合：`askClarification`、`askUserDecision`、`getSkillContent`、`getSkillReferenceContent`、`getCatalogComponentDetails`、`validateA2UI`。
+- `AgentWorkflowTaskResult` 是 workflow task 的执行结果，包含 `parsedResult`、`debugMetadata`、`toolCalls`、`rawOutputPreview`、`attemptCount`、`tokenUsage`、`traceSummary` 和 `resourceLedger`。
+- `AgentTraceEventDto` 与 `AgentRunTraceSummaryDto` 描述 ReAct 循环的实时 trace 事件与持久化摘要；trace 事件由 backend 零转换转发为 `agent_trace_event` SSE，摘要写入 `agent_runs.metadata.traceSummary`。
 
 ### WorkflowStepType
 
@@ -136,6 +139,7 @@ export type ParsedAgentResult =
       kind: "failure";
       reason: string;
       recoverable: boolean;
+      details?: JsonObject;
     };
 ```
 
@@ -183,12 +187,13 @@ export interface DecisionForm {
 
 ## 3.2 Agent Runtime 共享字段
 
-- `AgentRunInput.enabledSkills` 包含 `id`、`name`、`description`、`content` 和可选 `references`；Runtime 初始 Prompt 只暴露 Skill 摘要和 Reference 摘要，完整 `content` 仅在 `skillInfoRequest` 命中后披露，完整 Reference 内容仅在 `skillReferenceRequest` 命中后披露。
+- `AgentRunInput.enabledSkills` 包含 `id`、`name`、`description`、`content` 和可选 `references`；普通 `run()` 路径的初始 Prompt 只暴露 Skill 摘要和 Reference 摘要，完整内容按需披露。
 - `SkillReference` 包含 `id`、`title`、`content` 和可选 `description`，表示隶属于单个 Skill 的参考资料正文。
 - `ToolCallRecord.phase` 用于标记工具调用所属阶段，后端 SSE 会将该阶段透传给前端。
-- `IAgentRuntime` 接口定义普通生成入口 `run(input, onToolCall?) → AgentRunResult` 和 workflow 入口 `runWorkflowTask(input, onToolCall?) → AgentWorkflowTaskResult`，后端只依赖此接口，不感知具体实现。
+- `IAgentRuntime` 接口定义两个入口：普通生成 `run(input, onToolCall?) → AgentRunResult`，以及 workflow 入口 `runWorkflowTask(input, onToolCall?, onTraceEvent?) → AgentWorkflowTaskResult`。后端只依赖此接口，不感知具体实现。
 - `AgentRuntimeFactoryConfig` 定义工厂函数所需的最小配置（模型 API 连接参数），与具体模型客户端实现无关。
 - `AgentRuntimeFactory` 是工厂函数签名，后端持有此类型引用；替换 Agent 实现只需换一行 import。
+- `ResourceLedgerSnapshot`（`resource-ledger.ts`）只保存已披露资源的键与元信息（`skill:<skillId>`、`reference:<skillId>:<referenceId>`），不保存正文；正文在每次 workflow task 运行前由 Agent Runtime 依据 `enabledSkills` 重新 hydrate。该 snapshot 存于 `AgentWorkflow.metadata.resourceLedger`，跨 task 共享已披露资源并做披露去重。
 
 ## 3.3 Model IO Logging 契约
 
@@ -279,6 +284,21 @@ export interface ModelIOTraceRecord {
 - `full` 模式写入 JSONL 前必须做基础密钥脱敏。
 - 至少脱敏 `Authorization: Bearer ...`、`Bearer ...`、`sk-...`、`apiKey`、`api_key`、`authorization`、`Authorization` 以及 `.env` 风格的 `KEY`、`TOKEN`、`SECRET` 字段。
 - JSONL 文件只用于本地开发排查，不得提交到版本库。
+
+### 原始追写（AGENT_ROUND_DUMP）
+
+`AGENT_ROUND_DUMP` 是独立的本地诊断开关，与 `MODEL_IO_LOG` 相互独立：即使 `MODEL_IO_LOG=off`，只要该开关开启也会追写。
+
+```env
+AGENT_ROUND_DUMP=1
+```
+
+语义：
+
+- 取值 `1` / `true` / `on` / `yes`（大小写不敏感）视为开启，其余视为关闭。
+- 每次模型调用完成后，把原始 `messages` 与原始回复追写一段到会话级纯文本文件 `logs/agent-io/<sessionId>.txt`（`sessionId` 缺失时写入 `unknown.txt`）。
+- 该追写只做原样记录与基础密钥脱敏，不做统计或截断；写文件失败只告警，不影响模型调用主流程。
+- `logs/agent-io/` 与 `logs/model-io/` 一样只用于本地开发排查，不得提交到版本库。
 
 ## 4. 维护规则
 
