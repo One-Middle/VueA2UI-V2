@@ -50,7 +50,7 @@ plan -> generate_a2ui -> validate -> preview -> commit
 - Agent 负责理解用户输入、生成 clarification form、Markdown plan、candidate A2UI，并在关键环节通过工具请求用户决策。workflow task 由 ReAct 循环（think → act → observe）驱动，产出 `AgentWorkflowTaskResult`。
 - Agent Runtime 负责执行模型、暴露受控 AgentTool（6 个）、解析 Agent Output、维护 Resource Ledger，并产出 Parsed Agent Result 与 trace 摘要。
 - Resource Ledger 负责在 workflow 的多个 task 之间共享已披露的 Skill / Skill Reference，避免重复注入正文。
-- WorkflowService 负责当前阶段 gate、可见工具、状态推进、持久化 artifact、失败和重试。
+- WorkflowService 负责当前阶段 gate、可见工具、状态推进、持久化 artifact、失败和重试；当 workflow 处于 `failed_retryable` 时，用户追加普通消息是恢复触发器，复用最新失败 step 并创建新的 AgentRun 继续尝试。
 - API 只返回稳定 DTO / SSE payload，不暴露 raw Agent Output 给前端主流程。
 - Frontend 只渲染 parsed/validated artifact 和稳定 DTO。
 
@@ -58,6 +58,7 @@ plan -> generate_a2ui -> validate -> preview -> commit
 
 - `askClarification` 和 `askUserDecision` 是 AgentTool，不是 HTTP API。
 - `submit_clarification` 和 `submit_decision` 是 WorkflowAction，不是 AgentTool。
+- `failed_retryable` 的续跑由普通消息入口触发，不等同于 `submit_decision` / `submit_clarification`，也不绕过等待确认态的 WorkflowAction gate。
 - raw Agent Output 只能进入 debug metadata 摘要，例如 `rawOutputPreview`。
 - `workflow_artifacts` 只保存 parsed/validated 后的稳定产物。
 - ReAct trace 事件通过 `agent_trace_event` SSE 实时推送；持久化只保存 trace 摘要到 `agent_runs.metadata.traceSummary`。

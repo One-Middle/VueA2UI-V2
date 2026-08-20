@@ -11,6 +11,7 @@
 - HTTP API 调用和 SSE 接收。
 - 渲染 Agent Workflow timeline、主工作区产物和工具调用产生的特殊 UI block。
 - 在会话流中展示 `clarification_form` 和 `decision_form` 对应的交互表单，并通过 `workflow/actions` 提交澄清、决策、重试或取消。
+- 当用户在 `failed_retryable` workflow 后追加普通消息时，接收后端返回的 workflow 摘要并更新本地运行态；是否允许恢复由 Backend 决定。
 - 消费 `agent_trace_event` 实时展示 ReAct 循环进度。
 - 通过 Renderer 预览已校验 candidate A2UI。
 
@@ -21,6 +22,7 @@
 - 数据库访问和服务端事务。
 - 直接消费 raw Agent Output。
 - 自行推断 workflow gate 或替代后端做状态推进。
+- 把普通追加消息自行解释为 workflow action；前端只转发输入并消费后端返回的稳定状态。
 
 ## 边界
 

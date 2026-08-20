@@ -115,6 +115,22 @@ ReAct 循环内模型 give_up 或达到最大迭代次数
   -> candidate 生成失败时保存 validation_report，不创建正式 A2UI event/snapshot
 ```
 
+Workflow 普通消息续跑：
+
+```text
+用户在 failed_retryable workflow 后继续输入
+  -> workspace.sendMessage()
+  -> POST /api/sessions/:sessionId/messages
+  -> MessageService 创建 user message 并关联当前 workflow
+  -> WorkflowService.resumeFailedStepFromMessage()
+  -> 找到最新 failed step
+  -> plan failed：复用原 plan step，递增 attemptCount，重新 runWorkflowTask(task="plan" 或 "revise_plan")
+  -> generate_a2ui failed：复用原 generate_a2ui step，递增 attemptCount，重新 executeGenerateA2UI()
+  -> validate failed：定位 metadata.generateStepId，回到来源 generate_a2ui step 重新生成
+  -> 新 AgentRun 绑定原 workflowStepId 和新 triggerMessageId
+  -> 后续仍通过 workflow_step_updated / workflow_artifact_created / workflow_failed / workflow_completed SSE 同步
+```
+
 ## 6. 关键集成点
 
 ### Frontend -> Backend

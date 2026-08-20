@@ -11,7 +11,7 @@
 - 会话、消息、A2UI events、surface snapshots、Agent workflows、workflow steps、workflow artifacts、agent runs 和 tool calls。
 - 文件上传和 skills 数据管理。
 - 调用 Agent Runtime 并消费 Parsed Agent Result。
-- 应用 WorkflowStageGate：阶段前置条件、可见 AgentTools、允许 WorkflowAction、允许 Parsed Agent Result 和失败处理。
+- 应用 WorkflowStageGate：阶段前置条件、可见 AgentTools、允许 WorkflowAction、允许 Parsed Agent Result、失败处理和 retryable workflow 续跑。
 - 只在用户确认后提交 exact stored candidate A2UI 为正式 A2UI event 和 surface snapshot。
 
 ## 不负责
@@ -28,6 +28,7 @@
 - 通过 `packages/shared` 共享 DTO、事件和 Agent 结果类型。
 - WorkflowService 负责判断“这件事现在能不能做”，Agent 负责理解“用户这句话想干什么”。
 - `AgentTool` 与 `WorkflowAction` 必须保持分离。
+- `failed_retryable` workflow 收到普通用户消息时，Backend 将其视为恢复触发器：复用最新失败 step、递增 step attempt、创建新的 AgentRun，并继续原阶段；等待确认态仍必须通过 WorkflowAction 推进。
 
 ## Model IO Logging 边界
 
