@@ -207,15 +207,14 @@ body {
 }
 
 .creation-shell {
-  display: grid;
-  grid-template-columns: minmax(300px, 0.32fr) minmax(340px, 0.3fr) minmax(460px, 0.38fr);
-  gap: 18px;
+  display: flex;
   height: 100%;
   min-height: 0;
+  /* 窄屏仍保持左右两栏结构：最小列宽不足时横向滚动，不纵向堆叠 */
+  overflow-x: auto;
 }
 
 .creation-chat,
-.creation-workflow,
 .creation-preview,
 .page-panel {
   min-width: 0;
@@ -228,6 +227,44 @@ body {
     inset 0 1px 0 rgb(255 255 255 / 72%),
     0 22px 60px rgb(68 60 93 / 10%);
   backdrop-filter: blur(22px);
+}
+
+.creation-chat {
+  flex: 0 0 auto;
+  min-width: 340px;
+}
+
+.creation-divider {
+  position: relative;
+  z-index: 1;
+  flex: 0 0 12px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.creation-divider::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: rgb(120 113 108 / 18%);
+  content: "";
+  transform: translateX(-50%);
+  transition:
+    width 160ms ease,
+    background 160ms ease;
+}
+
+.creation-divider:hover::before,
+.creation-divider.dragging::before {
+  width: 2px;
+  background: rgb(15 159 143 / 60%);
+}
+
+.creation-preview {
+  flex: 1 1 auto;
+  min-width: 460px;
 }
 
 .page-panel {
@@ -289,20 +326,6 @@ body {
   box-shadow:
     0 10px 18px rgb(15 159 143 / 18%),
     inset 0 1px 0 rgb(255 255 255 / 24%);
-}
-
-@media (max-width: 1100px) {
-  .creation-shell {
-    align-content: start;
-    grid-template-columns: 1fr;
-    overflow: auto;
-  }
-
-  .creation-chat,
-  .creation-workflow,
-  .creation-preview {
-    min-height: 520px;
-  }
 }
 
 @media (max-width: 760px) {

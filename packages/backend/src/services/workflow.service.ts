@@ -20,6 +20,7 @@ import type {
   A2UIServerMessage,
   A2UIEventDto,
   AgentRunInput,
+  AgentRunTraceSummaryDto,
   AgentWorkflowTaskInput,
   AgentWorkflowTaskResult,
   AgentWorkflowDto,
@@ -455,7 +456,89 @@ async function runWorkflowTask(input: {
     });
   }
 
+  // 把每轮 ReAct 的 reasoningSummary 落库为 agent_status 消息（聊天记录的一部分），
+  // 并实时推送 assistant_message，使过程信息既能回放也能实时出现在会话栏。
+  await persistTraceReasoning(
+    input.sessionId,
+    input.workflowId,
+    input.workflowStepId,
+    run.id,
+    result.traceSummary,
+  );
+
   return { runId: run.id, result };
+}
+
+/**
+ * 将 ReAct trace 的每轮 reasoningSummary 落库为 agent_status 消息并实时推送。
+ *
+ * 让过程信息成为聊天记录（message）的一部分，支持刷新回放；
+ * 同时通过 assistant_message SSE 让前端实时看到 Agent 进度。
+ *
+ * @param sessionId - 会话 ID
+ * @param workflowId - 所属 workflow ID
+ * @param workflowStepId - 所属 step ID
+ * @param agentRunId - 本次 task 的 Agent Run ID
+ * @param traceSummary - ReAct 循环的 trace 摘要
+ */
+async function persistTraceReasoning(
+  sessionId: string,
+  workflowId: string,
+  workflowStepId: string,
+  agentRunId: string,
+  traceSummary: AgentRunTraceSummaryDto | null | undefined,
+): Promise<void> {
+  if (!traceSummary?.iterations?.length) return;
+
+  for (const iteration of traceSummary.iterations) {
+    const reasoning = iteration.reasoningSummary?.trim();
+    // 跳过没有 reasoningSummary 的轮次（如 parse_error / observation-only）
+    if (!reasoning) continue;
+
+    const message = await messageRepository.create({
+      session: { connect: { id: sessionId } },
+      workflow: { connect: { id: workflowId } },
+      workflowStep: { connect: { id: workflowStepId } },
+      agentRunId,
+      role: "assistant",
+      kind: "agent_status",
+      content: reasoning,
+      attachments: [],
+      a2uiEventIds: [],
+      metadata: {
+        trace: true,
+        iterationIndex: iteration.index,
+        actionType: iteration.actionType ?? null,
+        toolName: iteration.toolName ?? null,
+        finalKind: iteration.finalKind ?? null,
+      },
+    });
+
+    streamService.send(sessionId, {
+      event: "assistant_message",
+      data: { sessionId, message: buildMessageDto(message) },
+    });
+  }
+}
+
+/**
+ * 将 Prisma Message 实体转换为 MessageDto（用于 SSE 推送）。
+ */
+function buildMessageDto(message: Awaited<ReturnType<typeof messageRepository.create>>): MessageDto {
+  return {
+    id: message.id,
+    sessionId: message.sessionId,
+    agentRunId: message.agentRunId,
+    workflowId: message.workflowId,
+    workflowStepId: message.workflowStepId,
+    role: message.role as MessageDto["role"],
+    kind: message.kind as MessageDto["kind"],
+    content: message.content,
+    attachments: message.attachments as MessageDto["attachments"],
+    a2uiEventIds: message.a2uiEventIds as string[],
+    metadata: message.metadata as MessageDto["metadata"],
+    createdAt: message.createdAt.toISOString(),
+  };
 }
 
 function resultFailureReason(result: ParsedAgentResult): string {

@@ -78,12 +78,29 @@ export const useWorkspaceStore = defineStore("workspace", {
     // ─── 发送状态 ───
     isSending: false,
 
-    // ─── AI 生成状态（SSE 事件驱动） ───
-    isGenerating: false,
-
     // ─── SSE 连接（不在 state 中序列化） ───
     _streamConnection: null as StreamConnection | null,
   }),
+
+  getters: {
+    /**
+     * Agent 是否正在生成（派生状态）。
+     *
+     * 不再依赖手动布尔赋值，而是从数据实时推导，避免「任务已结束但动画残留」：
+     * - workflow 存在 running 的 step 视为正在生成（workflow task 执行中）
+     * - 非 workflow 的 agent run 处于 running 视为正在生成（普通聊天）
+     */
+    isGenerating(state): boolean {
+      return state.workflows.some((workflow) =>
+        workflow.steps.some((step) => step.status === "running"),
+      ) || state.agentRuns.some((run) => run.status === "running" && run.workflowId == null);
+    },
+
+    /** 非 workflow 的普通 agent run 是否生成中（用于独立 typing 指示器）。 */
+    isPlainChatGenerating(state): boolean {
+      return state.agentRuns.some((run) => run.status === "running" && run.workflowId == null);
+    },
+  },
 
   actions: {
     // ─── Tab 切换 ───
@@ -112,7 +129,6 @@ export const useWorkspaceStore = defineStore("workspace", {
       this.a2uiEvents = [];
       this.surfaceSnapshots = [];
       this.isSending = false;
-      this.isGenerating = false;
       const renderer = useRendererStore();
       renderer.reset();
     },
@@ -151,7 +167,6 @@ export const useWorkspaceStore = defineStore("workspace", {
 
       this.activeSessionId = sessionId;
       const sessionRevision = ++this._sessionRevision;
-      this.isGenerating = false;
       this.sessionHydrationStatus = sessionId ? "loading" : "idle";
       this.sessionHydrationError = null;
 
@@ -288,6 +303,10 @@ export const useWorkspaceStore = defineStore("workspace", {
         // 消息发送成功后，SSE 会自动推送 assistant 消息和 A2UI 结果
         // 这里先重新加载消息列表确保 user 消息出现在列表中
         await this.loadMessages();
+        // 后端在 sendMessage 请求内同步完成 plan task 并持久化 workflow，
+        // 但 SSE 是内存广播、无回放，初始 plan 阶段又不会产生 assistant 消息，
+        // 因此显式重拉 workflow 详情，避免依赖 SSE 事件的时序。
+        await this.loadWorkflows();
       } catch {
         throw new Error("消息发送失败");
       } finally {
@@ -498,7 +517,6 @@ export const useWorkspaceStore = defineStore("workspace", {
       if (result.message && !this.messages.some((message) => message.id === result.message!.id)) {
         this.messages.push(result.message);
       }
-      this.isGenerating = selectedOption !== "reject" && result.workflow.status !== "completed";
     },
 
     /** 重试当前失败的 workflow step。 */
@@ -514,7 +532,6 @@ export const useWorkspaceStore = defineStore("workspace", {
       }
       if (result.agentRun) {
         this.upsertAgentRun(result.agentRun);
-        this.isGenerating = true;
       }
     },
 
@@ -633,7 +650,6 @@ export const useWorkspaceStore = defineStore("workspace", {
         agent_run_started: (data: { sessionId: string; agentRun: Pick<AgentRunDto, "id" | "status" | "attemptCount" | "maxAttempts"> }) => {
           if (!isCurrent() || data.sessionId !== sessionId) return;
           this.streamStatus = "connected";
-          this.isGenerating = true;
           this.runtimeToolCalls = this.runtimeToolCalls.filter((toolCall) => toolCall.agentRunId === data.agentRun.id);
           logger.info(`← SSE ← BACKEND: agent_run_started → runId=${shortId(data.agentRun.id)}`);
           // 添加或更新 run
@@ -663,7 +679,6 @@ export const useWorkspaceStore = defineStore("workspace", {
         workflow_completed: (data: { sessionId: string; workflow: AgentWorkflowDto }) => {
           if (!isCurrent() || data.sessionId !== sessionId) return;
           this.upsertWorkflow(data.workflow);
-          this.isGenerating = false;
         },
 
         workflow_failed: (data: { sessionId: string; workflow: AgentWorkflowDto; failedStep?: WorkflowStepDto }) => {
@@ -672,7 +687,6 @@ export const useWorkspaceStore = defineStore("workspace", {
           if (data.failedStep) {
             this.upsertWorkflowStep(data.workflow.id, data.failedStep);
           }
-          this.isGenerating = false;
         },
 
         agent_run_attempt: (data: { sessionId: string; agentRunId: string; attemptIndex: number; phase: string; toolCall?: ToolCallDto }) => {
@@ -706,7 +720,6 @@ export const useWorkspaceStore = defineStore("workspace", {
             run.outputSnapshotId = data.agentRun.outputSnapshotId;
             run.completedAt = data.agentRun.completedAt;
           }
-          this.isGenerating = false;
         },
 
         assistant_message: (data: { sessionId: string; message: MessageDto }) => {
@@ -732,8 +745,6 @@ export const useWorkspaceStore = defineStore("workspace", {
           this.a2uiEvents.push(toWorkspaceA2UIEvent(data.a2uiEvent));
           // 排序
           this.a2uiEvents.sort((a, b) => a.sequence - b.sequence);
-          // A2UI 消息到达 = 生成完成
-          this.isGenerating = false;
         },
 
         surface_snapshot: (data: { sessionId: string; snapshot: SurfaceSnapshotDto }) => {
@@ -773,8 +784,6 @@ export const useWorkspaceStore = defineStore("workspace", {
           if (!existing) {
             this.messages.push(data.message);
           }
-          // 生成结束
-          this.isGenerating = false;
         },
 
         agent_trace_event: (data: AgentTraceEventDto) => {

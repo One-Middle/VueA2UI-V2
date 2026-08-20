@@ -1,14 +1,24 @@
 <script setup lang="ts">
-import type { MessageDto } from "@a2ui-platform/shared";
+import type { AgentWorkflowDetailDto, MessageDto } from "@a2ui-platform/shared";
 import { NScrollbar } from "naive-ui";
-import { nextTick, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { buildDisplayItems } from "../workflow/workflowDisplay";
+import WorkflowMessage from "../workflow/WorkflowMessage.vue";
 
 const props = defineProps<{
   messages: MessageDto[];
-  isGenerating?: boolean;
+  workflows: AgentWorkflowDetailDto[];
+  /** 非 workflow 的普通 agent run 是否生成中（用于独立 typing 指示器） */
+  isPlainGenerating?: boolean;
 }>();
 
 const bottomRef = ref<HTMLElement>();
+
+/**
+ * 将消息列表聚合为「普通消息 / AI Workflow Message」两类展示项。
+ * 保持原始顺序，Workflow Message 出现在其第一条相关消息的位置。
+ */
+const displayItems = computed(() => buildDisplayItems(props.messages, props.workflows));
 
 const scrollToBottom = async () => {
   await nextTick();
@@ -17,7 +27,7 @@ const scrollToBottom = async () => {
 
 onMounted(scrollToBottom);
 watch(() => props.messages.length, scrollToBottom);
-watch(() => props.isGenerating, (val) => {
+watch(() => props.isPlainGenerating, (val) => {
   if (val) scrollToBottom();
 });
 </script>
@@ -25,13 +35,24 @@ watch(() => props.isGenerating, (val) => {
 <template>
   <n-scrollbar class="message-list">
     <div class="message-stack">
-      <div v-if="messages.length === 0 && !isGenerating" class="message-empty">当前会话还没有消息。</div>
-      <div v-for="msg in messages" :key="msg.id" :class="['message-bubble', msg.role]">
-        <div class="message-role">{{ msg.role === "user" ? "你" : "AI" }}</div>
-        <div class="message-content">{{ msg.content }}</div>
-      </div>
-      <!-- AI 正在生成时的打字指示器 -->
-      <div v-if="isGenerating" class="message-bubble assistant typing-indicator">
+      <div v-if="displayItems.length === 0 && !isPlainGenerating" class="message-empty">当前会话还没有消息。</div>
+
+      <template v-for="item in displayItems" :key="item.kind === 'workflow' ? `workflow-${item.workflowId}` : `message-${item.message.id}`">
+        <WorkflowMessage
+          v-if="item.kind === 'workflow'"
+          :workflow-id="item.workflowId"
+          :workflow="item.workflow"
+          :step-log-messages="item.stepLogMessages"
+          :action-messages="item.actionMessages"
+        />
+        <div v-else :class="['message-bubble', item.message.role]">
+          <div class="message-role">{{ item.message.role === 'user' ? '你' : 'AI' }}</div>
+          <div class="message-content">{{ item.message.content }}</div>
+        </div>
+      </template>
+
+      <!-- 非 workflow 普通聊天的打字指示器（workflow 的生成动画在 Workflow Message 末尾） -->
+      <div v-if="isPlainGenerating" class="message-bubble assistant typing-indicator">
         <div class="message-role">AI</div>
         <div class="typing-dots">
           <span class="dot"></span>

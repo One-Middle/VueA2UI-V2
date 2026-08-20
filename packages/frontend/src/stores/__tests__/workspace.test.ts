@@ -1,4 +1,4 @@
-import type { AgentWorkflowDetailDto, MessageDto, SessionDetailResponse, SessionDto, SurfaceSnapshotDto } from "@a2ui-platform/shared";
+import type { AgentWorkflowDetailDto, MessageDto, SessionDetailResponse, SessionDto, SurfaceSnapshotDto, WorkflowStepDto } from "@a2ui-platform/shared";
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as api from "../../services/api";
@@ -171,6 +171,38 @@ describe("workspace store session restore", () => {
       assistantMessageId: "message-a",
       outputSnapshotId: null,
     });
+  });
+
+  it("derives isGenerating from workflow running steps instead of manual flags", async () => {
+    vi.mocked(api.getSession).mockResolvedValue({
+      session: makeSession("session-a"),
+      enabledSkillIds: [],
+      currentSnapshot: null,
+    });
+
+    const workspace = useWorkspaceStore();
+    workspace.setActiveSessionId("session-a");
+
+    const handlers = vi.mocked(connectStream).mock.calls.at(-1)?.[1] as StreamHandlers;
+
+    expect(workspace.isGenerating).toBe(false);
+
+    // plan step 进入 running → 生成中
+    handlers.workflow_started?.({ sessionId: "session-a", workflow: makeWorkflow() });
+    handlers.workflow_step_updated?.({
+      sessionId: "session-a",
+      workflowId: "workflow-a",
+      step: makeStep({ type: "plan", status: "running" }),
+    });
+    expect(workspace.isGenerating).toBe(true);
+
+    // step 进入 awaiting_confirmation（等待用户确认）→ 动画应自动消失，不再残留
+    handlers.workflow_step_updated?.({
+      sessionId: "session-a",
+      workflowId: "workflow-a",
+      step: makeStep({ type: "plan", status: "awaiting_confirmation", stageState: "awaiting_plan_confirmation" }),
+    });
+    expect(workspace.isGenerating).toBe(false);
   });
 
   it("restores renderer messages when a surface_snapshot SSE event arrives", async () => {
@@ -382,6 +414,30 @@ function makeWorkflow(): AgentWorkflowDetailDto {
     steps: [],
     artifacts: [],
     agentRuns: [],
+  };
+}
+
+function makeStep(overrides: Partial<WorkflowStepDto> = {}): WorkflowStepDto {
+  return {
+    id: "step-plan",
+    workflowId: "workflow-a",
+    sessionId: "session-a",
+    type: "plan",
+    status: "pending",
+    stageState: null,
+    sequence: 1,
+    attemptCount: 0,
+    maxAttempts: 1,
+    failureReason: null,
+    failureMetadata: {},
+    confirmedAt: null,
+    confirmedByMessageId: null,
+    startedAt: null,
+    completedAt: null,
+    metadata: {},
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+    ...overrides,
   };
 }
 
