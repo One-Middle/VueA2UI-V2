@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createAgentRuntime, validateA2UI } from "@a2ui-platform/agent";
+import type { AgentRunTraceSummaryDto } from "@a2ui-platform/shared";
 import { agentRunRepository } from "../../repositories/agent-run.repository.js";
 import { fileRepository } from "../../repositories/file.repository.js";
 import { messageRepository } from "../../repositories/message.repository.js";
@@ -69,6 +70,7 @@ vi.mock("../../repositories/surface-snapshot.repository.js", () => ({
 vi.mock("../../repositories/message.repository.js", () => ({
   messageRepository: {
     findBySessionId: vi.fn(),
+    create: vi.fn(),
   },
 }));
 
@@ -194,7 +196,10 @@ function agentRunRecord(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function mockRuntimeResult(parsedResult: Record<string, unknown>) {
+function mockRuntimeResult(
+  parsedResult: Record<string, unknown>,
+  traceSummary?: AgentRunTraceSummaryDto | null,
+) {
   vi.mocked(createAgentRuntime).mockReturnValue({
     run: vi.fn(),
     runWorkflowTask: vi.fn().mockResolvedValue({
@@ -204,6 +209,7 @@ function mockRuntimeResult(parsedResult: Record<string, unknown>) {
       rawOutputPreview: "preview",
       attemptCount: 1,
       tokenUsage: { totalTokens: 10 },
+      ...(traceSummary ? { traceSummary } : {}),
     }),
   } as never);
 }
@@ -264,6 +270,62 @@ describe("workflowService new workflow contract", () => {
     expect(workflowRepository.createArtifact).toHaveBeenCalledWith(expect.objectContaining({
       kind: "clarification_form",
       workflowStep: { connect: { id: "step-plan" } },
+    }));
+  });
+
+  it("persists each ReAct reasoningSummary as an agent_status message and pushes assistant_message", async () => {
+    vi.mocked(messageRepository.create).mockResolvedValue({
+      id: "msg-trace-1",
+      sessionId: "session-a",
+      agentRunId: "run-workflow",
+      workflowId: "workflow-a",
+      workflowStepId: "step-plan",
+      role: "assistant",
+      kind: "agent_status",
+      content: "[产出 plan_markdown] 生成方案",
+      attachments: [],
+      a2uiEventIds: [],
+      metadata: {},
+      createdAt: now,
+    } as never);
+
+    mockRuntimeResult(
+      {
+        kind: "plan_markdown",
+        markdown: "# Plan",
+        decisionForm: {
+          title: "确认方案",
+          prompt: "是否确认",
+          guidance: "确认后生成",
+          target: "plan_markdown",
+          options: [{ id: "confirm", label: "确认" }],
+        },
+      },
+      {
+        iterations: [
+          { index: 1, reasoningSummary: "生成方案", actionType: "final_draft", finalKind: "plan_markdown", durationMs: 10 },
+          { index: 2, reasoningSummary: "调用校验工具", actionType: "tool_call", toolName: "validateA2UI", durationMs: 20 },
+        ],
+      },
+    );
+
+    await workflowService.startInitialPlanning({
+      sessionId: "session-a",
+      workflowId: "workflow-a",
+      userMessage: "做一个销售看板",
+    });
+
+    // 每轮 ReAct 落一条 agent_status 消息，关联 workflow / step
+    expect(messageRepository.create).toHaveBeenCalledTimes(2);
+    expect(messageRepository.create).toHaveBeenCalledWith(expect.objectContaining({
+      role: "assistant",
+      kind: "agent_status",
+      workflow: { connect: { id: "workflow-a" } },
+      workflowStep: { connect: { id: "step-plan" } },
+    }));
+    // 落库后实时推送 assistant_message
+    expect(streamService.send).toHaveBeenCalledWith("session-a", expect.objectContaining({
+      event: "assistant_message",
     }));
   });
 

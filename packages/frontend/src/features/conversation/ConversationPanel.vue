@@ -2,6 +2,7 @@
 import { NAlert, NSpin, NTag } from "naive-ui";
 import { computed, ref } from "vue";
 import { useWorkspaceStore } from "../../stores/workspace";
+import WorkflowProgressBar from "../workflow/WorkflowProgressBar.vue";
 import MessageInput from "./MessageInput.vue";
 import MessageList from "./MessageList.vue";
 
@@ -70,10 +71,12 @@ const send = async (content: string) => {
     </n-alert>
 
     <n-spin :show="workspace.isSending" description="正在发送需求...">
+      <WorkflowProgressBar v-if="workspace.activeSessionId" />
       <MessageList
         v-if="workspace.activeSessionId"
         :messages="workspace.messages"
-        :is-generating="workspace.isGenerating"
+        :workflows="workspace.workflows"
+        :is-plain-generating="workspace.isPlainChatGenerating"
       />
       <div v-else class="conversation-start">
         <div class="start-content">

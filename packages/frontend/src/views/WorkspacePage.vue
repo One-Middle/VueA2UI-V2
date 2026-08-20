@@ -9,7 +9,7 @@ import {
   NTag,
   type GlobalThemeOverrides,
 } from "naive-ui";
-import { computed, onMounted } from "vue";
+import { computed, onMounted, ref } from "vue";
 import ConversationPanel from "../features/conversation/ConversationPanel.vue";
 import InitialCreatePanel from "../features/conversation/InitialCreatePanel.vue";
 import HistoryPanel from "../features/history/HistoryPanel.vue";
@@ -17,10 +17,66 @@ import ImportExportPanel from "../features/import-export/ImportExportPanel.vue";
 import PreviewPanel from "../features/preview/PreviewPanel.vue";
 import RuntimePanel from "../features/runtime/RuntimePanel.vue";
 import SkillsPanel from "../features/skills/SkillsPanel.vue";
-import WorkflowPanel from "../features/workflow/WorkflowPanel.vue";
 import { useWorkspaceStore, type WorkspaceTab } from "../stores/workspace";
 
 const workspace = useWorkspaceStore();
+
+// ─── 两栏拖拽分割线 ───
+// 会话区与组件展示区之间的分割线可拖动调整宽度比例。
+const creationShellRef = ref<HTMLElement | null>(null);
+const chatWidthPercent = ref(42);
+const isDraggingDivider = ref(false);
+
+const MIN_CHAT_WIDTH = 340;
+const MIN_PREVIEW_WIDTH = 460;
+const DIVIDER_WIDTH = 12;
+
+/** 拖拽起点快照（null 表示未在拖拽）。 */
+let dragStart: { x: number; percent: number } | null = null;
+
+const chatStyle = computed(() => ({ width: `${chatWidthPercent.value}%` }));
+
+/**
+ * 将聊天栏宽度百分比夹紧到合法区间：
+ * 下限保证聊天栏 >= MIN_CHAT_WIDTH，上限保证预览栏 >= MIN_PREVIEW_WIDTH。
+ * 当容器过窄无法同时容纳两栏时，退化为最小宽度交给 overflow-x 横向滚动。
+ */
+function clampChatPercent(value: number, shellWidth: number): number {
+  const minPercent = (MIN_CHAT_WIDTH / shellWidth) * 100;
+  const maxPercent = ((shellWidth - DIVIDER_WIDTH - MIN_PREVIEW_WIDTH) / shellWidth) * 100;
+  return Math.min(Math.max(value, minPercent), Math.max(minPercent, maxPercent));
+}
+
+function startDividerDrag(event: PointerEvent) {
+  const shell = creationShellRef.value;
+  if (!shell) return;
+  const divider = event.currentTarget as HTMLElement;
+  // pointer capture 保证鼠标移出分割线后仍持续收到 move/up 事件
+  divider.setPointerCapture(event.pointerId);
+  dragStart = { x: event.clientX, percent: chatWidthPercent.value };
+  isDraggingDivider.value = true;
+  event.preventDefault();
+}
+
+function onDividerDrag(event: PointerEvent) {
+  if (!dragStart) return;
+  const shell = creationShellRef.value;
+  if (!shell) return;
+  const shellWidth = shell.getBoundingClientRect().width;
+  if (shellWidth <= 0) return;
+  const deltaPercent = ((event.clientX - dragStart.x) / shellWidth) * 100;
+  chatWidthPercent.value = clampChatPercent(dragStart.percent + deltaPercent, shellWidth);
+}
+
+function endDividerDrag(event: PointerEvent) {
+  dragStart = null;
+  isDraggingDivider.value = false;
+  try {
+    (event.currentTarget as HTMLElement).releasePointerCapture(event.pointerId);
+  } catch {
+    // pointer capture 可能已随 pointerup 自动释放
+  }
+}
 
 const themeOverrides: GlobalThemeOverrides = {
   common: {
@@ -128,13 +184,18 @@ const createSession = () => {
         <main class="workspace-main">
           <InitialCreatePanel v-if="isInitialCreate" />
 
-          <section v-else-if="workspace.activeTab === 'conversation'" class="creation-shell">
-            <div class="creation-chat">
+          <section ref="creationShellRef" v-else-if="workspace.activeTab === 'conversation'" class="creation-shell">
+            <div class="creation-chat" :style="chatStyle">
               <ConversationPanel />
             </div>
-            <div class="creation-workflow">
-              <WorkflowPanel />
-            </div>
+            <div
+              class="creation-divider"
+              :class="{ dragging: isDraggingDivider }"
+              @pointerdown="startDividerDrag"
+              @pointermove="onDividerDrag"
+              @pointerup="endDividerDrag"
+              @pointercancel="endDividerDrag"
+            />
             <div class="creation-preview">
               <PreviewPanel compact />
             </div>
