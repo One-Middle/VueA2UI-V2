@@ -169,11 +169,10 @@ function formatToolCallSummary(row: ToolCallDto): string {
 
 .summary-item {
   padding: 14px;
-  border: 1px solid #dbe5f2;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
-  background:
-    linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
-  box-shadow: 0 8px 20px rgb(15 23 42 / 4%);
+  background: #ffffff;
+  box-shadow: 0 8px 18px rgb(15 23 42 / 3%);
 }
 
 .summary-item span {
@@ -194,10 +193,10 @@ function formatToolCallSummary(row: ToolCallDto): string {
 
 .runs-section {
   padding: 16px;
-  border: 1px solid #dbe5f2;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
   background: #ffffff;
-  box-shadow: 0 8px 20px rgb(15 23 42 / 4%);
+  box-shadow: 0 8px 18px rgb(15 23 42 / 3%);
 }
 
 .runs-section + .runs-section {

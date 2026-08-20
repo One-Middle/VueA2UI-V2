@@ -167,12 +167,12 @@ function formatJson(value: unknown): string {
   align-items: center;
   justify-content: space-between;
   padding: 13px 14px;
-  border: 1px solid #dbe5f2;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
   color: inherit;
   text-align: left;
   background: #ffffff;
-  box-shadow: 0 8px 20px rgb(15 23 42 / 4%);
+  box-shadow: 0 8px 18px rgb(15 23 42 / 3%);
   cursor: pointer;
   transition:
     border-color 160ms ease,
@@ -184,8 +184,8 @@ function formatJson(value: unknown): string {
 .record-row:hover,
 .record-row.active {
   border-color: rgb(45 212 191 / 42%);
-  background: #ecfdf9;
-  box-shadow: 0 12px 24px rgb(15 159 143 / 8%);
+  background: #ecfdf5;
+  box-shadow: 0 10px 22px rgb(15 159 143 / 7%);
   transform: translateY(-1px);
 }
 
@@ -222,7 +222,7 @@ function formatJson(value: unknown): string {
   padding: 12px 14px;
   border: 1px solid rgb(15 159 143 / 18%);
   border-radius: 8px;
-  background: rgb(236 253 249 / 72%);
+  background: rgb(236 253 245 / 72%);
   color: #475569;
   font-size: 13px;
   line-height: 1.55;
@@ -235,10 +235,10 @@ function formatJson(value: unknown): string {
 
 .event-card {
   padding: 14px;
-  border: 1px solid #dbe5f2;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
   background: #ffffff;
-  box-shadow: 0 8px 20px rgb(15 23 42 / 4%);
+  box-shadow: 0 8px 18px rgb(15 23 42 / 3%);
 }
 
 .event-summary {

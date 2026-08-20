@@ -69,14 +69,13 @@ watch(() => props.isPlainGenerating, (val) => {
 .message-list {
   flex: 1;
   min-height: 0;
-  background:
-    linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+  background: #ffffff;
 }
 
 .message-stack {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
   padding: 18px 16px;
 }
 
@@ -90,33 +89,33 @@ watch(() => props.isPlainGenerating, (val) => {
 }
 
 .message-bubble {
-  max-width: 84%;
+  max-width: 72%;
   padding: 12px 14px;
-  border: 1px solid #dbe5f2;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
   background: #ffffff;
-  box-shadow: 0 8px 22px rgb(15 23 42 / 5%);
+  box-shadow: 0 8px 20px rgb(15 23 42 / 4%);
 }
 
 .message-bubble.user {
+  max-width: 78%;
   align-self: flex-end;
-  border-color: rgb(45 212 191 / 42%);
-  background: linear-gradient(180deg, #ecfdf9 0%, #e5f7f2 100%);
-  box-shadow: 0 10px 24px rgb(15 159 143 / 10%);
+  border-color: rgb(45 212 191 / 34%);
+  background: linear-gradient(180deg, #ecfdf5 0%, #f0fdfa 100%);
+  box-shadow: 0 10px 22px rgb(15 159 143 / 8%);
 }
 
 .message-bubble.assistant {
   align-self: flex-start;
-  border-color: #e0e7f1;
-  background:
-    linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+  border-color: #e5e7eb;
+  background: #ffffff;
 }
 
 .typing-indicator {
   min-width: 72px;
-  border-color: rgb(45 212 191 / 42%);
-  background: linear-gradient(180deg, #ecfdf9 0%, #e5f7f2 100%);
-  box-shadow: 0 10px 24px rgb(15 159 143 / 8%);
+  border-color: rgb(45 212 191 / 34%);
+  background: #ecfdf5;
+  box-shadow: 0 10px 22px rgb(15 159 143 / 7%);
 }
 
 .typing-dots {

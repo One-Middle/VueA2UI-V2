@@ -49,9 +49,8 @@ const stepEntries = computed(() => {
 .workflow-progress {
   flex-shrink: 0;
   padding: 10px 16px 12px;
-  border-bottom: 1px solid #e2eaf5;
-  background:
-    linear-gradient(180deg, #ffffff 0%, #f7fbfe 100%);
+  border-bottom: 1px solid #eef2f7;
+  background: #ffffff;
 }
 
 .progress-caption {

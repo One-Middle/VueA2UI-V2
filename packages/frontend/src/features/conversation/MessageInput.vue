@@ -41,17 +41,16 @@ const handleSend = () => {
 
 <style scoped>
 .message-input-area {
-  padding: 14px 16px 16px;
-  border-top: 1px solid #e2eaf5;
-  background:
-    linear-gradient(180deg, rgb(248 250 252 / 72%) 0%, #ffffff 44%);
-  box-shadow: 0 -12px 28px rgb(15 23 42 / 3%);
+  padding: 12px 14px 14px;
+  border-top: 1px solid #e5e7eb;
+  background: rgb(255 255 255 / 88%);
+  box-shadow: 0 -10px 24px rgb(15 23 42 / 3%);
 }
 
 .message-input-area :deep(.n-input) {
   background: #ffffff;
   box-shadow:
-    0 8px 22px rgb(15 23 42 / 4%),
+    0 8px 20px rgb(15 23 42 / 4%),
     inset 0 1px 0 rgb(255 255 255 / 80%);
 }
 
@@ -69,7 +68,7 @@ const handleSend = () => {
 }
 
 .input-actions span {
-  color: #7b8da7;
+  color: #94a3b8;
   font-size: 12px;
 }
 

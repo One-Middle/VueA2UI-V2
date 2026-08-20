@@ -303,9 +303,6 @@ export const useWorkspaceStore = defineStore("workspace", {
         if (result.workflow) {
           this.upsertWorkflow(result.workflow);
         }
-        if (["pending", "running"].includes(result.agentRun?.status ?? "") || result.workflow?.status === "running") {
-          this.isGenerating = true;
-        }
         // 消息发送成功后，SSE 会自动推送 assistant 消息和 A2UI 结果
         // 这里先重新加载消息列表确保 user 消息出现在列表中
         await this.loadMessages();
