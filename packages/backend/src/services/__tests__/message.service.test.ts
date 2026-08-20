@@ -30,6 +30,7 @@ vi.mock("../workflow.service.js", () => ({
     getActiveWorkflow: vi.fn(),
     createWorkflow: vi.fn(),
     startInitialPlanning: vi.fn(),
+    resumeFailedStepFromMessage: vi.fn(),
   },
 }));
 
@@ -90,6 +91,43 @@ describe("messageService.createUserMessageAndAgentRun", () => {
     expect(workflowService.startInitialPlanning).not.toHaveBeenCalled();
     expect(result.agentRun).toBeNull();
     expect(result.workflow).toMatchObject({ id: "workflow-a", status: "active", currentStepType: "plan" });
+  });
+
+  it("resumes a retryable failed workflow when the user sends a follow-up message", async () => {
+    vi.mocked(sessionRepository.findById).mockResolvedValue(sessionRecord() as never);
+    vi.mocked(workflowService.getActiveWorkflow).mockResolvedValue(workflowRecord({
+      status: "failed_retryable",
+      currentStepType: "plan",
+    }) as never);
+    vi.mocked(messageRepository.create).mockResolvedValue(messageRecord({ id: "message-resume", workflowId: "workflow-a" }) as never);
+    vi.mocked(workflowService.resumeFailedStepFromMessage).mockResolvedValue({
+      workflow: {
+        id: "workflow-a",
+        status: "running",
+        currentStepType: "plan",
+      },
+      agentRun: {
+        id: "run-resume",
+        status: "running",
+      },
+    } as never);
+
+    const result = await messageService.createUserMessageAndAgentRun("session-a", "继续");
+
+    expect(messageRepository.create).toHaveBeenCalledWith(expect.objectContaining({
+      workflow: { connect: { id: "workflow-a" } },
+      content: "继续",
+    }));
+    expect(workflowService.resumeFailedStepFromMessage).toHaveBeenCalledWith({
+      sessionId: "session-a",
+      workflowId: "workflow-a",
+      messageId: "message-resume",
+      userMessage: "继续",
+    });
+    expect(agentRunRepository.create).not.toHaveBeenCalled();
+    expect(workflowService.startInitialPlanning).not.toHaveBeenCalled();
+    expect(result.agentRun).toMatchObject({ id: "run-resume", status: "running" });
+    expect(result.workflow).toMatchObject({ id: "workflow-a", status: "running", currentStepType: "plan" });
   });
 
   it("starts a plan workflow for A2UI generation intent", async () => {

@@ -291,6 +291,118 @@ describe("workflowService new workflow contract", () => {
     }));
   });
 
+  it("resumes a retryable failed plan step from a follow-up message", async () => {
+    mockRuntimeResult({
+      kind: "plan_markdown",
+      markdown: "# 新方案",
+      decisionForm: {
+        title: "确认方案",
+        prompt: "是否继续？",
+        target: "plan_markdown",
+        options: [{ id: "confirm", label: "确认" }],
+      },
+    });
+    const failedPlanStep = stepRecord({
+      id: "step-plan",
+      type: "plan",
+      status: "failed",
+      attemptCount: 1,
+      failureReason: "API 失败",
+      completedAt: now,
+    });
+    vi.mocked(workflowRepository.findWorkflowById)
+      .mockResolvedValueOnce({
+        ...workflowRecord({ status: "failed_retryable", failureReason: "API 失败" }),
+        steps: [failedPlanStep],
+        artifacts: [],
+        agentRuns: [],
+      } as never)
+      .mockResolvedValue({
+        ...workflowRecord({ status: "running", currentStepType: "plan" }),
+        steps: [stepRecord({ id: "step-plan", status: "awaiting_confirmation" })],
+        artifacts: [],
+        agentRuns: [],
+      } as never);
+    vi.mocked(workflowRepository.findStepById).mockResolvedValue(failedPlanStep as never);
+
+    const result = await workflowService.resumeFailedStepFromMessage({
+      sessionId: "session-a",
+      workflowId: "workflow-a",
+      messageId: "message-resume",
+      userMessage: "继续",
+    });
+
+    expect(workflowRepository.updateWorkflow).toHaveBeenCalledWith("workflow-a", expect.objectContaining({
+      status: "running",
+      currentStepType: "plan",
+      failureReason: null,
+    }));
+    expect(workflowRepository.updateStep).toHaveBeenCalledWith("step-plan", expect.objectContaining({
+      status: "running",
+      attemptCount: 2,
+      failureReason: null,
+      completedAt: null,
+      metadata: expect.objectContaining({
+        resumeMessageId: "message-resume",
+      }),
+    }));
+    expect(agentRunRepository.create).toHaveBeenCalledWith(expect.objectContaining({
+      workflowStep: { connect: { id: "step-plan" } },
+      triggerMessageId: "message-resume",
+    }));
+    expect(workflowRepository.createArtifact).toHaveBeenCalledWith(expect.objectContaining({
+      kind: "plan_markdown",
+      workflowStep: { connect: { id: "step-plan" } },
+    }));
+    expect(result.agentRun).toMatchObject({ id: "run-workflow", status: "committed" });
+  });
+
+  it("resumes a retryable failed generate step without creating another generate step", async () => {
+    const failedGenerateStep = stepRecord({
+      id: "step-generate",
+      type: "generate_a2ui",
+      status: "failed",
+      sequence: 2,
+      attemptCount: 1,
+      failureReason: "API 失败",
+      completedAt: now,
+    });
+    vi.mocked(workflowRepository.findWorkflowById)
+      .mockResolvedValueOnce({
+        ...workflowRecord({ status: "failed_retryable", currentStepType: "generate_a2ui" }),
+        steps: [failedGenerateStep],
+        artifacts: [artifactRecord({ id: "plan-a", kind: "plan_markdown" })],
+        agentRuns: [],
+      } as never)
+      .mockResolvedValue({
+        ...workflowRecord({ status: "running", currentStepType: "generate_a2ui" }),
+        steps: [failedGenerateStep],
+        artifacts: [],
+        agentRuns: [],
+      } as never);
+    vi.mocked(workflowRepository.findStepById).mockResolvedValue(failedGenerateStep as never);
+    const executeSpy = vi.spyOn(workflowService, "executeGenerateA2UI").mockResolvedValue();
+
+    await workflowService.resumeFailedStepFromMessage({
+      sessionId: "session-a",
+      workflowId: "workflow-a",
+      messageId: "message-resume",
+      userMessage: "继续生成",
+    });
+
+    expect(workflowRepository.createStep).not.toHaveBeenCalled();
+    expect(workflowRepository.updateStep).toHaveBeenCalledWith("step-generate", expect.objectContaining({
+      status: "running",
+      attemptCount: 2,
+      failureReason: null,
+      completedAt: null,
+    }));
+    expect(executeSpy).toHaveBeenCalledWith(expect.objectContaining({
+      workflowStepId: "step-generate",
+      triggerMessageId: "message-resume",
+    }));
+  });
+
   it("submits plan decision confirm through submit_decision and creates generate_a2ui", async () => {
     vi.mocked(workflowRepository.findArtifactById).mockResolvedValue(artifactRecord({
       id: "decision-plan",

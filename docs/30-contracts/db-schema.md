@@ -31,6 +31,7 @@
 - API key 不得写入数据库。
 - 一个 session 可以保留多次 Agent Workflow 历史，但同一时刻只能有一个处于 active、running、awaiting confirmation 或 retryable 状态的 workflow。
 - Agent run 和用户可见 message 可以关联到 workflow 和 workflow step，便于恢复完整 workflow timeline。
+- `failed_retryable` workflow 收到新的普通用户 message 时，可以复用最新失败 step 恢复执行；新的 Agent run 绑定原 `workflowStepId` 和新 `triggerMessageId`，`workflow_steps.attempt_count` 递增记录同一阶段的尝试次数。
 - Candidate A2UI 只能作为 workflow artifact 保存；用户确认提交前不得写入 A2UI events 或 surface snapshots。
 - `workflow_steps.type` 集合为 `plan`、`generate_a2ui`、`validate`、`preview` 和 `commit`。
 - `workflow_steps.stage_state` 是主状态字段，用于保存领域等待态：`awaiting_clarification`、`awaiting_plan_confirmation`、`awaiting_preview_confirmation` 或 `null`。该字段是独立列，不放 `metadata`。
@@ -85,4 +86,3 @@ Agent 成功提交时，必须在一个 Prisma 事务内完成：
 
 - 修改 Prisma schema 时，同步更新本文档和相关 API DTO。
 - 复杂索引或数据库约束如果不适合放入 Prisma schema，应通过 SQL migration 维护，并在本文档说明。
-

@@ -1,5 +1,12 @@
 ﻿# 更新日志
 
+## 2026-08-20
+
+### Workflow
+
+- 支持 `failed_retryable` workflow 的普通消息续跑：用户追加消息后复用最新失败 step，创建新的 AgentRun 记录本次尝试，并让前端根据 `SendMessageResponse.workflow` 更新运行状态。
+- 更新 API、数据库和前后端实现文档，明确普通消息恢复失败 workflow 的语义。
+
 ## 2026-08-08
 
 ### 文档治理

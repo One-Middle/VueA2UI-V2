@@ -126,6 +126,36 @@ export const messageService = {
     if (workflow) {
       logger.info(`收到 workflow 消息 → session=${SID(sessionId)}, workflow=${SID(workflow.id)}, content=${content.length}字`);
 
+      if (activeWorkflow?.status === "failed_retryable") {
+        const resumed = await workflowService.resumeFailedStepFromMessage({
+          sessionId,
+          workflowId: workflow.id,
+          messageId: message.id,
+          userMessage: content,
+        });
+
+        return {
+          message: {
+            id: message.id,
+            role: message.role as MessageDto["role"],
+            content: message.content,
+          },
+          agentRun: resumed.agentRun,
+          workflow: resumed.workflow
+            ? {
+              id: resumed.workflow.id,
+              status: resumed.workflow.status,
+              currentStepType: resumed.workflow.currentStepType,
+            }
+            : {
+              id: workflow.id,
+              status: workflow.status as NonNullable<SendMessageResponse["workflow"]>["status"],
+              currentStepType: workflow.currentStepType as NonNullable<SendMessageResponse["workflow"]>["currentStepType"],
+            },
+          streamUrl: `/api/sessions/${sessionId}/stream`,
+        };
+      }
+
       const advancedWorkflow = isNewWorkflow
         ? await workflowService.startInitialPlanning({
             sessionId,

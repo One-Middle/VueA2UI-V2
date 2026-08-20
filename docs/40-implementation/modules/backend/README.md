@@ -152,7 +152,7 @@ packages/backend/
 
 ### 7.1 Agent Workflow 流程
 
-1. `MessageService.createUserMessageAndAgentRun` 收到用户消息，先检查 session 是否已有 active workflow；否则用 UI 生成意图正则或前端 `intent` 判断是否新建 workflow。
+1. `MessageService.createUserMessageAndAgentRun` 收到用户消息，先检查 session 是否已有 active workflow；否则用 UI 生成意图正则或前端 `intent` 判断是否新建 workflow。若 active workflow 为 `failed_retryable`，该普通消息会触发 `resumeFailedStepFromMessage()`，复用最新失败 step 并创建新的 AgentRun 继续执行。
 2. 新建 workflow 后立即 `startInitialPlanning()`：创建一个 `plan` step，通过 `runWorkflowTask(task="plan")` 用 ReAct 循环生成 clarification form 或 Markdown plan + decision form。
 3. 若返回 clarification form，step 进入 `awaiting_confirmation + awaiting_clarification`，保存 `clarification_form` artifact。
 4. 若返回 plan，step 进入 `awaiting_confirmation + awaiting_plan_confirmation`，保存 `plan_markdown` 与 `decision_form` artifact（decision 回填 `targetArtifactId`）。
@@ -162,8 +162,9 @@ packages/backend/
 8. 校验通过后保存 `candidate_a2ui_messages` artifact，并 `createPreviewDecision()` 用 `runWorkflowTask(task="preview_decision")` 生成 decision form，进入 `preview + awaiting_preview_confirmation`。
 9. `submit_decision` 在 `preview + awaiting_preview_confirmation` 下：`confirm` 走 `confirmCandidateCommit()` + `commitExactCandidate()` 提交 exact stored candidate；`revise` 走 `requestPreviewRevision()` 回到新的 `plan` 轮次（旧 candidate 标记 `invalidated`）。
 10. `commitExactCandidate()` 在单个 Prisma 事务内创建 assistant message、A2UI event、current snapshot，完成 commit step 和 workflow。
-11. `retry_step` 只支持重试最新失败的 `generate_a2ui` step，创建新 `generate_a2ui` step 并复用已确认 plan 重新生成。
-12. 每个 workflow task 通过 `runWorkflowTask` 的第三个回调把 ReAct trace 事件转发为 `agent_trace_event` SSE；trace summary 写入 `agent_runs.metadata.traceSummary`，Resource Ledger snapshot 写回 `agent_workflows.metadata.resourceLedger`。
+11. 用户在 `failed_retryable` workflow 后追加普通消息时，恢复路径复用失败 step：`plan` 重新运行规划，`generate_a2ui` 复用已确认 plan 重新生成，`validate` 失败回到来源 `generate_a2ui` step；step 的 `attemptCount` 递增，新的 AgentRun 绑定原 step 与追加消息。
+12. `retry_step` 保留为 workflow action 入口，仍只支持重试最新失败的 `generate_a2ui` step。
+13. 每个 workflow task 通过 `runWorkflowTask` 的第三个回调把 ReAct trace 事件转发为 `agent_trace_event` SSE；trace summary 写入 `agent_runs.metadata.traceSummary`，Resource Ledger snapshot 写回 `agent_workflows.metadata.resourceLedger`。
 
 ### 7.2 普通 Agent Run 流程
 

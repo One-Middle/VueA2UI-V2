@@ -121,10 +121,11 @@ packages/frontend/src/
 2. `ConversationPanel` 调用 `workspace.sendMessage()`。
 3. 若当前没有会话，`workspace` 先自动创建会话，标题由消息前 24 个字符生成。
 4. `api.sendMessage()` 请求后端消息 API。
-5. 后端创建 Agent run 后通过 SSE 推送进度。
-6. `stream.ts` 分发 `agent_run_started`、`agent_run_attempt`、`assistant_message`、`a2ui_messages`、`surface_snapshot` 等事件。
-7. `workspace` 更新业务状态，`renderer.processMessages()` 追加 A2UI messages。
-8. `PreviewPanel` 观察 renderer revision，并用 `MessageProcessor` 消费新增 messages。
+5. 若后端返回 `workflow` 摘要（包括 `failed_retryable` workflow 被普通消息恢复为 `running`），`workspace` 会先 `upsertWorkflow()` 更新本地状态；若返回 `agentRun` 或 workflow 已 running，则设置 `isGenerating = true`。
+6. 后端创建 Agent run 后通过 SSE 推送进度。
+7. `stream.ts` 分发 `agent_run_started`、`agent_run_attempt`、`assistant_message`、`a2ui_messages`、`surface_snapshot` 等事件。
+8. `workspace` 更新业务状态，`renderer.processMessages()` 追加 A2UI messages。
+9. `PreviewPanel` 观察 renderer revision，并用 `MessageProcessor` 消费新增 messages。
 
 ### Workflow 交互
 

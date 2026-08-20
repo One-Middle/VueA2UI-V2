@@ -63,7 +63,7 @@ workflow 阶段：
 plan -> generate_a2ui -> validate -> preview -> commit
 ```
 
-workflow 的启动由 `POST /api/sessions/:sessionId/messages` 触发：`MessageService` 通过 UI 生成意图正则（`a2ui|ui|页面|界面|组件|生成|创建|修改|调整|改成|预览` 等）或前端传入的 `intent` 判断是否需要创建新 workflow。`SendMessageResponse.workflow` 返回触发或推进的 workflow 摘要。
+workflow 的启动由 `POST /api/sessions/:sessionId/messages` 触发：`MessageService` 通过 UI 生成意图正则（`a2ui|ui|页面|界面|组件|生成|创建|修改|调整|改成|预览` 等）或前端传入的 `intent` 判断是否需要创建新 workflow。若当前 active workflow 处于 `failed_retryable`，同一个消息入口会把用户追加消息作为恢复触发器，复用最新失败 step 重新执行；`plan` 和 `generate_a2ui` 失败直接恢复原 step，`validate` 失败回到其来源 `generate_a2ui` step 重新生成。`SendMessageResponse.workflow` 返回触发、恢复或推进的 workflow 摘要。
 
 `WorkflowStepDto.stageState` 是 API DTO 字段，用于表达阶段内等待态：
 
@@ -79,7 +79,7 @@ workflow 的启动由 `POST /api/sessions/:sessionId/messages` 触发：`Message
 - `retry_step`
 - `cancel`
 
-`retry_step` 当前只支持重试最新的失败 `generate_a2ui` step，通过创建新的 `generate_a2ui` step 并复用已确认 plan 重新生成 candidate。
+`retry_step` 当前只支持重试最新的失败 `generate_a2ui` step。Codex 式续跑的主路径是用户向 `POST /api/sessions/:sessionId/messages` 追加普通消息，由后端在 `failed_retryable` workflow 上复用失败 step 并创建新的 AgentRun 记录本次尝试。
 
 `submit_clarification`：
 

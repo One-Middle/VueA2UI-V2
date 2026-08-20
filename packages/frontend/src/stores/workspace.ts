@@ -280,11 +280,17 @@ export const useWorkspaceStore = defineStore("workspace", {
         }
 
         logger.info(`发送消息 → session=${shortId(sessionId)}, content=${trimmedContent.length}字`);
-        await api.sendMessage(sessionId, {
+        const result = await api.sendMessage(sessionId, {
           content: trimmedContent,
           attachmentFileIds,
           options: { intent: "CREATE_UI" },
         });
+        if (result.workflow) {
+          this.upsertWorkflow(result.workflow);
+        }
+        if (["pending", "running"].includes(result.agentRun?.status ?? "") || result.workflow?.status === "running") {
+          this.isGenerating = true;
+        }
         // 消息发送成功后，SSE 会自动推送 assistant 消息和 A2UI 结果
         // 这里先重新加载消息列表确保 user 消息出现在列表中
         await this.loadMessages();
@@ -519,12 +525,22 @@ export const useWorkspaceStore = defineStore("workspace", {
     },
 
     /** 插入或更新 Workflow。 */
-    upsertWorkflow(workflow: AgentWorkflowDetailDto | AgentWorkflowDto) {
+    upsertWorkflow(workflow: AgentWorkflowDetailDto | AgentWorkflowDto | Pick<AgentWorkflowDto, "id" | "status" | "currentStepType">) {
       const existingIdx = this.workflows.findIndex((item) => item.id === workflow.id);
       const detail = "steps" in workflow
         ? workflow
         : ({
             ...workflow,
+            sessionId: "sessionId" in workflow ? workflow.sessionId : (this.activeSessionId ?? ""),
+            title: "title" in workflow ? workflow.title : (existingIdx >= 0 ? this.workflows[existingIdx]!.title : null),
+            intent: "intent" in workflow ? workflow.intent : (existingIdx >= 0 ? this.workflows[existingIdx]!.intent : null),
+            completedReason: "completedReason" in workflow ? workflow.completedReason : (existingIdx >= 0 ? this.workflows[existingIdx]!.completedReason : null),
+            failureReason: "failureReason" in workflow ? workflow.failureReason : (existingIdx >= 0 ? this.workflows[existingIdx]!.failureReason : null),
+            metadata: "metadata" in workflow ? workflow.metadata : (existingIdx >= 0 ? this.workflows[existingIdx]!.metadata : {}),
+            startedAt: "startedAt" in workflow ? workflow.startedAt : (existingIdx >= 0 ? this.workflows[existingIdx]!.startedAt : null),
+            completedAt: "completedAt" in workflow ? workflow.completedAt : (existingIdx >= 0 ? this.workflows[existingIdx]!.completedAt : null),
+            createdAt: "createdAt" in workflow ? workflow.createdAt : (existingIdx >= 0 ? this.workflows[existingIdx]!.createdAt : new Date().toISOString()),
+            updatedAt: "updatedAt" in workflow ? workflow.updatedAt : new Date().toISOString(),
             steps: existingIdx >= 0 ? this.workflows[existingIdx]!.steps : [],
             artifacts: existingIdx >= 0 ? this.workflows[existingIdx]!.artifacts : [],
             agentRuns: existingIdx >= 0 ? this.workflows[existingIdx]!.agentRuns : [],

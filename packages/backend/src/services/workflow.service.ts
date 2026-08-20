@@ -201,6 +201,13 @@ export type ConfirmCandidateCommitInput = {
   candidateArtifactId?: string;
 };
 
+export type ResumeFailedStepFromMessageInput = {
+  sessionId: string;
+  workflowId: string;
+  messageId: string;
+  userMessage: string;
+};
+
 /**
  * 将未知值安全转换为 JsonObject。
  *
@@ -322,6 +329,7 @@ async function runWorkflowTask(input: {
   sessionId: string;
   workflowId: string;
   workflowStepId: string;
+  triggerMessageId?: string | null;
   task: AgentWorkflowTaskInput["task"];
   gate: WorkflowStepType;
   stageState?: AgentWorkflowTaskInput["stageState"];
@@ -337,6 +345,7 @@ async function runWorkflowTask(input: {
     sessionId: input.sessionId,
     workflowId: input.workflowId,
     workflowStepId: input.workflowStepId,
+    triggerMessageId: input.triggerMessageId ?? null,
     intent: input.task === "revise_plan" ? "REVISE_PLAN" : "INITIAL_PLANNING",
     metadata: {
       task: input.task,
@@ -878,6 +887,352 @@ export const workflowService = {
    */
   getActiveWorkflow(sessionId: string) {
     return workflowRepository.findActiveBySessionId(sessionId);
+  },
+
+  /**
+   * 用户在 retryable 失败后追加普通消息时，复用当前失败 step 继续执行。
+   *
+   * 注意：本方法只恢复同一个 workflow 内最新失败 step，不创建新 workflow，也不创建新的同类型 step。
+   * `validate` 失败会回到其来源 `generate_a2ui` step 重新生成 candidate。
+   *
+   * @param input - 恢复触发消息与目标 workflow
+   * @returns 更新后的 workflow 详情和同步创建的 AgentRun 摘要
+   */
+  async resumeFailedStepFromMessage(input: ResumeFailedStepFromMessageInput) {
+    const workflow = await workflowRepository.findWorkflowById(input.workflowId);
+    if (!workflow || workflow.sessionId !== input.sessionId || workflow.status !== "failed_retryable") {
+      throw conflict("当前 workflow 不在可恢复失败状态", "WORKFLOW_RESUME_NOT_AVAILABLE", {
+        workflowId: input.workflowId,
+      });
+    }
+
+    const latestFailedStep = [...(workflow.steps ?? [])]
+      .filter((step) => step.status === "failed")
+      .sort((a, b) => a.sequence - b.sequence)
+      .at(-1);
+    if (!latestFailedStep) {
+      throw conflict("当前 workflow 没有可恢复的失败 step", "WORKFLOW_RESUME_STEP_NOT_AVAILABLE", {
+        workflowId: input.workflowId,
+      });
+    }
+
+    if (latestFailedStep.type === "plan") {
+      const result = await this.resumePlanStepFromMessage({
+        ...input,
+        workflowStepId: latestFailedStep.id,
+      });
+      return {
+        workflow: result.workflow,
+        agentRun: result.agentRun,
+      };
+    }
+
+    if (latestFailedStep.type === "generate_a2ui") {
+      const workflowDetail = await this.resumeGenerateStepFromMessage({
+        ...input,
+        workflowStepId: latestFailedStep.id,
+      });
+      return {
+        workflow: workflowDetail,
+        agentRun: null,
+      };
+    }
+
+    if (latestFailedStep.type === "validate") {
+      const metadata = toJsonObject(latestFailedStep.metadata);
+      const generateStepId = typeof metadata["generateStepId"] === "string" ? metadata["generateStepId"] : null;
+      if (!generateStepId) {
+        throw conflict("validate 失败缺少来源 generate step，无法恢复", "WORKFLOW_VALIDATE_RESUME_SOURCE_NOT_FOUND", {
+          workflowId: input.workflowId,
+          workflowStepId: latestFailedStep.id,
+        });
+      }
+      const generateStep = await workflowRepository.findStepById(generateStepId);
+      if (!generateStep || generateStep.workflowId !== input.workflowId || generateStep.type !== "generate_a2ui") {
+        throw conflict("validate 失败来源 generate step 不可用", "WORKFLOW_VALIDATE_RESUME_SOURCE_NOT_AVAILABLE", {
+          workflowId: input.workflowId,
+          workflowStepId: latestFailedStep.id,
+          generateStepId,
+        });
+      }
+
+      await this.updateStep({
+        workflowId: input.workflowId,
+        sessionId: input.sessionId,
+        stepId: latestFailedStep.id,
+        status: "pending",
+        stageState: null,
+        failureReason: null,
+        failureMetadata: {},
+        completedAt: null,
+        metadata: {
+          ...metadata,
+          resumeMessageId: input.messageId,
+          resumeFromValidateFailure: true,
+        },
+      });
+
+      const workflowDetail = await this.resumeGenerateStepFromMessage({
+        ...input,
+        workflowStepId: generateStep.id,
+      });
+      return {
+        workflow: workflowDetail,
+        agentRun: null,
+      };
+    }
+
+    throw conflict("当前失败 step 暂不支持通过普通消息恢复", "WORKFLOW_RESUME_STEP_TYPE_NOT_SUPPORTED", {
+      workflowId: input.workflowId,
+      workflowStepId: latestFailedStep.id,
+      stepType: latestFailedStep.type,
+    });
+  },
+
+  /**
+   * 复用失败的 plan step 重新运行规划。
+   *
+   * @param input - 恢复消息与 plan step
+   * @returns 更新后的 workflow 详情和本次同步创建的 AgentRun 摘要
+   */
+  async resumePlanStepFromMessage(input: ResumeFailedStepFromMessageInput & { workflowStepId: string }) {
+    const planStep = await workflowRepository.findStepById(input.workflowStepId);
+    if (!planStep || planStep.workflowId !== input.workflowId || planStep.type !== "plan") {
+      throw conflict("当前 workflow 没有可恢复的 plan step", "PLAN_RESUME_STEP_NOT_AVAILABLE", {
+        workflowId: input.workflowId,
+        workflowStepId: input.workflowStepId,
+      });
+    }
+
+    await workflowRepository.updateWorkflow(input.workflowId, {
+      status: "running",
+      currentStepType: "plan",
+      failureReason: null,
+      completedAt: null,
+    });
+
+    const resumedStep = await this.updateStep({
+      workflowId: input.workflowId,
+      sessionId: input.sessionId,
+      stepId: planStep.id,
+      status: "running",
+      stageState: null,
+      attemptCount: planStep.attemptCount + 1,
+      failureReason: null,
+      failureMetadata: {},
+      startedAt: new Date(),
+      completedAt: null,
+      metadata: {
+        ...(toJsonObject(planStep.metadata)),
+        resumeMessageId: input.messageId,
+        resumeUserMessage: input.userMessage,
+      },
+    });
+
+    const latestPlan = await workflowRepository.findLatestArtifact(input.workflowId, "plan_markdown");
+    const latestClarification = await workflowRepository.findLatestArtifact(input.workflowId, "clarification_form");
+    const latestDecision = await workflowRepository.findLatestArtifact(input.workflowId, "decision_form");
+    const nextPlanVersion = (latestPlan?.version ?? 0) + 1;
+    const nextClarificationVersion = (latestClarification?.version ?? 0) + 1;
+    const nextDecisionVersion = (latestDecision?.version ?? 0) + 1;
+
+    const { runId, result } = await runWorkflowTask({
+      sessionId: input.sessionId,
+      workflowId: input.workflowId,
+      workflowStepId: planStep.id,
+      triggerMessageId: input.messageId,
+      task: latestPlan ? "revise_plan" : "plan",
+      gate: "plan",
+      userMessage: input.userMessage,
+      previousPlanMarkdown: latestPlan?.contentText ?? null,
+      revisionText: latestPlan ? input.userMessage : null,
+      workflowContext: {
+        resumeMessageId: input.messageId,
+        previousPlanArtifactId: latestPlan?.id ?? null,
+        planVersion: nextPlanVersion,
+      },
+    });
+
+    if (result.parsedResult.kind === "clarification_request") {
+      await this.updateStep({
+        workflowId: input.workflowId,
+        sessionId: input.sessionId,
+        stepId: planStep.id,
+        status: "awaiting_confirmation",
+        stageState: "awaiting_clarification",
+        metadata: {
+          ...(toJsonObject(resumedStep.metadata)),
+          agentRunId: runId,
+          parsedResultKind: result.parsedResult.kind,
+        },
+      });
+
+      await this.createArtifact({
+        workflowId: input.workflowId,
+        workflowStepId: planStep.id,
+        sessionId: input.sessionId,
+        kind: "clarification_form",
+        version: nextClarificationVersion,
+        contentJson: {
+          ...result.parsedResult.form,
+          additionalInstructions: {
+            id: "additional_instructions",
+            type: "textarea",
+            label: "其他自然语言补充",
+            required: false,
+          },
+        } as unknown as Prisma.InputJsonValue,
+        createdBy: "agent",
+        metadata: {
+          agentRunId: runId,
+          source: "askClarification",
+          toolCallId: result.toolCalls.find((call) => call.toolName === "askClarification")?.toolCallId ?? null,
+          resumeMessageId: input.messageId,
+        },
+      });
+      const workflowDetail = await workflowRepository.findWorkflowById(input.workflowId);
+      return {
+        workflow: workflowDetail ? toWorkflowDetailDto(workflowDetail) : null,
+        agentRun: { id: runId, status: "committed" as const },
+      };
+    }
+
+    if (result.parsedResult.kind !== "plan_markdown") {
+      const failureReason = resultFailureReason(result.parsedResult);
+      const failedStep = await this.updateStep({
+        workflowId: input.workflowId,
+        sessionId: input.sessionId,
+        stepId: planStep.id,
+        status: "failed",
+        stageState: null,
+        failureReason,
+        failureMetadata: {
+          agentRunId: runId,
+          parsedResultKind: result.parsedResult.kind,
+        },
+        completedAt: new Date(),
+        metadata: {
+          ...(toJsonObject(resumedStep.metadata)),
+          agentRunId: runId,
+        },
+      });
+      await this.failWorkflow({
+        workflowId: input.workflowId,
+        sessionId: input.sessionId,
+        failureReason,
+        failedStep: toStepDto(failedStep),
+        retryable: true,
+      });
+      const workflowDetail = await workflowRepository.findWorkflowById(input.workflowId);
+      return {
+        workflow: workflowDetail ? toWorkflowDetailDto(workflowDetail) : null,
+        agentRun: { id: runId, status: "failed" as const },
+      };
+    }
+
+    await this.updateStep({
+      workflowId: input.workflowId,
+      sessionId: input.sessionId,
+      stepId: planStep.id,
+      status: "awaiting_confirmation",
+      stageState: "awaiting_plan_confirmation",
+      metadata: {
+        ...(toJsonObject(resumedStep.metadata)),
+        agentRunId: runId,
+        parsedResultKind: result.parsedResult.kind,
+      },
+    });
+
+    const planArtifact = await this.createArtifact({
+      workflowId: input.workflowId,
+      workflowStepId: planStep.id,
+      sessionId: input.sessionId,
+      kind: "plan_markdown",
+      version: nextPlanVersion,
+      contentText: result.parsedResult.markdown,
+      createdBy: "agent",
+      metadata: {
+        agentRunId: runId,
+        previousPlanArtifactId: latestPlan?.id ?? null,
+        resumeMessageId: input.messageId,
+      },
+    });
+
+    await this.createArtifact({
+      workflowId: input.workflowId,
+      workflowStepId: planStep.id,
+      sessionId: input.sessionId,
+      kind: "decision_form",
+      version: nextDecisionVersion,
+      contentJson: {
+        ...result.parsedResult.decisionForm,
+        targetArtifactId: planArtifact.id,
+      } as unknown as Prisma.InputJsonValue,
+      createdBy: "agent",
+      metadata: {
+        source: "askUserDecision",
+        agentRunId: runId,
+        toolCallId: result.toolCalls.find((call) => call.toolName === "askUserDecision")?.toolCallId ?? null,
+        resumeMessageId: input.messageId,
+      },
+    });
+
+    const workflowDetail = await workflowRepository.findWorkflowById(input.workflowId);
+    return {
+      workflow: workflowDetail ? toWorkflowDetailDto(workflowDetail) : null,
+      agentRun: { id: runId, status: "committed" as const },
+    };
+  },
+
+  /**
+   * 复用失败的 generate_a2ui step 重新运行候选生成。
+   *
+   * @param input - 恢复消息与 generate step
+   * @returns 更新后的 workflow 详情
+   */
+  async resumeGenerateStepFromMessage(input: ResumeFailedStepFromMessageInput & { workflowStepId: string }) {
+    const generateStep = await workflowRepository.findStepById(input.workflowStepId);
+    if (!generateStep || generateStep.workflowId !== input.workflowId || generateStep.type !== "generate_a2ui") {
+      throw conflict("当前 workflow 没有可恢复的 generate_a2ui step", "GENERATE_RESUME_STEP_NOT_AVAILABLE", {
+        workflowId: input.workflowId,
+        workflowStepId: input.workflowStepId,
+      });
+    }
+
+    await workflowRepository.updateWorkflow(input.workflowId, {
+      status: "running",
+      currentStepType: "generate_a2ui",
+      failureReason: null,
+      completedAt: null,
+    });
+
+    await this.updateStep({
+      workflowId: input.workflowId,
+      sessionId: input.sessionId,
+      stepId: generateStep.id,
+      status: "running",
+      stageState: null,
+      attemptCount: generateStep.attemptCount + 1,
+      failureReason: null,
+      failureMetadata: {},
+      startedAt: new Date(),
+      completedAt: null,
+      metadata: {
+        ...(toJsonObject(generateStep.metadata)),
+        resumeMessageId: input.messageId,
+        resumeUserMessage: input.userMessage,
+      },
+    });
+
+    void this.executeGenerateA2UI({
+      sessionId: input.sessionId,
+      workflowId: input.workflowId,
+      workflowStepId: generateStep.id,
+      triggerMessageId: input.messageId,
+    });
+
+    const workflowDetail = await workflowRepository.findWorkflowById(input.workflowId);
+    return workflowDetail ? toWorkflowDetailDto(workflowDetail) : null;
   },
 
   /**
@@ -2019,6 +2374,7 @@ export const workflowService = {
         sessionId: input.sessionId,
         workflowId: input.workflowId,
         workflowStepId: generateStep.id,
+        triggerMessageId: input.triggerMessageId,
         task: "generate_a2ui",
         gate: "generate_a2ui",
         userMessage: [
@@ -2083,18 +2439,42 @@ export const workflowService = {
         },
       });
 
-      const validateStep = await this.createStep({
-        workflowId: input.workflowId,
-        sessionId: input.sessionId,
-        type: "validate",
-        sequence: generateStep.sequence + 1,
-        status: "running",
-        metadata: {
-          gate: "validate",
-          agentRunId: runId,
-          generateStepId: generateStep.id,
-        },
-      });
+      const latestValidateStep = await workflowRepository.findLatestStep(input.workflowId, "validate");
+      const latestValidateMetadata = toJsonObject(latestValidateStep?.metadata);
+      const canReuseValidateStep = latestValidateStep
+        && latestValidateStep.workflowId === input.workflowId
+        && latestValidateMetadata["generateStepId"] === generateStep.id
+        && ["failed", "pending"].includes(latestValidateStep.status);
+      const validateStep = canReuseValidateStep
+        ? await this.updateStep({
+          workflowId: input.workflowId,
+          sessionId: input.sessionId,
+          stepId: latestValidateStep.id,
+          status: "running",
+          stageState: null,
+          failureReason: null,
+          failureMetadata: {},
+          startedAt: new Date(),
+          completedAt: null,
+          metadata: {
+            ...latestValidateMetadata,
+            agentRunId: runId,
+            generateStepId: generateStep.id,
+            resumedFromMessageId: input.triggerMessageId,
+          },
+        })
+        : await this.createStep({
+          workflowId: input.workflowId,
+          sessionId: input.sessionId,
+          type: "validate",
+          sequence: generateStep.sequence + 1,
+          status: "running",
+          metadata: {
+            gate: "validate",
+            agentRunId: runId,
+            generateStepId: generateStep.id,
+          },
+        });
 
       const validateStartTime = Date.now();
       const validation = validateA2UI({

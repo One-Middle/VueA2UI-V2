@@ -14,6 +14,7 @@ vi.mock("../../services/api", () => ({
   listWorkflows: vi.fn(() => Promise.resolve({ items: [] })),
   listA2UIEvents: vi.fn(() => Promise.resolve({ items: [], pageInfo: { nextCursor: null, hasMore: false } })),
   listSnapshots: vi.fn(() => Promise.resolve({ items: [], pageInfo: { nextCursor: null, hasMore: false } })),
+  sendMessage: vi.fn(),
   sendWorkflowAction: vi.fn(),
 }));
 
@@ -298,6 +299,83 @@ describe("workspace store session restore", () => {
       },
     });
     expect(workspace.messages[0]).toMatchObject({ id: "message-decision" });
+  });
+
+  it("updates workflow state when sendMessage resumes a running workflow", async () => {
+    vi.mocked(api.sendMessage).mockResolvedValue({
+      message: {
+        id: "message-resume",
+        role: "user",
+        content: "继续",
+      },
+      agentRun: {
+        id: "run-resume",
+        status: "running",
+      },
+      workflow: {
+        id: "workflow-a",
+        status: "running",
+        currentStepType: "plan",
+      },
+      streamUrl: "/api/sessions/session-a/stream",
+    });
+    vi.mocked(api.listMessages).mockResolvedValue({
+      items: [makeMessage("message-resume")],
+      pageInfo: { nextCursor: null, hasMore: false },
+    });
+
+    const workspace = useWorkspaceStore();
+    workspace.activeSessionId = "session-a";
+    workspace.workflows = [{
+      ...makeWorkflow(),
+      status: "failed_retryable",
+      failureReason: "API 失败",
+    }];
+
+    await workspace.sendMessage("继续");
+
+    expect(api.sendMessage).toHaveBeenCalledWith("session-a", expect.objectContaining({
+      content: "继续",
+    }));
+    expect(workspace.workflows[0]).toMatchObject({
+      id: "workflow-a",
+      status: "running",
+      currentStepType: "plan",
+    });
+    expect(workspace.isGenerating).toBe(true);
+    expect(workspace.messages[0]).toMatchObject({ id: "message-resume" });
+  });
+
+  it("does not keep generating state for a synchronously completed workflow resume", async () => {
+    vi.mocked(api.sendMessage).mockResolvedValue({
+      message: {
+        id: "message-resume",
+        role: "user",
+        content: "继续",
+      },
+      agentRun: {
+        id: "run-resume",
+        status: "committed",
+      },
+      workflow: {
+        id: "workflow-a",
+        status: "awaiting_confirmation",
+        currentStepType: "plan",
+      },
+      streamUrl: "/api/sessions/session-a/stream",
+    });
+
+    const workspace = useWorkspaceStore();
+    workspace.activeSessionId = "session-a";
+
+    await workspace.sendMessage("继续");
+
+    expect(workspace.isGenerating).toBe(false);
+    expect(workspace.workflows[0]).toMatchObject({
+      id: "workflow-a",
+      status: "awaiting_confirmation",
+      currentStepType: "plan",
+    });
   });
 });
 
