@@ -42,6 +42,7 @@ import { WorkflowAgentExecutor } from "./workflow-agent-executor.js";
 import { WorkflowAgentContextBuilder } from "./workflow-agent-context-builder.js";
 import { ToolRegistry } from "./tool-registry.js";
 import { ReactPromptComposer } from "./react-prompt-composer.js";
+import { createCatalogContext } from "./catalog-context.js";
 import { dehydrateResourceLedger, hydrateResourceLedger, type DroppedResource, type ResourceLedger } from "./resource-ledger.js";
 import type { AgentFinalArtifact, ReactAgentRunResult } from "./react-agent-types.js";
 import {
@@ -341,6 +342,7 @@ export class AgentRuntime implements IAgentRuntime {
       input.resourceLedger,
       input.enabledSkills,
     );
+    const catalogContext = createCatalogContext();
 
     // 注入 ToolRegistry：skill 内容来自已构建上下文，不查询数据库；
     // resourceLedger 在多次 ReAct 迭代间共享，用于披露去重。
@@ -363,11 +365,12 @@ export class AgentRuntime implements IAgentRuntime {
       },
       currentSnapshot: input.currentSnapshot,
       resourceLedger: ledger,
+      catalogContext,
     });
 
     const executor = new WorkflowAgentExecutor({
       modelClient: this.modelClient,
-      promptComposer: new ReactPromptComposer(ledger),
+      promptComposer: new ReactPromptComposer(ledger, catalogContext),
       toolRegistry,
       onTraceEvent,
     });

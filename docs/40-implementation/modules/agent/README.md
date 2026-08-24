@@ -31,11 +31,12 @@ Runtime 有两个入口，对应两类运行路径：
 
 - 构建 Agent 上下文。
 - 组装普通生成的初始 prompt、修复 prompt、组件详情披露 prompt、Skill 内容披露 prompt 和 Skill Reference 披露 prompt。
-- 组装 workflow 任务的 ReAct system prompt 与逐轮 user prompt（goal / facts / observations / currentDraft / working resources）。
+- 组装 workflow 任务的 ReAct system prompt 与逐轮 user prompt（goal / facts / observations / currentDraft / working resources / catalog context）。
 - 调用 OpenAI-compatible API。
 - 普通生成解析模型输出中的 `{ assistantMessage, a2uiMessages }`，并按需披露组件详情、Skill 内容和 Skill Reference。
-- workflow 任务以严格 JSON 动作协议（`tool_call` / `final_draft` / `give_up`）执行 ReAct 循环，产出 ParsedAgentResult 与 trace 事件。
+- workflow 任务以严格 JSON 动作协议（`tool_call` / `final_draft` / `give_up`）执行 ReAct 循环；A2UI 候选结果必须嵌入 `final_draft.draft.messages`，不能以 `{ assistantMessage, a2uiMessages }` 作为顶层输出。
 - 维护 Resource Ledger，跨 workflow task 共享已披露 Skill / Reference 并做去重。
+- 维护 Catalog Context，保存已披露组件字段规范，供生成和修复 A2UI 时直接引用。
 - 调用 `validateA2UI` 校验 A2UI 消息。
 - 记录 `validateA2UI`、`getCatalogComponentDetails`、`getSkillContent`、`getSkillReferenceContent`、`askClarification`、`askUserDecision` 等工具调用信息。
 
@@ -102,7 +103,8 @@ packages/agent/src/
 | `src/runtime/agent-runtime.ts` | Agent 主循环：普通 `run()` 编排生成、渐进披露、校验、修复；`runWorkflowTask()` 组装 ReAct executor、hydrate Resource Ledger 并把 trace summary 映射为结果。 |
 | `src/runtime/react-agent-types.ts` | ReAct 运行时内部类型：goal / facts / capabilities / limits / draft / observation / 动作与最终产物。 |
 | `src/runtime/react-action-parser.ts` | 解析模型原始输出为单一 `AgentModelAction`（只接受严格 JSON object）。 |
-| `src/runtime/react-prompt-composer.ts` | 合成 ReAct 的稳定 system prompt 与逐轮 user prompt（含 Working Resources 分区）。 |
+| `src/runtime/catalog-context.ts` | 维护 workflow 单次运行内已披露组件字段规范，并渲染面向生成与修复的 Catalog Context。 |
+| `src/runtime/react-prompt-composer.ts` | 合成 ReAct 的稳定 system prompt 与逐轮 user prompt（含 Working Resources 与 Catalog Context 分区）。 |
 | `src/runtime/workflow-agent-context-builder.ts` | 把 `AgentWorkflowTaskInput` 投影为 executor 输入（goal / facts / capabilities / limits）。 |
 | `src/runtime/workflow-agent-executor.ts` | ReAct while 循环执行器：模型调用 → 动作解析 → 工具执行 → 观察累积 → 草稿修复，并发出 trace 事件。 |
 | `src/runtime/tool-registry.ts` | 受控工具注册表（6 个工具），执行参数校验与失败策略，并提供最终产物结构校验辅助。 |
@@ -156,6 +158,13 @@ packages/agent/src/
 6. 每轮迭代通过 `onTraceEvent` 发出 trace 事件，后端零转换转发为 `agent_trace_event` SSE。
 7. 执行结束把最终产物映射为 `ParsedAgentResult`，从 trace 提取 `ToolCallRecord`，并把运行时 ledger 脱水为 `ResourceLedgerSnapshot`。
 
+Workflow 路径的模型输出约束：
+
+- 顶层必须是 ReAct action envelope，不能直接输出普通生成路径的 `{ assistantMessage, a2uiMessages }`。
+- 生成候选 A2UI 时，`finalKind` 必须是 `candidate_a2ui_messages`，A2UI 消息数组必须放在 `draft.messages`。
+- `draft.assistantMessage` 可作为候选说明文本，由 Runtime 映射到候选 artifact 的说明字段。
+- `builtin:a2ui-v0.9-generation` 在 workflow prompt 中注入时，应描述 A2UI payload 在 ReAct draft 内的位置，避免和普通 `run()` 输出协议冲突。
+
 ## 7.1 Model IO Logging
 
 `ModelClient.generate(messages, traceContext?)` 统一接入 Model IO Logging（模型输入输出日志），因此普通 `run()`、Workflow `runWorkflowTask()`、修复和渐进披露路径都会经过同一个模型 IO 记录点。
@@ -189,6 +198,19 @@ packages/agent/src/
 
 - `a2ui-generation-standards`：生成 UI 前必须请求，包含符合 Renderer 的 A2UI 消息结构、组件树、dataModel、交互、JSRuntime、安全边界、bad case 和输出检查。
 - `high-quality-a2ui-good-cases`：复杂 UI 或需要质量标杆时请求，包含来自 Renderer 能力 demo 的 Music Player、Finance Brief 和 Work Board 三个完整 good case。
+
+### workflow Catalog Context
+
+Workflow 路径中，`getCatalogComponentDetails` 的结果不应作为大段 observation 正文长期回放。组件详情是生成约束，应进入独立 Catalog Context 分区。
+
+Catalog Context 的推荐渲染方式：
+
+- 按组件名称分组。
+- 列出允许字段、必填字段、枚举值和动态绑定形状。
+- 对常见混淆字段给出禁止说明，例如 `TextField` 使用 `text` 绑定输入值，`CheckBox` 使用布尔 `value`，`Text` 使用 `text` 展示内容。
+- Observation 只保留工具执行摘要，避免把组件规范混入时间线日志。
+
+`validateA2UI` 失败反馈应尽量保留结构化诊断：组件 ID、组件类型、错误 path、多余字段名、期望类型、实际值摘要和修复提示。这样 executor 下一轮能基于 `currentDraft + Catalog Context + structured validation errors` 做局部修复。
 
 ## 8.1 A2UI 脚本路径作用域方案
 

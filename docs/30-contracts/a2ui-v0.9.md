@@ -204,7 +204,7 @@ Frontend 负责监听并转发 Renderer action/error，Backend 负责记录，Ag
 
 ## 6. Agent 输出约束
 
-Agent 只能输出：
+普通非 workflow 生成路径中，Agent 最终输出仍使用：
 
 ```json
 {
@@ -213,7 +213,23 @@ Agent 只能输出：
 }
 ```
 
-Agent 的身份 Prompt 只注入工作流、输出通道和安全边界；A2UI 生成规则通过 `builtin:a2ui-v0.9-generation` 基础 Skill 渐进披露。该 Skill 由后端 Skill Resolver 放入 `AgentRunInput.enabledSkills` 后供 Runtime 消费，最终提交仍必须通过 `validateA2UI`。
+Workflow ReAct 路径中，模型顶层输出必须是单个 action envelope，不能直接输出上述普通路径格式。候选 A2UI payload 必须嵌入 `candidate_a2ui_messages` final draft：
+
+```json
+{
+  "type": "final_draft",
+  "reasoningSummary": "生成候选 A2UI",
+  "finalKind": "candidate_a2ui_messages",
+  "draft": {
+    "assistantMessage": "说明文本",
+    "messages": []
+  }
+}
+```
+
+Workflow Runtime 会将 `draft.messages` 作为候选 A2UI server-to-client messages，并在保存 artifact 前强制执行 `validateA2UI`。`draft.assistantMessage` 只作为候选说明文本，不参与 A2UI 协议校验。
+
+Agent 的身份 Prompt 只注入工作流、输出通道和安全边界；A2UI 生成规则通过 `builtin:a2ui-v0.9-generation` 基础 Skill 渐进披露。该 Skill 由后端 Skill Resolver 放入 `AgentRunInput.enabledSkills` 后供 Runtime 消费。Skill 正文在 workflow prompt 中出现时，必须说明 A2UI payload 如何放入 ReAct `final_draft.draft`，不能把普通非 workflow 的 `{ assistantMessage, a2uiMessages }` 描述成 workflow 顶层输出。
 
 `builtin:a2ui-v0.9-generation` 的 Reference 是 A2UI 生成约束的一部分：
 
@@ -227,6 +243,8 @@ Agent 的身份 Prompt 只注入工作流、输出通道和安全边界；A2UI �
 - 使用 Catalog 外组件。
 - 绕过 `validateA2UI`。
 - 把未校验草稿写入后端正式事件。
+
+Workflow 路径中，`getCatalogComponentDetails` 披露的组件字段约束属于 Catalog Context，不属于普通 observation 正文。模型生成或修复 A2UI 时应以 Catalog Context 中的允许字段、必填字段、枚举和禁止字段为准。
 
 ## 7. 维护规则
 

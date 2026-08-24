@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ToolRegistry } from "../tool-registry.js";
+import { createCatalogContext, listCatalogComponentNames } from "../catalog-context.js";
 import {
   createResourceLedger,
   hasSkill,
@@ -174,6 +175,67 @@ describe("ToolRegistry", () => {
     expect(result.status).toBe("completed");
     if (result.status === "completed") {
       expect(result.observation.kind).toBe("tool_result");
+    }
+  });
+
+  it("getCatalogComponentDetails 写入 Catalog Context，observation 只返回摘要", async () => {
+    const ledger = createResourceLedger();
+    const catalogContext = createCatalogContext();
+    const registry = new ToolRegistry(createCapabilities(), {
+      getSkillContent: () => null,
+      resourceLedger: ledger,
+      catalogContext,
+    });
+
+    const result = await registry.execute("getCatalogComponentDetails", {
+      components: ["Text", "TextField"],
+    });
+
+    expect(result.status).toBe("completed");
+    expect(listCatalogComponentNames(catalogContext)).toEqual(["Text", "TextField"]);
+    if (result.status === "completed") {
+      const serialized = JSON.stringify(result.observation.details ?? {});
+      expect(result.observation.message).toContain("Catalog Context");
+      expect(serialized).toContain("TextField");
+      expect(serialized).not.toContain("显示的文本内容");
+      expect(serialized).not.toContain("输入框值");
+    }
+  });
+
+  it("validateA2UI 失败 observation 包含可修复 diagnostics", async () => {
+    const registry = createRegistry(createCapabilities());
+
+    const result = await registry.execute("validateA2UI", {
+      messages: [
+        {
+          version: "v0.9",
+          createSurface: { surfaceId: "main", catalogId: CATALOG_ID },
+        },
+        {
+          version: "v0.9",
+          updateComponents: {
+            surfaceId: "main",
+            components: [
+              { id: "root", component: "Column", children: ["draftField"] },
+              { id: "draftField", component: "TextField", label: "任务", value: { path: "/todo/draft" } },
+            ],
+          },
+        },
+      ],
+    });
+
+    expect(result.status).toBe("completed");
+    if (result.status === "completed") {
+      expect(result.observation.details?.["diagnostics"]).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            componentId: "draftField",
+            component: "TextField",
+            extraProperty: "value",
+            repairHint: expect.stringContaining("改为 text"),
+          }),
+        ]),
+      );
     }
   });
 

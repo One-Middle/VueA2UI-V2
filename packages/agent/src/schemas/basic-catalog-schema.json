@@ -133,7 +133,9 @@
             { "type": "number", "minimum": 0, "maximum": 1 },
             { "$ref": "#/$defs/propertyScript" }
           ]
-        }
+        },
+        "overflow": { "$ref": "#/$defs/styleStringOrScript" },
+        "flex": { "$ref": "#/$defs/styleStringNumberOrScript" }
       },
       "additionalProperties": false
     },

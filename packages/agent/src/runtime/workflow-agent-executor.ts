@@ -26,6 +26,7 @@ import { parseAgentAction } from "./react-action-parser.js";
 import { ReactPromptComposer } from "./react-prompt-composer.js";
 import {
   ToolRegistry,
+  buildValidationObservationDetails,
   getMissingPlanHeadings,
   normalizeClarificationForm,
   normalizeDecisionForm,
@@ -245,6 +246,7 @@ export class WorkflowAgentExecutor {
           const observation: AgentObservation = {
             kind: "validation_error",
             message: finalization.error,
+            ...(finalization.details ? { details: finalization.details } : {}),
           };
           observations.push(observation);
           record.finalValidation = { valid: false, error: finalization.error };
@@ -311,7 +313,7 @@ export class WorkflowAgentExecutor {
     finalKind: AgentFinalKind,
     draft: JsonObject,
     expectedResult: AgentFinalKind[],
-  ): { ok: true; artifact: AgentFinalArtifact } | { ok: false; error: string } {
+  ): { ok: true; artifact: AgentFinalArtifact } | { ok: false; error: string; details?: JsonObject } {
     try {
       if (!expectedResult.includes(finalKind)) {
         return {
@@ -362,7 +364,14 @@ export class WorkflowAgentExecutor {
               .map((e) => `${e.code}: ${e.message}`)
               .join("; ");
             const suffix = result.errors.length > 5 ? ` 等共 ${result.errors.length} 个错误` : "";
-            return { ok: false, error: `candidate_a2ui_messages 未通过 validateA2UI：${summary}${suffix}` };
+            return {
+              ok: false,
+              error: `candidate_a2ui_messages 未通过 validateA2UI：${summary}${suffix}`,
+              details: {
+                valid: false,
+                ...buildValidationObservationDetails(result, messages),
+              },
+            };
           }
           return {
             ok: true,

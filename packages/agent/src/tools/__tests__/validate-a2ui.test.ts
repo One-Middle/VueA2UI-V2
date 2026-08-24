@@ -132,6 +132,7 @@ describe("validateA2UI catalog properties", () => {
               role: "previousPrice",
               emphasis: "muted",
               decoration: "lineThrough",
+              style: { flex: 1, overflow: "hidden" },
             },
             {
               id: "spacer",
@@ -151,5 +152,104 @@ describe("validateA2UI catalog properties", () => {
     });
 
     expect(result.valid).toBe(true);
+  });
+
+  it("does not treat harmless script variable fragments like one = as unsafe content", () => {
+    const messages: A2UIServerMessage[] = [
+      {
+        version: "v0.9",
+        createSurface: {
+          surfaceId: "main",
+          catalogId,
+        },
+      },
+      {
+        version: "v0.9",
+        updateComponents: {
+          surfaceId: "main",
+          components: [
+            { id: "root", component: "Column", children: ["button"] },
+            {
+              id: "button",
+              component: "Button",
+              label: "计算",
+              action: {
+                script: {
+                  code: "const one = 1; actions.emit('done', { one });",
+                  deps: [],
+                },
+              },
+            },
+          ],
+        },
+      },
+    ];
+
+    const result = validateA2UI({
+      messages,
+      catalogId,
+      currentSnapshot: null,
+    });
+
+    expect(result.errors).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: "UNSAFE_CONTENT" })]),
+    );
+  });
+
+  it("rejects browser event property names and html event attributes", () => {
+    const propertyResult = validateA2UI({
+      messages: [
+        {
+          version: "v0.9",
+          createSurface: { surfaceId: "main", catalogId },
+        },
+        {
+          version: "v0.9",
+          updateComponents: {
+            surfaceId: "main",
+            components: [
+              { id: "root", component: "Column", children: ["button"] },
+              {
+                id: "button",
+                component: "Button",
+                label: "保存",
+                onClick: "submit",
+                action: { event: { name: "submit" } },
+              },
+            ],
+          },
+        },
+      ] as unknown as A2UIServerMessage[],
+      catalogId,
+      currentSnapshot: null,
+    });
+
+    expect(propertyResult.errors).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: "UNSAFE_CONTENT" })]),
+    );
+
+    const htmlResult = validateA2UI({
+      messages: [
+        {
+          version: "v0.9",
+          createSurface: { surfaceId: "main", catalogId },
+        },
+        {
+          version: "v0.9",
+          updateComponents: {
+            surfaceId: "main",
+            components: [
+              { id: "root", component: "Text", text: '<button onclick="x()">x</button>' },
+            ],
+          },
+        },
+      ],
+      catalogId,
+      currentSnapshot: null,
+    });
+
+    expect(htmlResult.errors).toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: "UNSAFE_CONTENT" })]),
+    );
   });
 });
