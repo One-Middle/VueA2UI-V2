@@ -18,7 +18,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "../db.js";
 
 /** 处于进行中状态的 Workflow 状态枚举。 */
-export const ACTIVE_WORKFLOW_STATUSES = ["active", "running", "awaiting_confirmation", "failed_retryable"] as const;
+export const ACTIVE_WORKFLOW_STATUSES = ["active", "running", "awaiting_confirmation", "failed_retryable", "interrupted"] as const;
 
 export const workflowRepository = {
   /** 创建 AgentWorkflow 记录。 */

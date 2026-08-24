@@ -9,7 +9,12 @@
  * 不负责：A2UI 协议类型（见 a2ui.ts）、Agent 内部类型（见 agent.ts）、SSE 事件类型（见 sse.ts）。
  */
 
-import type { A2UIClientMessage, A2UIServerMessage, JsonObject, SurfaceSnapshotData } from "./a2ui";
+import type {
+  A2UIClientMessage,
+  A2UIServerMessage,
+  JsonObject,
+  SurfaceSnapshotData,
+} from "./a2ui";
 
 /** Skill 附带的参考资料。 */
 export interface SkillReference {
@@ -37,7 +42,8 @@ export type MessageKind =
   | "import_notice"
   | "export_notice";
 /** Agent 运行状态 */
-export type AgentRunStatus = "pending" | "running" | "committed" | "failed" | "cancelled";
+export type AgentRunStatus =
+  "pending" | "running" | "committed" | "failed" | "cancelled";
 /** 工具调用状态 */
 export type ToolCallStatus = "running" | "succeeded" | "failed";
 /** Agent Workflow 状态 */
@@ -46,6 +52,7 @@ export type AgentWorkflowStatus =
   | "running"
   | "awaiting_confirmation"
   | "failed_retryable"
+  | "interrupted"
   | "completed"
   | "failed"
   | "cancelled";
@@ -57,14 +64,11 @@ export type WorkflowStepStatus =
   | "confirmed"
   | "completed"
   | "failed"
+  | "interrupted"
   | "skipped";
 /** Workflow Step 类型 */
 export type WorkflowStepType =
-  | "plan"
-  | "generate_a2ui"
-  | "validate"
-  | "preview"
-  | "commit";
+  "plan" | "generate_a2ui" | "validate" | "preview" | "commit";
 /** Workflow 阶段内领域等待态。 */
 export type WorkflowStageState =
   | "awaiting_clarification"
@@ -82,10 +86,7 @@ export type WorkflowArtifactKind =
 export type WorkflowArtifactCreatedBy = "agent" | "user" | "backend";
 /** Workflow action 类型 */
 export type WorkflowActionType =
-  | "submit_clarification"
-  | "submit_decision"
-  | "retry_step"
-  | "cancel";
+  "submit_clarification" | "submit_decision" | "retry_step" | "cancel";
 /** Workflow decision form 的用户选择。 */
 export type WorkflowDecisionOption = "confirm" | "revise" | "reject";
 /** A2UI 事件状态 */
@@ -593,6 +594,8 @@ export interface WorkflowActionResponse {
   message?: MessageDto;
   /** 可选触发的 Agent run */
   agentRun?: AgentRunDto;
+  /** 可选受 action 影响的 Workflow step */
+  step?: WorkflowStepDto;
 }
 
 /** Renderer Action 请求（复用 A2UI 客户端消息） */
@@ -750,7 +753,12 @@ export interface AgentTraceEventDto {
   /** 所在迭代轮次索引 */
   iterationIndex: number;
   /** 事件类型 */
-  type: "iteration_started" | "model_action" | "tool_call" | "observation" | "final_validation";
+  type:
+    | "iteration_started"
+    | "model_action"
+    | "tool_call"
+    | "observation"
+    | "final_validation";
   /** 审计用推理摘要（非隐藏思维链） */
   reasoningSummary?: string;
   /** 模型动作类型 */
@@ -813,4 +821,3 @@ export interface SessionSkillDto {
   /** 是否已启用 */
   enabled: boolean;
 }
-

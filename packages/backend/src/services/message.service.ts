@@ -41,7 +41,8 @@ const SID = (id: string) => id.slice(0, 8);
  * 当消息内容匹配这些关键词时，自动触发 Agent Workflow（如"生成一个登录页"），
  * 而非走常规的 Agent Run 流程。
  */
-const WORKFLOW_INTENT_RE = /a2ui|ui|页面|界面|组件|生成|创建|修改|调整|改成|预览/i;
+const WORKFLOW_INTENT_RE =
+  /a2ui|ui|页面|界面|组件|生成|创建|修改|调整|改成|预览/i;
 
 /**
  * 判断一条用户消息是否需要启动 Agent Workflow。
@@ -53,7 +54,8 @@ const WORKFLOW_INTENT_RE = /a2ui|ui|页面|界面|组件|生成|创建|修改|�
  * @returns true 表示应启动 Workflow
  */
 function shouldStartWorkflow(content: string, intent?: string): boolean {
-  if (intent && /a2ui|ui|create_ui|generate|modify|workflow/i.test(intent)) return true;
+  if (intent && /a2ui|ui|create_ui|generate|modify|workflow/i.test(intent))
+    return true;
   return WORKFLOW_INTENT_RE.test(content);
 }
 
@@ -64,7 +66,7 @@ function shouldStartWorkflow(content: string, intent?: string): boolean {
  * @returns 转换后的 DTO，实体不存在时返回 null
  */
 function toMessageDto(
-  m: Awaited<ReturnType<typeof messageRepository.findById>>
+  m: Awaited<ReturnType<typeof messageRepository.findById>>,
 ): MessageDto | null {
   if (!m) return null;
   return {
@@ -92,7 +94,7 @@ export const messageService = {
     sessionId: string,
     content: string,
     attachmentFileIds?: string[],
-    options?: { intent?: string }
+    options?: { intent?: string },
   ): Promise<SendMessageResponse> {
     const session = await sessionRepository.findById(sessionId);
     if (!session) {
@@ -103,16 +105,17 @@ export const messageService = {
     }
 
     const activeWorkflow = await workflowService.getActiveWorkflow(sessionId);
-    const isNewWorkflow = !activeWorkflow && shouldStartWorkflow(content, options?.intent);
-    const workflow = activeWorkflow ?? (
-      isNewWorkflow
+    const isNewWorkflow =
+      !activeWorkflow && shouldStartWorkflow(content, options?.intent);
+    const workflow =
+      activeWorkflow ??
+      (isNewWorkflow
         ? await workflowService.createWorkflow({
             sessionId,
             title: content.slice(0, 60),
             intent: options?.intent ?? "CREATE_UI",
           })
-        : null
-    );
+        : null);
 
     const message = await messageRepository.create({
       session: { connect: { id: sessionId } },
@@ -124,15 +127,28 @@ export const messageService = {
     });
 
     if (workflow) {
-      logger.info(`收到 workflow 消息 → session=${SID(sessionId)}, workflow=${SID(workflow.id)}, content=${content.length}字`);
+      logger.info(
+        `收到 workflow 消息 → session=${SID(sessionId)}, workflow=${SID(workflow.id)}, content=${content.length}字`,
+      );
 
-      if (activeWorkflow?.status === "failed_retryable") {
-        const resumed = await workflowService.resumeFailedStepFromMessage({
-          sessionId,
-          workflowId: workflow.id,
-          messageId: message.id,
-          userMessage: content,
-        });
+      if (
+        activeWorkflow?.status === "failed_retryable" ||
+        activeWorkflow?.status === "interrupted"
+      ) {
+        const resumed =
+          activeWorkflow.status === "interrupted"
+            ? await workflowService.resumeInterruptedWorkflowFromMessage({
+                sessionId,
+                workflowId: workflow.id,
+                messageId: message.id,
+                userMessage: content,
+              })
+            : await workflowService.resumeFailedStepFromMessage({
+                sessionId,
+                workflowId: workflow.id,
+                messageId: message.id,
+                userMessage: content,
+              });
 
         return {
           message: {
@@ -140,18 +156,27 @@ export const messageService = {
             role: message.role as MessageDto["role"],
             content: message.content,
           },
-          agentRun: resumed.agentRun,
+          agentRun: resumed.agentRun
+            ? {
+                id: resumed.agentRun.id,
+                status: resumed.agentRun.status,
+              }
+            : null,
           workflow: resumed.workflow
             ? {
-              id: resumed.workflow.id,
-              status: resumed.workflow.status,
-              currentStepType: resumed.workflow.currentStepType,
-            }
+                id: resumed.workflow.id,
+                status: resumed.workflow.status,
+                currentStepType: resumed.workflow.currentStepType,
+              }
             : {
-              id: workflow.id,
-              status: workflow.status as NonNullable<SendMessageResponse["workflow"]>["status"],
-              currentStepType: workflow.currentStepType as NonNullable<SendMessageResponse["workflow"]>["currentStepType"],
-            },
+                id: workflow.id,
+                status: workflow.status as NonNullable<
+                  SendMessageResponse["workflow"]
+                >["status"],
+                currentStepType: workflow.currentStepType as NonNullable<
+                  SendMessageResponse["workflow"]
+                >["currentStepType"],
+              },
           streamUrl: `/api/sessions/${sessionId}/stream`,
         };
       }
@@ -173,8 +198,13 @@ export const messageService = {
         agentRun: null,
         workflow: {
           id: advancedWorkflow?.id ?? workflow.id,
-          status: (advancedWorkflow?.status ?? workflow.status) as NonNullable<SendMessageResponse["workflow"]>["status"],
-          currentStepType: (advancedWorkflow?.currentStepType ?? workflow.currentStepType) as NonNullable<SendMessageResponse["workflow"]>["currentStepType"],
+          status: (advancedWorkflow?.status ?? workflow.status) as NonNullable<
+            SendMessageResponse["workflow"]
+          >["status"],
+          currentStepType: (advancedWorkflow?.currentStepType ??
+            workflow.currentStepType) as NonNullable<
+            SendMessageResponse["workflow"]
+          >["currentStepType"],
         },
         streamUrl: `/api/sessions/${sessionId}/stream`,
       };
@@ -192,7 +222,9 @@ export const messageService = {
       maxAttempts: 3,
     });
 
-    logger.info(`收到用户消息 → session=${SID(sessionId)}, content=${content.length}字, agentRun=${SID(agentRun.id)}`);
+    logger.info(
+      `收到用户消息 → session=${SID(sessionId)}, content=${content.length}字, agentRun=${SID(agentRun.id)}`,
+    );
 
     return {
       message: {
@@ -202,7 +234,9 @@ export const messageService = {
       },
       agentRun: {
         id: agentRun.id,
-        status: agentRun.status as NonNullable<SendMessageResponse["agentRun"]>["status"],
+        status: agentRun.status as NonNullable<
+          SendMessageResponse["agentRun"]
+        >["status"],
       },
       streamUrl: `/api/sessions/${sessionId}/stream`,
     };
@@ -211,12 +245,12 @@ export const messageService = {
   /**
    * 按 session 分页查询消息列表。
    */
-  async listBySession(
-    sessionId: string,
-    query: Record<string, unknown>
-  ) {
+  async listBySession(sessionId: string, query: Record<string, unknown>) {
     const { limit, cursor } = parsePagination(query);
-    const messages = await messageRepository.findBySessionId(sessionId, { limit, cursor });
+    const messages = await messageRepository.findBySessionId(sessionId, {
+      limit,
+      cursor,
+    });
     const items = messages.map((m) => toMessageDto(m)!).filter(Boolean);
     return buildPageResult(items, items.length, limit, (item) => item.id);
   },

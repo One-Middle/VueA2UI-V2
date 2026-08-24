@@ -31,6 +31,7 @@ vi.mock("../workflow.service.js", () => ({
     createWorkflow: vi.fn(),
     startInitialPlanning: vi.fn(),
     resumeFailedStepFromMessage: vi.fn(),
+    resumeInterruptedWorkflowFromMessage: vi.fn(),
   },
 }));
 
@@ -77,29 +78,53 @@ describe("messageService.createUserMessageAndAgentRun", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("records an ordinary message on the active workflow without advancing workflow gates", async () => {
-    vi.mocked(sessionRepository.findById).mockResolvedValue(sessionRecord() as never);
-    vi.mocked(workflowService.getActiveWorkflow).mockResolvedValue(workflowRecord() as never);
-    vi.mocked(messageRepository.create).mockResolvedValue(messageRecord({ workflowId: "workflow-a" }) as never);
+    vi.mocked(sessionRepository.findById).mockResolvedValue(
+      sessionRecord() as never,
+    );
+    vi.mocked(workflowService.getActiveWorkflow).mockResolvedValue(
+      workflowRecord() as never,
+    );
+    vi.mocked(messageRepository.create).mockResolvedValue(
+      messageRecord({ workflowId: "workflow-a" }) as never,
+    );
 
-    const result = await messageService.createUserMessageAndAgentRun("session-a", "继续修改方案");
+    const result = await messageService.createUserMessageAndAgentRun(
+      "session-a",
+      "继续修改方案",
+    );
 
-    expect(messageRepository.create).toHaveBeenCalledWith(expect.objectContaining({
-      workflow: { connect: { id: "workflow-a" } },
-      content: "继续修改方案",
-    }));
+    expect(messageRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workflow: { connect: { id: "workflow-a" } },
+        content: "继续修改方案",
+      }),
+    );
     expect(agentRunRepository.create).not.toHaveBeenCalled();
     expect(workflowService.startInitialPlanning).not.toHaveBeenCalled();
     expect(result.agentRun).toBeNull();
-    expect(result.workflow).toMatchObject({ id: "workflow-a", status: "active", currentStepType: "plan" });
+    expect(result.workflow).toMatchObject({
+      id: "workflow-a",
+      status: "active",
+      currentStepType: "plan",
+    });
   });
 
   it("resumes a retryable failed workflow when the user sends a follow-up message", async () => {
-    vi.mocked(sessionRepository.findById).mockResolvedValue(sessionRecord() as never);
-    vi.mocked(workflowService.getActiveWorkflow).mockResolvedValue(workflowRecord({
-      status: "failed_retryable",
-      currentStepType: "plan",
-    }) as never);
-    vi.mocked(messageRepository.create).mockResolvedValue(messageRecord({ id: "message-resume", workflowId: "workflow-a" }) as never);
+    vi.mocked(sessionRepository.findById).mockResolvedValue(
+      sessionRecord() as never,
+    );
+    vi.mocked(workflowService.getActiveWorkflow).mockResolvedValue(
+      workflowRecord({
+        status: "failed_retryable",
+        currentStepType: "plan",
+      }) as never,
+    );
+    vi.mocked(messageRepository.create).mockResolvedValue(
+      messageRecord({
+        id: "message-resume",
+        workflowId: "workflow-a",
+      }) as never,
+    );
     vi.mocked(workflowService.resumeFailedStepFromMessage).mockResolvedValue({
       workflow: {
         id: "workflow-a",
@@ -112,12 +137,17 @@ describe("messageService.createUserMessageAndAgentRun", () => {
       },
     } as never);
 
-    const result = await messageService.createUserMessageAndAgentRun("session-a", "继续");
+    const result = await messageService.createUserMessageAndAgentRun(
+      "session-a",
+      "继续",
+    );
 
-    expect(messageRepository.create).toHaveBeenCalledWith(expect.objectContaining({
-      workflow: { connect: { id: "workflow-a" } },
-      content: "继续",
-    }));
+    expect(messageRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workflow: { connect: { id: "workflow-a" } },
+        content: "继续",
+      }),
+    );
     expect(workflowService.resumeFailedStepFromMessage).toHaveBeenCalledWith({
       sessionId: "session-a",
       workflowId: "workflow-a",
@@ -126,53 +156,143 @@ describe("messageService.createUserMessageAndAgentRun", () => {
     });
     expect(agentRunRepository.create).not.toHaveBeenCalled();
     expect(workflowService.startInitialPlanning).not.toHaveBeenCalled();
-    expect(result.agentRun).toMatchObject({ id: "run-resume", status: "running" });
-    expect(result.workflow).toMatchObject({ id: "workflow-a", status: "running", currentStepType: "plan" });
+    expect(result.agentRun).toMatchObject({
+      id: "run-resume",
+      status: "running",
+    });
+    expect(result.workflow).toMatchObject({
+      id: "workflow-a",
+      status: "running",
+      currentStepType: "plan",
+    });
+  });
+
+  it("resumes an interrupted workflow when the user sends a follow-up message", async () => {
+    vi.mocked(sessionRepository.findById).mockResolvedValue(
+      sessionRecord() as never,
+    );
+    vi.mocked(workflowService.getActiveWorkflow).mockResolvedValue(
+      workflowRecord({
+        status: "interrupted",
+        currentStepType: "plan",
+      }) as never,
+    );
+    vi.mocked(messageRepository.create).mockResolvedValue(
+      messageRecord({
+        id: "message-resume",
+        workflowId: "workflow-a",
+      }) as never,
+    );
+    vi.mocked(
+      workflowService.resumeInterruptedWorkflowFromMessage,
+    ).mockResolvedValue({
+      workflow: {
+        id: "workflow-a",
+        status: "running",
+        currentStepType: "plan",
+      },
+      agentRun: {
+        id: "run-resume",
+        status: "running",
+      },
+    } as never);
+
+    const result = await messageService.createUserMessageAndAgentRun(
+      "session-a",
+      "继续原来的流程",
+    );
+
+    expect(
+      workflowService.resumeInterruptedWorkflowFromMessage,
+    ).toHaveBeenCalledWith({
+      sessionId: "session-a",
+      workflowId: "workflow-a",
+      messageId: "message-resume",
+      userMessage: "继续原来的流程",
+    });
+    expect(workflowService.resumeFailedStepFromMessage).not.toHaveBeenCalled();
+    expect(agentRunRepository.create).not.toHaveBeenCalled();
+    expect(result.agentRun).toMatchObject({
+      id: "run-resume",
+      status: "running",
+    });
+    expect(result.workflow).toMatchObject({
+      id: "workflow-a",
+      status: "running",
+      currentStepType: "plan",
+    });
   });
 
   it("starts a plan workflow for A2UI generation intent", async () => {
-    vi.mocked(sessionRepository.findById).mockResolvedValue(sessionRecord() as never);
+    vi.mocked(sessionRepository.findById).mockResolvedValue(
+      sessionRecord() as never,
+    );
     vi.mocked(workflowService.getActiveWorkflow).mockResolvedValue(null);
-    vi.mocked(workflowService.createWorkflow).mockResolvedValue(workflowRecord({ id: "workflow-new" }) as never);
-    vi.mocked(workflowService.startInitialPlanning).mockResolvedValue(workflowRecord({
-      id: "workflow-new",
-      currentStepType: "plan",
-    }) as never);
-    vi.mocked(messageRepository.create).mockResolvedValue(messageRecord({ workflowId: "workflow-new" }) as never);
+    vi.mocked(workflowService.createWorkflow).mockResolvedValue(
+      workflowRecord({ id: "workflow-new" }) as never,
+    );
+    vi.mocked(workflowService.startInitialPlanning).mockResolvedValue(
+      workflowRecord({
+        id: "workflow-new",
+        currentStepType: "plan",
+      }) as never,
+    );
+    vi.mocked(messageRepository.create).mockResolvedValue(
+      messageRecord({ workflowId: "workflow-new" }) as never,
+    );
 
-    const result = await messageService.createUserMessageAndAgentRun("session-a", "生成一个数据看板", [], {
-      intent: "CREATE_UI",
-    });
+    const result = await messageService.createUserMessageAndAgentRun(
+      "session-a",
+      "生成一个数据看板",
+      [],
+      {
+        intent: "CREATE_UI",
+      },
+    );
 
-    expect(workflowService.createWorkflow).toHaveBeenCalledWith(expect.objectContaining({
-      sessionId: "session-a",
-      intent: "CREATE_UI",
-    }));
+    expect(workflowService.createWorkflow).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: "session-a",
+        intent: "CREATE_UI",
+      }),
+    );
     expect(workflowService.startInitialPlanning).toHaveBeenCalledWith({
       sessionId: "session-a",
       workflowId: "workflow-new",
       userMessage: "生成一个数据看板",
     });
     expect(agentRunRepository.create).not.toHaveBeenCalled();
-    expect(result.workflow).toMatchObject({ id: "workflow-new", currentStepType: "plan" });
+    expect(result.workflow).toMatchObject({
+      id: "workflow-new",
+      currentStepType: "plan",
+    });
   });
 
   it("keeps ordinary messages on the existing lightweight agent run path when no workflow is active", async () => {
-    vi.mocked(sessionRepository.findById).mockResolvedValue(sessionRecord() as never);
+    vi.mocked(sessionRepository.findById).mockResolvedValue(
+      sessionRecord() as never,
+    );
     vi.mocked(workflowService.getActiveWorkflow).mockResolvedValue(null);
-    vi.mocked(messageRepository.create).mockResolvedValue(messageRecord({ content: "你好" }) as never);
+    vi.mocked(messageRepository.create).mockResolvedValue(
+      messageRecord({ content: "你好" }) as never,
+    );
     vi.mocked(agentRunRepository.create).mockResolvedValue({
       id: "run-a",
       status: "pending",
     } as never);
 
-    const result = await messageService.createUserMessageAndAgentRun("session-a", "你好");
+    const result = await messageService.createUserMessageAndAgentRun(
+      "session-a",
+      "你好",
+    );
 
     expect(workflowService.createWorkflow).not.toHaveBeenCalled();
-    expect(agentRunRepository.create).toHaveBeenCalledWith(expect.objectContaining({
-      triggerMessageId: "message-a",
-      status: "pending",
-    }));
+    expect(agentRunRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        triggerMessageId: "message-a",
+        status: "pending",
+      }),
+    );
     expect(result.agentRun).toMatchObject({ id: "run-a", status: "pending" });
     expect(result.workflow).toBeUndefined();
   });

@@ -36,7 +36,10 @@ import { connectStream, type StreamConnection } from "../services/stream";
 import { logger, shortId } from "../services/logger";
 import { useRendererStore } from "./renderer";
 
-type WorkspaceA2UIEvent = Omit<A2UIEventDto, "messages" | "validationResult"> & {
+type WorkspaceA2UIEvent = Omit<
+  A2UIEventDto,
+  "messages" | "validationResult"
+> & {
   messages: unknown[];
   validationResult: unknown;
 };
@@ -46,11 +49,7 @@ type WorkspaceSurfaceSnapshot = Omit<SurfaceSnapshotDto, "snapshot"> & {
 };
 
 export type WorkspaceTab =
-  | "conversation"
-  | "history"
-  | "skills"
-  | "import-export"
-  | "runtime";
+  "conversation" | "history" | "skills" | "import-export" | "runtime";
 
 export const useWorkspaceStore = defineStore("workspace", {
   state: () => ({
@@ -80,6 +79,7 @@ export const useWorkspaceStore = defineStore("workspace", {
 
     // ─── SSE 连接（不在 state 中序列化） ───
     _streamConnection: null as StreamConnection | null,
+    _resyncToken: 0,
   }),
 
   getters: {
@@ -91,14 +91,21 @@ export const useWorkspaceStore = defineStore("workspace", {
      * - 非 workflow 的 agent run 处于 running 视为正在生成（普通聊天）
      */
     isGenerating(state): boolean {
-      return state.workflows.some((workflow) =>
-        workflow.steps.some((step) => step.status === "running"),
-      ) || state.agentRuns.some((run) => run.status === "running" && run.workflowId == null);
+      return (
+        state.workflows.some((workflow) =>
+          workflow.steps.some((step) => step.status === "running"),
+        ) ||
+        state.agentRuns.some(
+          (run) => run.status === "running" && run.workflowId == null,
+        )
+      );
     },
 
     /** 非 workflow 的普通 agent run 是否生成中（用于独立 typing 指示器）。 */
     isPlainChatGenerating(state): boolean {
-      return state.agentRuns.some((run) => run.status === "running" && run.workflowId == null);
+      return state.agentRuns.some(
+        (run) => run.status === "running" && run.workflowId == null,
+      );
     },
   },
 
@@ -233,7 +240,10 @@ export const useWorkspaceStore = defineStore("workspace", {
      * 加载会话详情（含当前快照和已启用 Skill），并尝试从快照恢复 Renderer 状态。
      * 通过 sessionRevision 防止竞态：只有当前会话 ID 与版本号匹配时才会写入状态。
      */
-    async loadSessionDetail(sessionId?: string | null, requestedRevision?: number) {
+    async loadSessionDetail(
+      sessionId?: string | null,
+      requestedRevision?: number,
+    ) {
       const targetSessionId = sessionId ?? this.activeSessionId;
       const sessionRevision = requestedRevision ?? this._sessionRevision;
       if (!targetSessionId) return;
@@ -251,20 +261,90 @@ export const useWorkspaceStore = defineStore("workspace", {
       } catch (error) {
         if (!this.isCurrentSession(targetSessionId, sessionRevision)) return;
         this.sessionHydrationStatus = "error";
-        this.sessionHydrationError = error instanceof Error ? error.message : "会话恢复失败";
+        this.sessionHydrationError =
+          error instanceof Error ? error.message : "会话恢复失败";
         logger.error(`会话恢复失败 → session=${shortId(targetSessionId)}`);
+      }
+    },
+
+    /**
+     * SSE 重连后的会话事实源重同步。
+     *
+     * 注意：SSE 不是业务状态事实源；重连后用 HTTP API 全量拉取关键状态，
+     * 并通过 token + sessionRevision 防止过期同步结果覆盖当前会话。
+     */
+    async recoverSessionState(sessionId: string, sessionRevision: number) {
+      const resyncToken = ++this._resyncToken;
+      if (!this.isCurrentSession(sessionId, sessionRevision)) return;
+      this.sessionHydrationStatus = "loading";
+      this.sessionHydrationError = null;
+
+      try {
+        const [
+          messagesResult,
+          workflowsResult,
+          agentRunsResult,
+          a2uiEventsResult,
+          snapshotsResult,
+          sessionResult,
+        ] = await Promise.all([
+          api.listMessages(sessionId, { limit: 200 }),
+          api.listWorkflows(sessionId),
+          api.listAgentRuns(sessionId, { limit: 100 }),
+          api.listA2UIEvents(sessionId, { limit: 200 }),
+          api.listSnapshots(sessionId, { limit: 100 }),
+          api.getSession(sessionId),
+        ]);
+
+        if (
+          !this.isCurrentSession(sessionId, sessionRevision) ||
+          this._resyncToken !== resyncToken
+        )
+          return;
+
+        this.messages = messagesResult.items;
+        this.workflows = workflowsResult.items;
+        this.agentRuns = agentRunsResult.items;
+        this.a2uiEvents = a2uiEventsResult.items.map(toWorkspaceA2UIEvent);
+        this.surfaceSnapshots = snapshotsResult.items.map(
+          toWorkspaceSurfaceSnapshot,
+        );
+
+        const idx = this.sessions.findIndex((s) => s.id === sessionId);
+        if (idx >= 0) {
+          this.sessions[idx] = sessionResult.session;
+        }
+        this.enabledSkillIds = sessionResult.enabledSkillIds ?? [];
+        restoreRendererFromSnapshot(sessionResult.currentSnapshot);
+        this.sessionHydrationStatus = "ready";
+      } catch (error) {
+        if (
+          !this.isCurrentSession(sessionId, sessionRevision) ||
+          this._resyncToken !== resyncToken
+        )
+          return;
+        this.sessionHydrationStatus = "error";
+        this.sessionHydrationError =
+          error instanceof Error ? error.message : "会话重同步失败";
+        logger.error(`会话重同步失败 → session=${shortId(sessionId)}`);
       }
     },
 
     /** 检查给定的会话 ID 和版本号是否为当前活跃会话（用于防止异步竞态）。 */
     isCurrentSession(sessionId: string, sessionRevision: number) {
-      return this.activeSessionId === sessionId && this._sessionRevision === sessionRevision;
+      return (
+        this.activeSessionId === sessionId &&
+        this._sessionRevision === sessionRevision
+      );
     },
 
     // ─── 消息管理 ───
 
     /** 加载当前会话的消息列表（最多 200 条）。 */
-    async loadMessages(requestedSessionId?: string | null, requestedRevision?: number) {
+    async loadMessages(
+      requestedSessionId?: string | null,
+      requestedRevision?: number,
+    ) {
       const sessionId = requestedSessionId ?? this.activeSessionId;
       const sessionRevision = requestedRevision ?? this._sessionRevision;
       if (!sessionId) return;
@@ -290,11 +370,15 @@ export const useWorkspaceStore = defineStore("workspace", {
       try {
         let sessionId = this.activeSessionId;
         if (!sessionId) {
-          const session = await this.createSession(createSessionTitle(trimmedContent));
+          const session = await this.createSession(
+            createSessionTitle(trimmedContent),
+          );
           sessionId = session.id;
         }
 
-        logger.info(`发送消息 → session=${shortId(sessionId)}, content=${trimmedContent.length}字`);
+        logger.info(
+          `发送消息 → session=${shortId(sessionId)}, content=${trimmedContent.length}字`,
+        );
         const result = await api.sendMessage(sessionId, {
           content: trimmedContent,
           attachmentFileIds,
@@ -303,7 +387,10 @@ export const useWorkspaceStore = defineStore("workspace", {
         if (result.workflow) {
           this.upsertWorkflow(result.workflow);
         }
-        if (["pending", "running"].includes(result.agentRun?.status ?? "") || result.workflow?.status === "running") {
+        if (
+          ["pending", "running"].includes(result.agentRun?.status ?? "") ||
+          result.workflow?.status === "running"
+        ) {
           this.isGenerating = true;
         }
         // 消息发送成功后，SSE 会自动推送 assistant 消息和 A2UI 结果
@@ -323,7 +410,10 @@ export const useWorkspaceStore = defineStore("workspace", {
     // ─── 文件管理 ───
 
     /** 加载当前会话的上传文件列表。 */
-    async loadFiles(requestedSessionId?: string | null, requestedRevision?: number) {
+    async loadFiles(
+      requestedSessionId?: string | null,
+      requestedRevision?: number,
+    ) {
       const sessionId = requestedSessionId ?? this.activeSessionId;
       const sessionRevision = requestedRevision ?? this._sessionRevision;
       if (!sessionId) return;
@@ -344,7 +434,10 @@ export const useWorkspaceStore = defineStore("workspace", {
         throw new Error("仅支持上传 .txt 文件");
       }
       try {
-        const result = await api.uploadFileToSession(this.activeSessionId, file);
+        const result = await api.uploadFileToSession(
+          this.activeSessionId,
+          file,
+        );
         this.uploadedFiles.push(result.file);
         return result.file;
       } catch {
@@ -383,7 +476,12 @@ export const useWorkspaceStore = defineStore("workspace", {
       references: SkillReference[] = [],
     ) {
       try {
-        const result = await api.createSkill({ name, description, content, references });
+        const result = await api.createSkill({
+          name,
+          description,
+          content,
+          references,
+        });
         this.skills.push(result.skill);
         return result.skill;
       } catch {
@@ -432,7 +530,9 @@ export const useWorkspaceStore = defineStore("workspace", {
       if (!this.activeSessionId) throw new Error("请先选择会话");
       try {
         await api.disableSkill(this.activeSessionId, skillId);
-        this.enabledSkillIds = this.enabledSkillIds.filter((id) => id !== skillId);
+        this.enabledSkillIds = this.enabledSkillIds.filter(
+          (id) => id !== skillId,
+        );
       } catch {
         throw new Error("禁用 Skill 失败");
       }
@@ -441,7 +541,10 @@ export const useWorkspaceStore = defineStore("workspace", {
     // ─── Agent Run ───
 
     /** 加载当前会话的 Agent Run 列表（最多 100 条）。 */
-    async loadAgentRuns(requestedSessionId?: string | null, requestedRevision?: number) {
+    async loadAgentRuns(
+      requestedSessionId?: string | null,
+      requestedRevision?: number,
+    ) {
       const sessionId = requestedSessionId ?? this.activeSessionId;
       const sessionRevision = requestedRevision ?? this._sessionRevision;
       if (!sessionId) return;
@@ -467,7 +570,10 @@ export const useWorkspaceStore = defineStore("workspace", {
     // ─── Workflow ───
 
     /** 加载当前会话的 Workflow 历史。 */
-    async loadWorkflows(requestedSessionId?: string | null, requestedRevision?: number) {
+    async loadWorkflows(
+      requestedSessionId?: string | null,
+      requestedRevision?: number,
+    ) {
       const sessionId = requestedSessionId ?? this.activeSessionId;
       const sessionRevision = requestedRevision ?? this._sessionRevision;
       if (!sessionId) return;
@@ -497,7 +603,10 @@ export const useWorkspaceStore = defineStore("workspace", {
         },
       });
       this.upsertWorkflow(result.workflow);
-      if (result.message && !this.messages.some((message) => message.id === result.message!.id)) {
+      if (
+        result.message &&
+        !this.messages.some((message) => message.id === result.message!.id)
+      ) {
         this.messages.push(result.message);
       }
     },
@@ -512,15 +621,24 @@ export const useWorkspaceStore = defineStore("workspace", {
       const result = await api.sendWorkflowAction(this.activeSessionId, {
         action: "submit_decision",
         artifactId,
-        message: selectedOption === "revise" ? comment : selectedOption === "confirm" ? "确认" : "拒绝",
-        payload: selectedOption === "confirm"
-          ? { selectedOption }
-          : selectedOption === "revise"
-            ? { selectedOption, comment: comment ?? "" }
-            : { selectedOption, comment },
+        message:
+          selectedOption === "revise"
+            ? comment
+            : selectedOption === "confirm"
+              ? "确认"
+              : "拒绝",
+        payload:
+          selectedOption === "confirm"
+            ? { selectedOption }
+            : selectedOption === "revise"
+              ? { selectedOption, comment: comment ?? "" }
+              : { selectedOption, comment },
       });
       this.upsertWorkflow(result.workflow);
-      if (result.message && !this.messages.some((message) => message.id === result.message!.id)) {
+      if (
+        result.message &&
+        !this.messages.some((message) => message.id === result.message!.id)
+      ) {
         this.messages.push(result.message);
       }
     },
@@ -533,7 +651,10 @@ export const useWorkspaceStore = defineStore("workspace", {
         message: "重试失败步骤",
       });
       this.upsertWorkflow(result.workflow);
-      if (result.message && !this.messages.some((message) => message.id === result.message!.id)) {
+      if (
+        result.message &&
+        !this.messages.some((message) => message.id === result.message!.id)
+      ) {
         this.messages.push(result.message);
       }
       if (result.agentRun) {
@@ -542,26 +663,82 @@ export const useWorkspaceStore = defineStore("workspace", {
     },
 
     /** 插入或更新 Workflow。 */
-    upsertWorkflow(workflow: AgentWorkflowDetailDto | AgentWorkflowDto | Pick<AgentWorkflowDto, "id" | "status" | "currentStepType">) {
-      const existingIdx = this.workflows.findIndex((item) => item.id === workflow.id);
-      const detail = "steps" in workflow
-        ? workflow
-        : ({
-            ...workflow,
-            sessionId: "sessionId" in workflow ? workflow.sessionId : (this.activeSessionId ?? ""),
-            title: "title" in workflow ? workflow.title : (existingIdx >= 0 ? this.workflows[existingIdx]!.title : null),
-            intent: "intent" in workflow ? workflow.intent : (existingIdx >= 0 ? this.workflows[existingIdx]!.intent : null),
-            completedReason: "completedReason" in workflow ? workflow.completedReason : (existingIdx >= 0 ? this.workflows[existingIdx]!.completedReason : null),
-            failureReason: "failureReason" in workflow ? workflow.failureReason : (existingIdx >= 0 ? this.workflows[existingIdx]!.failureReason : null),
-            metadata: "metadata" in workflow ? workflow.metadata : (existingIdx >= 0 ? this.workflows[existingIdx]!.metadata : {}),
-            startedAt: "startedAt" in workflow ? workflow.startedAt : (existingIdx >= 0 ? this.workflows[existingIdx]!.startedAt : null),
-            completedAt: "completedAt" in workflow ? workflow.completedAt : (existingIdx >= 0 ? this.workflows[existingIdx]!.completedAt : null),
-            createdAt: "createdAt" in workflow ? workflow.createdAt : (existingIdx >= 0 ? this.workflows[existingIdx]!.createdAt : new Date().toISOString()),
-            updatedAt: "updatedAt" in workflow ? workflow.updatedAt : new Date().toISOString(),
-            steps: existingIdx >= 0 ? this.workflows[existingIdx]!.steps : [],
-            artifacts: existingIdx >= 0 ? this.workflows[existingIdx]!.artifacts : [],
-            agentRuns: existingIdx >= 0 ? this.workflows[existingIdx]!.agentRuns : [],
-          } satisfies AgentWorkflowDetailDto);
+    upsertWorkflow(
+      workflow:
+        | AgentWorkflowDetailDto
+        | AgentWorkflowDto
+        | Pick<AgentWorkflowDto, "id" | "status" | "currentStepType">,
+    ) {
+      const existingIdx = this.workflows.findIndex(
+        (item) => item.id === workflow.id,
+      );
+      const detail =
+        "steps" in workflow
+          ? workflow
+          : ({
+              ...workflow,
+              sessionId:
+                "sessionId" in workflow
+                  ? workflow.sessionId
+                  : (this.activeSessionId ?? ""),
+              title:
+                "title" in workflow
+                  ? workflow.title
+                  : existingIdx >= 0
+                    ? this.workflows[existingIdx]!.title
+                    : null,
+              intent:
+                "intent" in workflow
+                  ? workflow.intent
+                  : existingIdx >= 0
+                    ? this.workflows[existingIdx]!.intent
+                    : null,
+              completedReason:
+                "completedReason" in workflow
+                  ? workflow.completedReason
+                  : existingIdx >= 0
+                    ? this.workflows[existingIdx]!.completedReason
+                    : null,
+              failureReason:
+                "failureReason" in workflow
+                  ? workflow.failureReason
+                  : existingIdx >= 0
+                    ? this.workflows[existingIdx]!.failureReason
+                    : null,
+              metadata:
+                "metadata" in workflow
+                  ? workflow.metadata
+                  : existingIdx >= 0
+                    ? this.workflows[existingIdx]!.metadata
+                    : {},
+              startedAt:
+                "startedAt" in workflow
+                  ? workflow.startedAt
+                  : existingIdx >= 0
+                    ? this.workflows[existingIdx]!.startedAt
+                    : null,
+              completedAt:
+                "completedAt" in workflow
+                  ? workflow.completedAt
+                  : existingIdx >= 0
+                    ? this.workflows[existingIdx]!.completedAt
+                    : null,
+              createdAt:
+                "createdAt" in workflow
+                  ? workflow.createdAt
+                  : existingIdx >= 0
+                    ? this.workflows[existingIdx]!.createdAt
+                    : new Date().toISOString(),
+              updatedAt:
+                "updatedAt" in workflow
+                  ? workflow.updatedAt
+                  : new Date().toISOString(),
+              steps: existingIdx >= 0 ? this.workflows[existingIdx]!.steps : [],
+              artifacts:
+                existingIdx >= 0 ? this.workflows[existingIdx]!.artifacts : [],
+              agentRuns:
+                existingIdx >= 0 ? this.workflows[existingIdx]!.agentRuns : [],
+            } satisfies AgentWorkflowDetailDto);
       if (existingIdx >= 0) {
         this.workflows[existingIdx] = {
           ...this.workflows[existingIdx],
@@ -576,7 +753,9 @@ export const useWorkspaceStore = defineStore("workspace", {
     upsertWorkflowStep(workflowId: string, step: WorkflowStepDto) {
       const workflow = this.workflows.find((item) => item.id === workflowId);
       if (!workflow) return;
-      const existingIdx = workflow.steps.findIndex((item) => item.id === step.id);
+      const existingIdx = workflow.steps.findIndex(
+        (item) => item.id === step.id,
+      );
       if (existingIdx >= 0) {
         workflow.steps[existingIdx] = step;
       } else {
@@ -590,20 +769,29 @@ export const useWorkspaceStore = defineStore("workspace", {
     upsertWorkflowArtifact(workflowId: string, artifact: WorkflowArtifactDto) {
       const workflow = this.workflows.find((item) => item.id === workflowId);
       if (!workflow) return;
-      const existingIdx = workflow.artifacts.findIndex((item) => item.id === artifact.id);
+      const existingIdx = workflow.artifacts.findIndex(
+        (item) => item.id === artifact.id,
+      );
       if (existingIdx >= 0) {
         workflow.artifacts[existingIdx] = artifact;
       } else {
         workflow.artifacts.push(artifact);
-        workflow.artifacts.sort((a, b) => a.kind.localeCompare(b.kind) || a.version - b.version);
+        workflow.artifacts.sort(
+          (a, b) => a.kind.localeCompare(b.kind) || a.version - b.version,
+        );
       }
     },
 
     /** 插入或更新 Agent run。 */
     upsertAgentRun(agentRun: AgentRunDto) {
-      const existingIdx = this.agentRuns.findIndex((run) => run.id === agentRun.id);
+      const existingIdx = this.agentRuns.findIndex(
+        (run) => run.id === agentRun.id,
+      );
       if (existingIdx >= 0) {
-        this.agentRuns[existingIdx] = { ...this.agentRuns[existingIdx], ...agentRun };
+        this.agentRuns[existingIdx] = {
+          ...this.agentRuns[existingIdx],
+          ...agentRun,
+        };
       } else {
         this.agentRuns.push(agentRun);
       }
@@ -612,7 +800,10 @@ export const useWorkspaceStore = defineStore("workspace", {
     // ─── A2UI / Snapshots ───
 
     /** 加载当前会话的 A2UI Event 列表（最多 200 条）。 */
-    async loadA2UIEvents(requestedSessionId?: string | null, requestedRevision?: number) {
+    async loadA2UIEvents(
+      requestedSessionId?: string | null,
+      requestedRevision?: number,
+    ) {
       const sessionId = requestedSessionId ?? this.activeSessionId;
       const sessionRevision = requestedRevision ?? this._sessionRevision;
       if (!sessionId) return;
@@ -626,7 +817,10 @@ export const useWorkspaceStore = defineStore("workspace", {
     },
 
     /** 加载当前会话的 Surface Snapshot 列表（最多 100 条）。 */
-    async loadSnapshots(requestedSessionId?: string | null, requestedRevision?: number) {
+    async loadSnapshots(
+      requestedSessionId?: string | null,
+      requestedRevision?: number,
+    ) {
       const sessionId = requestedSessionId ?? this.activeSessionId;
       const sessionRevision = requestedRevision ?? this._sessionRevision;
       if (!sessionId) return;
@@ -658,46 +852,84 @@ export const useWorkspaceStore = defineStore("workspace", {
       logger.info(`SSE 连接中 → session=${sid}`);
 
       this._streamConnection = connectStream(sessionId, {
+        connected: (data: { sessionId: string; time: string }) => {
+          if (!isCurrent() || data.sessionId !== sessionId) return;
+          this.streamStatus = "connected";
+        },
+
         heartbeat: (_data: { time: string }) => {
           if (!isCurrent()) return;
           this.streamStatus = "connected";
         },
 
-        agent_run_started: (data: { sessionId: string; agentRun: Pick<AgentRunDto, "id" | "status" | "attemptCount" | "maxAttempts"> }) => {
+        agent_run_started: (data: {
+          sessionId: string;
+          agentRun: Pick<
+            AgentRunDto,
+            "id" | "status" | "attemptCount" | "maxAttempts"
+          >;
+        }) => {
           if (!isCurrent() || data.sessionId !== sessionId) return;
           this.streamStatus = "connected";
-          this.runtimeToolCalls = this.runtimeToolCalls.filter((toolCall) => toolCall.agentRunId === data.agentRun.id);
-          logger.info(`← SSE ← BACKEND: agent_run_started → runId=${shortId(data.agentRun.id)}`);
+          this.runtimeToolCalls = this.runtimeToolCalls.filter(
+            (toolCall) => toolCall.agentRunId === data.agentRun.id,
+          );
+          logger.info(
+            `← SSE ← BACKEND: agent_run_started → runId=${shortId(data.agentRun.id)}`,
+          );
           // 添加或更新 run
-          const existingIdx = this.agentRuns.findIndex((r) => r.id === data.agentRun.id);
+          const existingIdx = this.agentRuns.findIndex(
+            (r) => r.id === data.agentRun.id,
+          );
           if (existingIdx >= 0) {
-            this.agentRuns[existingIdx] = { ...this.agentRuns[existingIdx], ...data.agentRun } as AgentRunDto;
+            this.agentRuns[existingIdx] = {
+              ...this.agentRuns[existingIdx],
+              ...data.agentRun,
+            } as AgentRunDto;
           } else {
             this.agentRuns.push(data.agentRun as AgentRunDto);
           }
         },
 
-        workflow_started: (data: { sessionId: string; workflow: AgentWorkflowDto }) => {
+        workflow_started: (data: {
+          sessionId: string;
+          workflow: AgentWorkflowDto;
+        }) => {
           if (!isCurrent() || data.sessionId !== sessionId) return;
           this.upsertWorkflow(data.workflow);
         },
 
-        workflow_step_updated: (data: { sessionId: string; workflowId: string; step: WorkflowStepDto }) => {
+        workflow_step_updated: (data: {
+          sessionId: string;
+          workflowId: string;
+          step: WorkflowStepDto;
+        }) => {
           if (!isCurrent() || data.sessionId !== sessionId) return;
           this.upsertWorkflowStep(data.workflowId, data.step);
         },
 
-        workflow_artifact_created: (data: { sessionId: string; workflowId: string; artifact: WorkflowArtifactDto }) => {
+        workflow_artifact_created: (data: {
+          sessionId: string;
+          workflowId: string;
+          artifact: WorkflowArtifactDto;
+        }) => {
           if (!isCurrent() || data.sessionId !== sessionId) return;
           this.upsertWorkflowArtifact(data.workflowId, data.artifact);
         },
 
-        workflow_completed: (data: { sessionId: string; workflow: AgentWorkflowDto }) => {
+        workflow_completed: (data: {
+          sessionId: string;
+          workflow: AgentWorkflowDto;
+        }) => {
           if (!isCurrent() || data.sessionId !== sessionId) return;
           this.upsertWorkflow(data.workflow);
         },
 
-        workflow_failed: (data: { sessionId: string; workflow: AgentWorkflowDto; failedStep?: WorkflowStepDto }) => {
+        workflow_failed: (data: {
+          sessionId: string;
+          workflow: AgentWorkflowDto;
+          failedStep?: WorkflowStepDto;
+        }) => {
           if (!isCurrent() || data.sessionId !== sessionId) return;
           this.upsertWorkflow(data.workflow);
           if (data.failedStep) {
@@ -705,7 +937,40 @@ export const useWorkspaceStore = defineStore("workspace", {
           }
         },
 
-        agent_run_attempt: (data: { sessionId: string; agentRunId: string; attemptIndex: number; phase: string; toolCall?: ToolCallDto }) => {
+        workflow_interrupted: (data: {
+          sessionId: string;
+          workflow: AgentWorkflowDto;
+          step: WorkflowStepDto;
+          agentRun?: Pick<
+            AgentRunDto,
+            "id" | "status" | "attemptCount" | "failureReason" | "completedAt"
+          >;
+        }) => {
+          if (!isCurrent() || data.sessionId !== sessionId) return;
+          this.upsertWorkflow(data.workflow);
+          this.upsertWorkflowStep(data.workflow.id, data.step);
+          if (data.agentRun) {
+            const existingIdx = this.agentRuns.findIndex(
+              (run) => run.id === data.agentRun!.id,
+            );
+            if (existingIdx >= 0) {
+              this.agentRuns[existingIdx] = {
+                ...this.agentRuns[existingIdx],
+                ...data.agentRun,
+              };
+            } else {
+              this.agentRuns.push(data.agentRun as AgentRunDto);
+            }
+          }
+        },
+
+        agent_run_attempt: (data: {
+          sessionId: string;
+          agentRunId: string;
+          attemptIndex: number;
+          phase: string;
+          toolCall?: ToolCallDto;
+        }) => {
           if (!isCurrent() || data.sessionId !== sessionId) return;
           // 更新对应 run 的 attempt
           const run = this.agentRuns.find((r) => r.id === data.agentRunId);
@@ -713,7 +978,9 @@ export const useWorkspaceStore = defineStore("workspace", {
             run.attemptCount = data.attemptIndex + 1;
           }
           if (data.toolCall) {
-            const existingIdx = this.runtimeToolCalls.findIndex((toolCall) => toolCall.id === data.toolCall!.id);
+            const existingIdx = this.runtimeToolCalls.findIndex(
+              (toolCall) => toolCall.id === data.toolCall!.id,
+            );
             if (existingIdx >= 0) {
               this.runtimeToolCalls[existingIdx] = data.toolCall;
             } else {
@@ -724,10 +991,20 @@ export const useWorkspaceStore = defineStore("workspace", {
 
         agent_run_completed: (data: {
           sessionId: string;
-          agentRun: Pick<AgentRunDto, "id" | "status" | "attemptCount" | "assistantMessageId" | "outputSnapshotId" | "completedAt">;
+          agentRun: Pick<
+            AgentRunDto,
+            | "id"
+            | "status"
+            | "attemptCount"
+            | "assistantMessageId"
+            | "outputSnapshotId"
+            | "completedAt"
+          >;
         }) => {
           if (!isCurrent() || data.sessionId !== sessionId) return;
-          logger.info(`← SSE ← BACKEND: agent_run_completed → runId=${shortId(data.agentRun.id)}`);
+          logger.info(
+            `← SSE ← BACKEND: agent_run_completed → runId=${shortId(data.agentRun.id)}`,
+          );
           const run = this.agentRuns.find((r) => r.id === data.agentRun.id);
           if (run) {
             run.status = data.agentRun.status;
@@ -738,7 +1015,10 @@ export const useWorkspaceStore = defineStore("workspace", {
           }
         },
 
-        assistant_message: (data: { sessionId: string; message: MessageDto }) => {
+        assistant_message: (data: {
+          sessionId: string;
+          message: MessageDto;
+        }) => {
           if (!isCurrent() || data.sessionId !== sessionId) return;
           // 追加 assistant 消息
           const existing = this.messages.find((m) => m.id === data.message.id);
@@ -749,11 +1029,16 @@ export const useWorkspaceStore = defineStore("workspace", {
           this.loadMessages();
         },
 
-        a2ui_messages: (data: { sessionId: string; a2uiEvent: A2UIEventDto }) => {
+        a2ui_messages: (data: {
+          sessionId: string;
+          a2uiEvent: A2UIEventDto;
+        }) => {
           if (!isCurrent() || data.sessionId !== sessionId) return;
           // 将 A2UI 消息交给 Renderer 处理
           const msgs = data.a2uiEvent.messages as A2UIServerMessage[];
-          logger.info(`← SSE ← BACKEND: a2ui_messages → ${msgs.length}条 → RENDERER`);
+          logger.info(
+            `← SSE ← BACKEND: a2ui_messages → ${msgs.length}条 → RENDERER`,
+          );
           if (msgs.length > 0) {
             renderer.processMessages(msgs);
           }
@@ -763,11 +1048,18 @@ export const useWorkspaceStore = defineStore("workspace", {
           this.a2uiEvents.sort((a, b) => a.sequence - b.sequence);
         },
 
-        surface_snapshot: (data: { sessionId: string; snapshot: SurfaceSnapshotDto }) => {
+        surface_snapshot: (data: {
+          sessionId: string;
+          snapshot: SurfaceSnapshotDto;
+        }) => {
           if (!isCurrent() || data.sessionId !== sessionId) return;
           const snapshot = toWorkspaceSurfaceSnapshot(data.snapshot);
-          logger.info(`← SSE ← BACKEND: surface_snapshot → surfaces=${data.snapshot.surfaceCount}, components=${data.snapshot.componentCount}`);
-          const existingIdx = this.surfaceSnapshots.findIndex((s) => s.id === snapshot.id);
+          logger.info(
+            `← SSE ← BACKEND: surface_snapshot → surfaces=${data.snapshot.surfaceCount}, components=${data.snapshot.componentCount}`,
+          );
+          const existingIdx = this.surfaceSnapshots.findIndex(
+            (s) => s.id === snapshot.id,
+          );
           if (existingIdx >= 0) {
             this.surfaceSnapshots[existingIdx] = snapshot;
           } else {
@@ -783,11 +1075,16 @@ export const useWorkspaceStore = defineStore("workspace", {
 
         agent_run_failed: (data: {
           sessionId: string;
-          agentRun: Pick<AgentRunDto, "id" | "status" | "attemptCount" | "failureReason">;
+          agentRun: Pick<
+            AgentRunDto,
+            "id" | "status" | "attemptCount" | "failureReason"
+          >;
           message: MessageDto;
         }) => {
           if (!isCurrent() || data.sessionId !== sessionId) return;
-          logger.warn(`← SSE ← BACKEND: agent_run_failed → runId=${shortId(data.agentRun.id)}, reason=${(data.agentRun.failureReason ?? "").slice(0, 80)}`);
+          logger.warn(
+            `← SSE ← BACKEND: agent_run_failed → runId=${shortId(data.agentRun.id)}, reason=${(data.agentRun.failureReason ?? "").slice(0, 80)}`,
+          );
           // 更新 run 状态
           const run = this.agentRuns.find((r) => r.id === data.agentRun.id);
           if (run) {
@@ -811,6 +1108,19 @@ export const useWorkspaceStore = defineStore("workspace", {
           if (!isCurrent()) return;
           this.streamStatus = "error";
           logger.error(`SSE 连接错误 → ${_error.message}`);
+        },
+
+        onConnected: ({
+          reconnect,
+        }: {
+          reconnect: boolean;
+          lastEventId: string | null;
+        }) => {
+          if (!isCurrent()) return;
+          this.streamStatus = "connected";
+          if (reconnect) {
+            void this.recoverSessionState(sessionId, sessionRevision);
+          }
         },
 
         onReconnecting: (_attempt: number) => {
@@ -848,7 +1158,9 @@ function toWorkspaceA2UIEvent(event: A2UIEventDto): WorkspaceA2UIEvent {
 /**
  * 将 SurfaceSnapshotDto 转换为 Store 内部使用的宽松类型（snapshot 转为 unknown）。
  */
-function toWorkspaceSurfaceSnapshot(snapshot: SurfaceSnapshotDto): WorkspaceSurfaceSnapshot {
+function toWorkspaceSurfaceSnapshot(
+  snapshot: SurfaceSnapshotDto,
+): WorkspaceSurfaceSnapshot {
   return {
     ...snapshot,
     snapshot: snapshot.snapshot,
@@ -858,7 +1170,9 @@ function toWorkspaceSurfaceSnapshot(snapshot: SurfaceSnapshotDto): WorkspaceSurf
 /**
  * 从 Surface Snapshot 中提取 A2UI 消息，传入 Renderer 恢复渲染状态。
  */
-function restoreRendererFromSnapshot(snapshot: SurfaceSnapshotDto | null): void {
+function restoreRendererFromSnapshot(
+  snapshot: SurfaceSnapshotDto | null,
+): void {
   if (!snapshot) return;
 
   const renderer = useRendererStore();
@@ -871,7 +1185,9 @@ function restoreRendererFromSnapshot(snapshot: SurfaceSnapshotDto | null): void 
 /**
  * 将 Surface Snapshot 数据还原为 A2UI Server Message 序列（createSurface → updateComponents → updateDataModel）。
  */
-function snapshotToRendererMessages(snapshot: SurfaceSnapshotDto): A2UIServerMessage[] {
+function snapshotToRendererMessages(
+  snapshot: SurfaceSnapshotDto,
+): A2UIServerMessage[] {
   const version = snapshot.snapshot.version;
   const surfaces = Object.values(snapshot.snapshot.surfaces) as SurfaceState[];
   const messages: A2UIServerMessage[] = [];

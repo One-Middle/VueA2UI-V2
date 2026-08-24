@@ -2,17 +2,26 @@
  * SSE 客户端
  *
  * 使用 fetch + ReadableStream 连接服务器推送事件流，
- * 支持自动重连和 Last-Event-ID 恢复。
+ * 支持自动重连，并在请求头携带 Last-Event-ID 供后端识别。
  */
 
-import type { PlatformSseEvent, ServerSentEventName } from "@a2ui-platform/shared";
+import type {
+  PlatformSseEvent,
+  ServerSentEventName,
+} from "@a2ui-platform/shared";
 import { resolveApiBaseUrl } from "./api";
 import { logger } from "./logger";
 
 /** SSE 事件处理器映射 */
 export type StreamHandlers = {
-  [E in PlatformSseEvent["event"]]?: (data: Extract<PlatformSseEvent, { event: E }>["data"]) => void;
+  [E in PlatformSseEvent["event"]]?: (
+    data: Extract<PlatformSseEvent, { event: E }>["data"],
+  ) => void;
 } & {
+  onConnected?: (input: {
+    reconnect: boolean;
+    lastEventId: string | null;
+  }) => void;
   onError?: (error: Error) => void;
   onReconnecting?: (attempt: number) => void;
   onClosed?: () => void;
@@ -36,7 +45,10 @@ const RECONNECT_DELAY_MS = 3000;
  * @param handlers 事件处理器
  * @returns 连接控制器，可调用 close() 主动关闭
  */
-export function connectStream(sessionId: string, handlers: StreamHandlers): StreamConnection {
+export function connectStream(
+  sessionId: string,
+  handlers: StreamHandlers,
+): StreamConnection {
   const baseUrl = resolveApiBaseUrl(import.meta.env.VITE_API_BASE_URL);
   const url = `${baseUrl}/sessions/${sessionId}/stream`;
 
@@ -69,6 +81,7 @@ export function connectStream(sessionId: string, handlers: StreamHandlers): Stre
         throw new Error(`SSE 连接失败，HTTP ${res.status}`);
       }
 
+      const reconnect = retryCount > 0;
       // 连接成功，重置重试计数
       retryCount = 0;
 
@@ -101,13 +114,16 @@ export function connectStream(sessionId: string, handlers: StreamHandlers): Stre
             currentEvent = line.slice(7).trim();
           } else if (line.startsWith("data: ")) {
             const dataLine = line.slice(6);
-            currentData = currentData === null ? dataLine : `${currentData}\n${dataLine}`;
+            currentData =
+              currentData === null ? dataLine : `${currentData}\n${dataLine}`;
           } else if (line.startsWith("id: ")) {
             currentId = line.slice(4).trim();
           } else if (line === "") {
             // 空行表示一帧结束
             if (currentEvent && currentData) {
-              logger.debug(`SSE 帧 → event=${currentEvent}, id=${currentId ?? "-"}`);
+              logger.debug(
+                `SSE 帧 → event=${currentEvent}, id=${currentId ?? "-"}`,
+              );
               try {
                 const parsedData = JSON.parse(currentData);
                 if (currentId) {
@@ -115,9 +131,17 @@ export function connectStream(sessionId: string, handlers: StreamHandlers): Stre
                 }
 
                 // 调用对应事件处理器
-                const handler = (handlers as Record<string, ((data: unknown) => void) | undefined>)[currentEvent];
+                const handler = (
+                  handlers as Record<
+                    string,
+                    ((data: unknown) => void) | undefined
+                  >
+                )[currentEvent];
                 if (handler) {
                   handler(parsedData);
+                }
+                if (currentEvent === "connected") {
+                  handlers.onConnected?.({ reconnect, lastEventId });
                 }
               } catch {
                 // JSON 解析失败，忽略此帧
@@ -130,6 +154,10 @@ export function connectStream(sessionId: string, handlers: StreamHandlers): Stre
             currentId = null;
           }
         }
+      }
+
+      if (!aborted) {
+        throw new Error("SSE 连接已关闭");
       }
     } catch (err: unknown) {
       if (aborted) return;

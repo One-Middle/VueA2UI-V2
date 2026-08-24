@@ -1,4 +1,11 @@
-import type { AgentWorkflowDetailDto, MessageDto, SessionDetailResponse, SessionDto, SurfaceSnapshotDto, WorkflowStepDto } from "@a2ui-platform/shared";
+import type {
+  AgentWorkflowDetailDto,
+  MessageDto,
+  SessionDetailResponse,
+  SessionDto,
+  SurfaceSnapshotDto,
+  WorkflowStepDto,
+} from "@a2ui-platform/shared";
 import { createPinia, setActivePinia } from "pinia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as api from "../../services/api";
@@ -8,12 +15,32 @@ import { useWorkspaceStore } from "../workspace";
 
 vi.mock("../../services/api", () => ({
   getSession: vi.fn(),
-  listMessages: vi.fn(() => Promise.resolve({ items: [], pageInfo: { nextCursor: null, hasMore: false } })),
+  listMessages: vi.fn(() =>
+    Promise.resolve({
+      items: [],
+      pageInfo: { nextCursor: null, hasMore: false },
+    }),
+  ),
   listFiles: vi.fn(() => Promise.resolve({ items: [] })),
-  listAgentRuns: vi.fn(() => Promise.resolve({ items: [], pageInfo: { nextCursor: null, hasMore: false } })),
+  listAgentRuns: vi.fn(() =>
+    Promise.resolve({
+      items: [],
+      pageInfo: { nextCursor: null, hasMore: false },
+    }),
+  ),
   listWorkflows: vi.fn(() => Promise.resolve({ items: [] })),
-  listA2UIEvents: vi.fn(() => Promise.resolve({ items: [], pageInfo: { nextCursor: null, hasMore: false } })),
-  listSnapshots: vi.fn(() => Promise.resolve({ items: [], pageInfo: { nextCursor: null, hasMore: false } })),
+  listA2UIEvents: vi.fn(() =>
+    Promise.resolve({
+      items: [],
+      pageInfo: { nextCursor: null, hasMore: false },
+    }),
+  ),
+  listSnapshots: vi.fn(() =>
+    Promise.resolve({
+      items: [],
+      pageInfo: { nextCursor: null, hasMore: false },
+    }),
+  ),
   sendMessage: vi.fn(),
   sendWorkflowAction: vi.fn(),
 }));
@@ -29,7 +56,9 @@ describe("workspace store session restore", () => {
   });
 
   it("restores renderer messages from the current session snapshot", async () => {
-    vi.mocked(api.getSession).mockResolvedValue(makeSessionDetail("session-a", "surface-a"));
+    vi.mocked(api.getSession).mockResolvedValue(
+      makeSessionDetail("session-a", "surface-a"),
+    );
 
     const workspace = useWorkspaceStore();
     const renderer = useRendererStore();
@@ -87,10 +116,16 @@ describe("workspace store session restore", () => {
   });
 
   it("ignores stale list responses and late renderer events from the previous session", async () => {
-    const firstMessages = deferred<{ items: MessageDto[]; pageInfo: { nextCursor: null; hasMore: false } }>();
+    const firstMessages = deferred<{
+      items: MessageDto[];
+      pageInfo: { nextCursor: null; hasMore: false };
+    }>();
     vi.mocked(api.listMessages)
       .mockReturnValueOnce(firstMessages.promise)
-      .mockResolvedValueOnce({ items: [], pageInfo: { nextCursor: null, hasMore: false } });
+      .mockResolvedValueOnce({
+        items: [],
+        pageInfo: { nextCursor: null, hasMore: false },
+      });
     vi.mocked(api.getSession).mockResolvedValue({
       session: makeSession("session-a"),
       enabledSkillIds: [],
@@ -100,24 +135,28 @@ describe("workspace store session restore", () => {
     const workspace = useWorkspaceStore();
     const renderer = useRendererStore();
     workspace.setActiveSessionId("session-a");
-    const oldHandlers = vi.mocked(connectStream).mock.calls.at(-1)?.[1] as StreamHandlers;
+    const oldHandlers = vi
+      .mocked(connectStream)
+      .mock.calls.at(-1)?.[1] as StreamHandlers;
     workspace.setActiveSessionId("session-b");
 
     firstMessages.resolve({
-      items: [{
-        id: "stale-message",
-        sessionId: "session-a",
-        agentRunId: null,
-        workflowId: null,
-        workflowStepId: null,
-        role: "user",
-        kind: "chat",
-        content: "旧会话消息",
-        attachments: [],
-        a2uiEventIds: [],
-        metadata: {},
-        createdAt: "2026-01-01T00:00:00.000Z",
-      }],
+      items: [
+        {
+          id: "stale-message",
+          sessionId: "session-a",
+          agentRunId: null,
+          workflowId: null,
+          workflowStepId: null,
+          role: "user",
+          kind: "chat",
+          content: "旧会话消息",
+          attachments: [],
+          a2uiEventIds: [],
+          metadata: {},
+          createdAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
       pageInfo: { nextCursor: null, hasMore: false },
     });
     oldHandlers.surface_snapshot?.({
@@ -140,7 +179,9 @@ describe("workspace store session restore", () => {
     const workspace = useWorkspaceStore();
     workspace.setActiveSessionId("session-a");
 
-    const handlers = vi.mocked(connectStream).mock.calls.at(-1)?.[1] as StreamHandlers;
+    const handlers = vi
+      .mocked(connectStream)
+      .mock.calls.at(-1)?.[1] as StreamHandlers;
     handlers.agent_run_started?.({
       sessionId: "session-a",
       agentRun: {
@@ -184,12 +225,17 @@ describe("workspace store session restore", () => {
     const workspace = useWorkspaceStore();
     workspace.setActiveSessionId("session-a");
 
-    const handlers = vi.mocked(connectStream).mock.calls.at(-1)?.[1] as StreamHandlers;
+    const handlers = vi
+      .mocked(connectStream)
+      .mock.calls.at(-1)?.[1] as StreamHandlers;
 
     expect(workspace.isGenerating).toBe(false);
 
     // plan step 进入 running → 生成中
-    handlers.workflow_started?.({ sessionId: "session-a", workflow: makeWorkflow() });
+    handlers.workflow_started?.({
+      sessionId: "session-a",
+      workflow: makeWorkflow(),
+    });
     handlers.workflow_step_updated?.({
       sessionId: "session-a",
       workflowId: "workflow-a",
@@ -201,9 +247,121 @@ describe("workspace store session restore", () => {
     handlers.workflow_step_updated?.({
       sessionId: "session-a",
       workflowId: "workflow-a",
-      step: makeStep({ type: "plan", status: "awaiting_confirmation", stageState: "awaiting_plan_confirmation" }),
+      step: makeStep({
+        type: "plan",
+        status: "awaiting_confirmation",
+        stageState: "awaiting_plan_confirmation",
+      }),
     });
     expect(workspace.isGenerating).toBe(false);
+  });
+
+  it("does not resync on first SSE connected lifecycle", async () => {
+    vi.mocked(api.getSession).mockResolvedValue({
+      session: makeSession("session-a"),
+      enabledSkillIds: [],
+      currentSnapshot: null,
+    });
+
+    const workspace = useWorkspaceStore();
+    workspace.setActiveSessionId("session-a");
+
+    const handlers = vi
+      .mocked(connectStream)
+      .mock.calls.at(-1)?.[1] as StreamHandlers;
+    vi.mocked(api.listMessages).mockClear();
+    vi.mocked(api.listWorkflows).mockClear();
+    vi.mocked(api.listAgentRuns).mockClear();
+    vi.mocked(api.listA2UIEvents).mockClear();
+    vi.mocked(api.listSnapshots).mockClear();
+    vi.mocked(api.getSession).mockClear();
+
+    handlers.onConnected?.({ reconnect: false, lastEventId: "1" });
+
+    expect(workspace.streamStatus).toBe("connected");
+    expect(api.listMessages).not.toHaveBeenCalled();
+    expect(api.listWorkflows).not.toHaveBeenCalled();
+    expect(api.listAgentRuns).not.toHaveBeenCalled();
+    expect(api.listA2UIEvents).not.toHaveBeenCalled();
+    expect(api.listSnapshots).not.toHaveBeenCalled();
+    expect(api.getSession).not.toHaveBeenCalled();
+  });
+
+  it("resyncs session state after SSE reconnect", async () => {
+    vi.mocked(api.getSession).mockResolvedValue({
+      session: makeSession("session-a"),
+      enabledSkillIds: [],
+      currentSnapshot: null,
+    });
+    vi.mocked(api.listMessages).mockResolvedValue({
+      items: [makeMessage("message-after-reconnect")],
+      pageInfo: { nextCursor: null, hasMore: false },
+    });
+    vi.mocked(api.listWorkflows).mockResolvedValue({
+      items: [{ ...makeWorkflow(), status: "awaiting_confirmation" }],
+    });
+
+    const workspace = useWorkspaceStore();
+    workspace.setActiveSessionId("session-a");
+    const handlers = vi
+      .mocked(connectStream)
+      .mock.calls.at(-1)?.[1] as StreamHandlers;
+
+    handlers.onConnected?.({ reconnect: true, lastEventId: "9" });
+
+    await vi.waitFor(() => {
+      expect(workspace.messages[0]).toMatchObject({
+        id: "message-after-reconnect",
+      });
+    });
+    expect(workspace.workflows[0]).toMatchObject({
+      status: "awaiting_confirmation",
+    });
+    expect(workspace.sessionHydrationStatus).toBe("ready");
+  });
+
+  it("updates interrupted workflow from SSE without keeping generating state", async () => {
+    vi.mocked(api.getSession).mockResolvedValue({
+      session: makeSession("session-a"),
+      enabledSkillIds: [],
+      currentSnapshot: null,
+    });
+
+    const workspace = useWorkspaceStore();
+    workspace.setActiveSessionId("session-a");
+    const handlers = vi
+      .mocked(connectStream)
+      .mock.calls.at(-1)?.[1] as StreamHandlers;
+
+    handlers.workflow_started?.({
+      sessionId: "session-a",
+      workflow: makeWorkflow(),
+    });
+    handlers.workflow_step_updated?.({
+      sessionId: "session-a",
+      workflowId: "workflow-a",
+      step: makeStep({ status: "running" }),
+    });
+    expect(workspace.isGenerating).toBe(true);
+
+    handlers.workflow_interrupted?.({
+      sessionId: "session-a",
+      workflow: { ...makeWorkflow(), status: "interrupted" },
+      step: makeStep({ status: "interrupted" }),
+      agentRun: {
+        id: "run-cancelled",
+        status: "cancelled",
+        attemptCount: 0,
+        failureReason: "用户已停止运行",
+        completedAt: "2026-01-01T00:00:01.000Z",
+      },
+    });
+
+    expect(workspace.isGenerating).toBe(false);
+    expect(workspace.workflows[0]).toMatchObject({ status: "interrupted" });
+    expect(workspace.workflows[0]?.steps[0]).toMatchObject({
+      status: "interrupted",
+    });
   });
 
   it("restores renderer messages when a surface_snapshot SSE event arrives", async () => {
@@ -217,7 +375,9 @@ describe("workspace store session restore", () => {
     const renderer = useRendererStore();
     workspace.setActiveSessionId("session-a");
 
-    const handlers = vi.mocked(connectStream).mock.calls.at(-1)?.[1] as StreamHandlers;
+    const handlers = vi
+      .mocked(connectStream)
+      .mock.calls.at(-1)?.[1] as StreamHandlers;
     handlers.surface_snapshot?.({
       sessionId: "session-a",
       snapshot: makeSnapshot("session-a", "surface-live"),
@@ -243,7 +403,9 @@ describe("workspace store session restore", () => {
     const workspace = useWorkspaceStore();
     workspace.setActiveSessionId("session-a");
 
-    const handlers = vi.mocked(connectStream).mock.calls.at(-1)?.[1] as StreamHandlers;
+    const handlers = vi
+      .mocked(connectStream)
+      .mock.calls.at(-1)?.[1] as StreamHandlers;
     handlers.agent_run_started?.({
       sessionId: "session-a",
       agentRun: {
@@ -296,7 +458,11 @@ describe("workspace store session restore", () => {
     const workspace = useWorkspaceStore();
     workspace.activeSessionId = "session-a";
 
-    await workspace.submitWorkflowClarification("artifact-clarification", { goal: "dashboard" }, "更多背景");
+    await workspace.submitWorkflowClarification(
+      "artifact-clarification",
+      { goal: "dashboard" },
+      "更多背景",
+    );
 
     expect(api.sendWorkflowAction).toHaveBeenCalledWith("session-a", {
       action: "submit_clarification",
@@ -307,7 +473,9 @@ describe("workspace store session restore", () => {
         additionalText: "更多背景",
       },
     });
-    expect(workspace.messages[0]).toMatchObject({ id: "message-clarification" });
+    expect(workspace.messages[0]).toMatchObject({
+      id: "message-clarification",
+    });
   });
 
   it("submits decision form with submit_decision payload", async () => {
@@ -319,7 +487,11 @@ describe("workspace store session restore", () => {
     const workspace = useWorkspaceStore();
     workspace.activeSessionId = "session-a";
 
-    await workspace.submitWorkflowDecision("artifact-decision", "revise", "调整布局");
+    await workspace.submitWorkflowDecision(
+      "artifact-decision",
+      "revise",
+      "调整布局",
+    );
 
     expect(api.sendWorkflowAction).toHaveBeenCalledWith("session-a", {
       action: "submit_decision",
@@ -358,17 +530,22 @@ describe("workspace store session restore", () => {
 
     const workspace = useWorkspaceStore();
     workspace.activeSessionId = "session-a";
-    workspace.workflows = [{
-      ...makeWorkflow(),
-      status: "failed_retryable",
-      failureReason: "API 失败",
-    }];
+    workspace.workflows = [
+      {
+        ...makeWorkflow(),
+        status: "failed_retryable",
+        failureReason: "API 失败",
+      },
+    ];
 
     await workspace.sendMessage("继续");
 
-    expect(api.sendMessage).toHaveBeenCalledWith("session-a", expect.objectContaining({
-      content: "继续",
-    }));
+    expect(api.sendMessage).toHaveBeenCalledWith(
+      "session-a",
+      expect.objectContaining({
+        content: "继续",
+      }),
+    );
     expect(workspace.workflows[0]).toMatchObject({
       id: "workflow-a",
       status: "running",
@@ -411,7 +588,10 @@ describe("workspace store session restore", () => {
   });
 });
 
-function makeSessionDetail(sessionId: string, surfaceId: string): SessionDetailResponse {
+function makeSessionDetail(
+  sessionId: string,
+  surfaceId: string,
+): SessionDetailResponse {
   return {
     session: makeSession(sessionId),
     enabledSkillIds: [],
@@ -437,7 +617,10 @@ function makeSession(sessionId: string): SessionDto {
   };
 }
 
-function makeSnapshot(sessionId: string, surfaceId: string): SurfaceSnapshotDto {
+function makeSnapshot(
+  sessionId: string,
+  surfaceId: string,
+): SurfaceSnapshotDto {
   return {
     id: `snapshot-${surfaceId}`,
     sessionId,

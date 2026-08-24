@@ -1,5 +1,14 @@
 ﻿# 更新日志
 
+## 2026-08-24
+
+### Workflow
+
+- 新增可继续的 `interrupted` workflow / step 生命周期：用户 `cancel` action 会停止当前 AgentRun，并保留原 workflow 阶段供后续普通消息继续。
+- 后端新增进程内 cancellation token、`workflow_interrupted` SSE、`resumeInterruptedWorkflowFromMessage()` 和启动时 orphan running work 修复。
+- 前端处理后端初始 `connected` SSE，修复建连后状态延迟；SSE 重连后执行 Session Resync，从 HTTP 事实源恢复 messages、workflows、agent runs、A2UI events、snapshots 和 current snapshot。
+- 同步更新 shared DTO / SSE 类型、design、contract、implementation、ADR、spec 和本地 issues。
+
 ## 2026-08-20
 
 ### Workflow
@@ -227,4 +236,3 @@
 - Renderer store 新增快照恢复用的消息替换入口，避免恢复当前快照时重复累积历史消息。
 - 修复 `Card.children` 非法字段漏过 Agent 校验导致卡片内容不渲染的问题；未来输出会被 `validateA2UI` 拦截并进入修复循环。
 - Renderer 的 Card 增加历史数据兼容：当旧事件使用 `children` 且没有 `child` 时，仍可渲染其子组件内容。
-

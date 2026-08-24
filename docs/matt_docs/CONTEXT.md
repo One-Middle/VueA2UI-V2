@@ -52,6 +52,15 @@ Agent Runtime 内部暴露给 Agent 调用的受控工具，例如 `askClarifica
 **WorkflowAction**:
 用户或前端通过 API 推进 workflow 的受控操作。第一版包含 `submit_clarification`、`submit_decision`、`retry_step` 和 `cancel`。WorkflowAction 由 WorkflowService 校验和执行，不等同于 AgentTool。
 
+**User Gate**:
+Agent Workflow 中必须等待用户动作的边界。第一版包含 clarification、plan confirmation、preview confirmation 和 commit 前确认。Agent 到达 User Gate 后必须持久化可恢复 artifact 并停止等待 WorkflowAction，不能自动越过确认或提交边界。
+
+**Session Resync**:
+前端 SSE 重连成功后，从后端 HTTP API 重新同步当前 session 事实源的过程。它用于补齐断线期间漏掉的实时事件，数据来源包括 messages、workflows、agent runs、A2UI events、surface snapshots 和 session detail；它不同于 Agent Runtime 的 Hydration。
+
+**Workflow Interruption**:
+用户或运行环境中断当前 AgentRun 后保留 Agent Workflow 上下文的状态。中断后的 workflow 和当前 step 进入 `interrupted`，当前 AgentRun 进入 `cancelled`；用户后续发送非空普通消息时，可以沿原 workflow step 创建新的 AgentRun 继续。
+
 **Agent Workflow**:
 由后端约束、Agent 参与生成和判断的多阶段任务流程。一个 session 可以保留多次 workflow 历史，但同一时刻只能有一个进行中的 workflow。
 

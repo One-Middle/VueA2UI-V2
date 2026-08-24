@@ -13,6 +13,10 @@
 - 调用 Agent Runtime 并消费 Parsed Agent Result。
 - 应用 WorkflowStageGate：阶段前置条件、可见 AgentTools、允许 WorkflowAction、允许 Parsed Agent Result、失败处理和 retryable workflow 续跑。
 - 只在用户确认后提交 exact stored candidate A2UI 为正式 A2UI event 和 surface snapshot。
+- 维护 Agent 运行生命周期：切换会话、前端断线或页面刷新不取消运行；用户显式 `cancel` WorkflowAction 才中断当前 AgentRun。
+- 将 `cancel` action 解释为可继续的中断：当前 AgentRun 变为 `cancelled`，当前 workflow 和 step 变为 `interrupted`，并记录 interruption reason。
+- 在同一 workflow / step 上用新的 AgentRun 承载 interrupted 后的继续尝试。
+- 在模型调用、工具调用、artifact 持久化、状态推进和 commit 事务前检查 cancellation token 与数据库状态。
 
 ## 不负责
 
@@ -29,6 +33,9 @@
 - WorkflowService 负责判断“这件事现在能不能做”，Agent 负责理解“用户这句话想干什么”。
 - `AgentTool` 与 `WorkflowAction` 必须保持分离。
 - `failed_retryable` workflow 收到普通用户消息时，Backend 将其视为恢复触发器：复用最新失败 step、递增 step attempt、创建新的 AgentRun，并继续原阶段；等待确认态仍必须通过 WorkflowAction 推进。
+- `interrupted` workflow 仍属于当前 active workflow。收到非空普通用户消息时，Backend 将其视为继续触发器：当前 step 从 `interrupted` 回到 `running`，创建新的 AgentRun，并继续原阶段。
+- User Gate 是后端强制边界。无论前端是否正在监听，Agent 到达 clarification、plan confirmation、preview confirmation 或 commit 前确认时都必须持久化 artifact 并停止等待用户动作。
+- Backend 不需要依赖 SSE client 数量判断用户是否在会话内；SSE 连接生命周期和 Agent 运行生命周期相互独立。
 
 ## Model IO Logging 边界
 

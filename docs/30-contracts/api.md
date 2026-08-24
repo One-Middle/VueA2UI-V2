@@ -65,6 +65,8 @@ plan -> generate_a2ui -> validate -> preview -> commit
 
 workflow 的启动由 `POST /api/sessions/:sessionId/messages` 触发：`MessageService` 通过 UI 生成意图正则（`a2ui|ui|页面|界面|组件|生成|创建|修改|调整|改成|预览` 等）或前端传入的 `intent` 判断是否需要创建新 workflow。若当前 active workflow 处于 `failed_retryable`，同一个消息入口会把用户追加消息作为恢复触发器，复用最新失败 step 重新执行；`plan` 和 `generate_a2ui` 失败直接恢复原 step，`validate` 失败回到其来源 `generate_a2ui` step 重新生成。`SendMessageResponse.workflow` 返回触发、恢复或推进的 workflow 摘要。
 
+若当前 active workflow 处于 `interrupted`，同一个消息入口会把非空用户追加消息作为继续触发器。后端保留原 workflow 和当前 step，上一次被取消的 AgentRun 保持 `cancelled`，新的继续尝试创建新的 AgentRun 并绑定原 `workflowStepId` 和新的 `triggerMessageId`。前端不得自行把该消息转换为 workflow action。
+
 `WorkflowStepDto.stageState` 是 API DTO 字段，用于表达阶段内等待态：
 
 - `awaiting_clarification`
@@ -80,6 +82,10 @@ workflow 的启动由 `POST /api/sessions/:sessionId/messages` 触发：`Message
 - `cancel`
 
 `retry_step` 当前只支持重试最新的失败 `generate_a2ui` step。Codex 式续跑的主路径是用户向 `POST /api/sessions/:sessionId/messages` 追加普通消息，由后端在 `failed_retryable` workflow 上复用失败 step 并创建新的 AgentRun 记录本次尝试。
+
+`cancel` 表示用户主动停止当前运行，不表示删除 workflow 或把 workflow 置为不可继续终态。后端应中断当前 running AgentRun，并把 workflow 与当前 step 标记为 `interrupted`。对已 `interrupted` 的 workflow 重复 `cancel` 应幂等返回当前状态；对 awaiting User Gate 的 workflow 不需要 cancel；对 completed 或 terminal failed workflow 应返回不可取消错误。
+
+`cancel` 响应必须包含最新 `{ workflow, agentRun, step }` 语义的数据，至少通过 `WorkflowActionResponse.workflow` 和 `agentRun` 让当前客户端立即进入“已停止，可继续”状态。SSE 仅用于同步其他客户端。
 
 `submit_clarification`：
 
@@ -133,6 +139,12 @@ artifact 输出规则：
 - `validation_report` 在 validate 成功或失败时都可以保存；失败时不得保存 candidate artifact。
 - raw Agent Output 不进入 API 主流程，也不得作为 artifact content 返回。
 
+User Gate 规则：
+
+- User Gate 包含 clarification、plan confirmation、preview confirmation 和 commit 前确认。
+- Agent 到达 User Gate 后必须持久化 `WorkflowArtifact` 并停止等待 `WorkflowAction`。
+- 前端断线、刷新或切换会话不会取消 Agent；后台运行最多推进到下一个 User Gate，不能自动越过确认或提交边界。
+
 ### Files
 
 - `POST /api/sessions/:sessionId/files`
@@ -176,6 +188,7 @@ artifact 输出规则：
 SSE 事件类型由 `packages/shared/src/sse.ts` 维护。当前核心事件包括：
 
 - `heartbeat`
+- `connected`
 - `agent_run_started`
 - `agent_run_attempt`
 - `assistant_message`
@@ -189,8 +202,15 @@ SSE 事件类型由 `packages/shared/src/sse.ts` 维护。当前核心事件包�
 - `workflow_artifact_created`
 - `workflow_completed`
 - `workflow_failed`
+- `workflow_interrupted`
 
 前端必须在会话切换时关闭旧 SSE 连接，并使用会话 ID 与会话修订号拦截迟到事件。
+
+`connected` 由后端在 SSE 连接建立后立即发送。前端收到后应把连接状态置为 connected；首次连接不额外触发 Session Resync。
+
+`workflow_interrupted` 在用户 `cancel` action 成功中断当前运行时发送。payload 应包含 `sessionId`、最新 workflow、被中断 step 和被取消 agentRun 摘要。前端收到后停止 generating 状态并展示可继续输入。
+
+SSE 重连不是业务状态事实源。客户端可带 `Last-Event-ID`，但第一版不要求后端按该 ID 回放事件。前端在重连成功后必须执行 Session Resync，全量拉取 messages、workflows、agent runs、A2UI events、snapshots 和 session detail，以修复断线期间漏掉的实时事件。
 
 ## 5. 错误码分类
 
