@@ -49,38 +49,45 @@ packages/shared/src/
 
 ## 5. 文件职责
 
-| 文件 | 作用 |
-| --- | --- |
-| `src/a2ui.ts` | A2UI v0.9 消息、Renderer 回传、脚本声明、Basic Catalog、surface snapshot 类型。 |
-| `src/api.ts` | HTTP API request/response DTO、分页、错误、会话、消息、文件、Skill、Agent run、Tool call、A2UI event、snapshot 和导出类型。 |
-| `src/agent.ts` | AgentRunInput、AgentRunResult、ValidateA2UIResult、ToolCallRecord、IAgentRuntime 和工厂配置。 |
-| `src/resource-ledger.ts` | Resource Ledger Snapshot 契约类型（已披露 Skill / Reference 的键与元信息）。 |
-| `src/sse.ts` | AgentRunPhase、SSE event name（含 `agent_trace_event`）和 PlatformSseEvent 联合类型。 |
-| `src/logger.ts` | 共享日志类型或辅助。 |
-| `src/index.ts` | 统一 re-export 入口。 |
+| 文件                     | 作用                                                                                                                        |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| `src/a2ui.ts`            | A2UI v0.9 消息、Renderer 回传、脚本声明、Basic Catalog、surface snapshot 类型。                                             |
+| `src/api.ts`             | HTTP API request/response DTO、分页、错误、会话、消息、文件、Skill、Agent run、Tool call、A2UI event、snapshot 和导出类型。 |
+| `src/agent.ts`           | AgentRunInput、AgentRunResult、ValidateA2UIResult、ToolCallRecord、IAgentRuntime 和工厂配置。                               |
+| `src/resource-ledger.ts` | Resource Ledger Snapshot 契约类型（已披露 Skill / Reference 的键与元信息）。                                                |
+| `src/sse.ts`             | AgentRunPhase、SSE event name（含 `connected`、`workflow_interrupted`、`agent_trace_event`）和 PlatformSseEvent 联合类型。  |
+| `src/logger.ts`          | 共享日志类型或辅助。                                                                                                        |
+| `src/index.ts`           | 统一 re-export 入口。                                                                                                       |
 
 ## 6. 核心类型
 
-| 类型 / 常量 | 位置 | 作用 |
-| --- | --- | --- |
-| `A2UI_VERSION` | `src/a2ui.ts` | 当前协议版本常量，值为 `v0.9`。 |
-| `A2UIServerMessage` | `src/a2ui.ts` | 后端传给 Renderer 的 server-to-client 消息联合。 |
-| `A2UIClientMessage` | `src/a2ui.ts` | Renderer 回传 action/error 的 client-to-server 消息联合。 |
-| `A2UIComponentActionDeclaration` | `src/a2ui.ts` | 组件 action 声明，包含 `event`、`script` 和未来保留的 `functionCall`。 |
-| `A2UIPropertyScriptDeclaration` | `src/a2ui.ts` | 组件属性脚本声明，包含 `code`、`deps` 和 `fallback`。 |
-| `BASIC_CATALOG_COMPONENTS` | `src/a2ui.ts` | 当前 Basic Catalog 的 21 个组件名称。 |
-| `SurfaceSnapshotData` | `src/a2ui.ts` | 后端持久化和前端恢复 Renderer 状态的数据结构。 |
-| `SessionDto` / `MessageDto` / `SkillDto` | `src/api.ts` | 前后端主要业务 DTO。 |
-| `AgentRunDto` / `ToolCallDto` | `src/api.ts` | Runtime 面板和后端 run 记录使用的 DTO。 |
-| `RuntimeConfigDto` | `src/api.ts` | Runtime 配置展示 DTO。 |
-| `ExportSessionDto` | `src/api.ts` | 完整会话导出结构。 |
-| `AgentRunInput` | `src/agent.ts` | 后端注入给 Agent Runtime 的完整上下文输入。 |
-| `AgentRunResult` | `src/agent.ts` | Agent 返回结果，包含 `COMMITTED`、`TEXT_ONLY`、`FAILED`。 |
-| `ToolCallRecord` | `src/agent.ts` | Agent 工具调用回调记录，后端会持久化为 tool call。 |
-| `PlatformSseEvent` | `src/sse.ts` | 后端推给前端的 SSE 事件联合类型。 |
-| `AgentTraceEventDto` | `src/api.ts` | ReAct 循环单条实时 trace 事件，通过 `agent_trace_event` SSE 推送。 |
-| `AgentRunTraceSummaryDto` | `src/api.ts` | ReAct 循环持久化 trace 摘要，写入 `agent_runs.metadata.traceSummary`。 |
-| `ResourceLedgerSnapshot` | `src/resource-ledger.ts` | 跨 workflow task 共享的已披露资源快照（不含正文）。 |
+| 类型 / 常量                              | 位置                     | 作用                                                                   |
+| ---------------------------------------- | ------------------------ | ---------------------------------------------------------------------- |
+| `A2UI_VERSION`                           | `src/a2ui.ts`            | 当前协议版本常量，值为 `v0.9`。                                        |
+| `A2UIServerMessage`                      | `src/a2ui.ts`            | 后端传给 Renderer 的 server-to-client 消息联合。                       |
+| `A2UIClientMessage`                      | `src/a2ui.ts`            | Renderer 回传 action/error 的 client-to-server 消息联合。              |
+| `A2UIComponentActionDeclaration`         | `src/a2ui.ts`            | 组件 action 声明，包含 `event`、`script` 和未来保留的 `functionCall`。 |
+| `A2UIPropertyScriptDeclaration`          | `src/a2ui.ts`            | 组件属性脚本声明，包含 `code`、`deps` 和 `fallback`。                  |
+| `BASIC_CATALOG_COMPONENTS`               | `src/a2ui.ts`            | 当前 Basic Catalog 的 21 个组件名称。                                  |
+| `SurfaceSnapshotData`                    | `src/a2ui.ts`            | 后端持久化和前端恢复 Renderer 状态的数据结构。                         |
+| `SessionDto` / `MessageDto` / `SkillDto` | `src/api.ts`             | 前后端主要业务 DTO。                                                   |
+| `AgentRunDto` / `ToolCallDto`            | `src/api.ts`             | Runtime 面板和后端 run 记录使用的 DTO。                                |
+| `RuntimeConfigDto`                       | `src/api.ts`             | Runtime 配置展示 DTO。                                                 |
+| `ExportSessionDto`                       | `src/api.ts`             | 完整会话导出结构。                                                     |
+| `AgentRunInput`                          | `src/agent.ts`           | 后端注入给 Agent Runtime 的完整上下文输入。                            |
+| `AgentRunResult`                         | `src/agent.ts`           | Agent 返回结果，包含 `COMMITTED`、`TEXT_ONLY`、`FAILED`。              |
+| `ToolCallRecord`                         | `src/agent.ts`           | Agent 工具调用回调记录，后端会持久化为 tool call。                     |
+| `PlatformSseEvent`                       | `src/sse.ts`             | 后端推给前端的 SSE 事件联合类型。                                      |
+| `AgentTraceEventDto`                     | `src/api.ts`             | ReAct 循环单条实时 trace 事件，通过 `agent_trace_event` SSE 推送。     |
+| `AgentRunTraceSummaryDto`                | `src/api.ts`             | ReAct 循环持久化 trace 摘要，写入 `agent_runs.metadata.traceSummary`。 |
+| `ResourceLedgerSnapshot`                 | `src/resource-ledger.ts` | 跨 workflow task 共享的已披露资源快照（不含正文）。                    |
+
+Workflow 生命周期类型包含可继续中断状态：
+
+- `AgentWorkflowStatus` 包含 `interrupted`，表示当前运行被用户或系统中断，但 workflow 仍可通过后续普通消息继续。
+- `WorkflowStepStatus` 包含 `interrupted`，表示当前 step 停在可继续的中断点。
+- `WorkflowActionResponse` 可返回受 action 影响的 `step`，用于 `cancel` 后让前端立即更新当前 step。
+- `PlatformSseEvent` 包含 `connected` 和 `workflow_interrupted`；前者用于 SSE 建连生命周期，后者用于广播可继续中断结果。
 
 ## 7. 当前 A2UI 类型边界
 
@@ -135,5 +142,3 @@ Shared 不应反向 import 任何业务模块。跨模块字段变更应先改 S
 - [Shared 类型契约](../../../30-contracts/shared-types.md)
 - [API 契约](../../../30-contracts/api.md)
 - [A2UI v0.9 契约](../../../30-contracts/a2ui-v0.9.md)
-
-

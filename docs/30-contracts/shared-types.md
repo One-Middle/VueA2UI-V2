@@ -25,12 +25,13 @@
 
 - `AgentWorkflowDto` 描述 session 内一次可恢复 Agent Workflow 的状态、当前 step、意图、完成/失败原因和时间戳。
 - `WorkflowStepDto` 描述 workflow 中的可观测阶段，`type` 只能是 `plan`、`generate_a2ui`、`validate`、`preview` 或 `commit`。
-- `WorkflowStepDto.status` 描述通用执行状态，集合为 `pending`、`running`、`awaiting_confirmation`、`confirmed`、`completed`、`failed` 和 `skipped`。
+- `AgentWorkflowDto.status` 描述 workflow 生命周期状态，集合包含 `active`、`running`、`awaiting_confirmation`、`failed_retryable`、`interrupted`、`completed`、`failed` 和 `cancelled`。`interrupted` 表示用户主动停止当前运行但 workflow 可继续。
+- `WorkflowStepDto.status` 描述通用执行状态，集合为 `pending`、`running`、`awaiting_confirmation`、`confirmed`、`completed`、`failed`、`interrupted` 和 `skipped`。
 - `WorkflowStepDto.stageState` 描述领域等待态，集合为 `awaiting_clarification`、`awaiting_plan_confirmation`、`awaiting_preview_confirmation` 或 `null`。该字段是主状态字段，不放入 `metadata`（`workflow_steps.stage_state` 是其持久化列）。
 - `WorkflowArtifactDto` 描述 workflow 产物，`kind` 包含 `clarification_form`、`decision_form`、`plan_markdown`、`candidate_a2ui_messages` 和 `validation_report`。
 - `MessageDto` 和 `AgentRunDto` 包含可选 `workflowId` 与 `workflowStepId`，用于恢复完整 workflow timeline。
-- `WorkflowActionRequest` 和 `WorkflowActionResponse` 是前端推进 workflow 的通用 action 契约。当前 action 集合为 `submit_clarification`、`submit_decision`、`retry_step` 和 `cancel`。
-- `PlatformSseEvent` 包含 workflow 级事件：`workflow_started`、`workflow_step_updated`、`workflow_artifact_created`、`workflow_completed`、`workflow_failed`，以及 ReAct 循环实时事件 `agent_trace_event`。
+- `WorkflowActionRequest` 和 `WorkflowActionResponse` 是前端推进 workflow 的通用 action 契约。当前 action 集合为 `submit_clarification`、`submit_decision`、`retry_step` 和 `cancel`。`cancel` 的结果是可继续的 `interrupted` 状态，不是 workflow 删除或不可继续终态。
+- `PlatformSseEvent` 包含连接事件 `connected`、`heartbeat`，workflow 级事件：`workflow_started`、`workflow_step_updated`、`workflow_artifact_created`、`workflow_completed`、`workflow_failed`、`workflow_interrupted`，以及 ReAct 循环实时事件 `agent_trace_event`。
 - `AgentWorkflowTaskInput` 是 workflow task 执行入口的上下文快照，`task` 联合为 `plan`、`revise_plan`、`generate_a2ui`、`validate`、`preview_decision`、`initial_planning`、`generate_candidate`；后端实际只使用 `plan`、`revise_plan`、`generate_a2ui`、`preview_decision` 四种。它还携带 `availableTools`、`resourceLedger`、`agentRunId`、`clarificationAnswers`、`previousPlanMarkdown`、`previousCandidate`、`revisionText` 等跨 task 上下文。
 - `AgentToolName` 是 workflow 内 Agent 可调用的受控工具集合：`askClarification`、`askUserDecision`、`getSkillContent`、`getSkillReferenceContent`、`getCatalogComponentDetails`、`validateA2UI`。
 - `AgentWorkflowTaskResult` 是 workflow task 的执行结果，包含 `parsedResult`、`debugMetadata`、`toolCalls`、`rawOutputPreview`、`attemptCount`、`tokenUsage`、`traceSummary` 和 `resourceLedger`。
@@ -77,6 +78,25 @@ export type WorkflowActionType =
   | "retry_step"
   | "cancel";
 ```
+
+`cancel` payload：
+
+```ts
+{
+  action: "cancel";
+  workflowStepId?: string;
+  message?: string;
+  payload?: JsonObject;
+}
+```
+
+约束：
+
+- `cancel` 只中断当前 running workflow run。
+- `AgentRun.status` 置为 `cancelled`。
+- `AgentWorkflow.status` 与当前 `WorkflowStep.status` 置为 `interrupted`。
+- `interruptionReason` 第一版写入 workflow/step metadata，推荐值为 `user_cancelled`、`server_restarted`、`runtime_cancelled`、`provider_disconnected` 或 `unknown`。
+- 重复 `cancel` 对 `interrupted` workflow 幂等成功并返回当前状态。
 
 `submit_clarification` payload：
 

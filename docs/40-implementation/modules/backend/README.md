@@ -69,6 +69,7 @@ packages/backend/
       stream.ts
     services/
       agent-run.service.ts
+      cancellation.service.ts
       export.service.ts
       file.service.ts
       message.service.ts
@@ -103,43 +104,44 @@ packages/backend/
 
 ## 5. 关键文件职责
 
-| 文件 / 目录 | 作用 |
-| --- | --- |
-| `src/server.ts` | HTTP 服务启动入口，负责监听和退出处理。 |
-| `src/app.ts` | Express app 工厂，注册 CORS、JSON 解析、健康检查、Runtime 配置端点、路由、404 和错误处理。 |
-| `src/config.ts` | 读取环境变量，生成模型、Catalog、数据库和 Skill 配置。 |
-| `src/db.ts` | Prisma Client 初始化。 |
-| `src/routes/*.ts` | 参数和 body 校验层，转发到 service。 |
-| `src/services/agent-run.service.ts` | Agent run 核心编排，负责调用 Agent、提交结果、失败处理和 SSE 推送。 |
-| `src/services/message.service.ts` | 保存用户消息，并根据消息意图触发 Agent run 或推进 Agent Workflow。 |
-| `src/services/workflow.service.ts` | 编排 Agent Workflow 全流程：创建 workflow、plan / generate_a2ui / validate / preview / commit step 推进、artifact 版本、失败重试，并调用 `runWorkflowTask` 执行 ReAct task、回写 Resource Ledger。 |
-| `src/routes/workflows.ts` | 查询 workflow timeline / 详情，并接收 `submit_clarification`、`submit_decision`、`retry_step`、`cancel` 等 workflow action。 |
-| `src/repositories/workflow.repository.ts` | AgentWorkflow / WorkflowStep / WorkflowArtifact 三张表的数据访问层。 |
-| `src/services/snapshot.service.ts` | 从 committed A2UI events 回放生成 surface snapshot。 |
-| `src/services/skill-resolver.service.ts` | 合并 session 启用 Skill 和平台默认 Skill，供 Agent 输入使用。 |
-| `src/services/skill.service.ts` | Skill CRUD、Reference metadata、会话启用关系和内置 Skill upsert。 |
-| `src/services/stream.service.ts` | 管理 SSE 客户端连接和事件广播。 |
-| `src/services/renderer-event.service.ts` | 持久化 Renderer action/error。 |
-| `src/services/export.service.ts` | 导出会话、A2UI JSONL 和 snapshot。 |
-| `src/repositories/*.ts` | 数据访问层，封装 Prisma CRUD 和查询。 |
-| `src/scripts/sync-builtin-skills.ts` | 将 Agent 包内置 Skill 同步到数据库。 |
-| `src/scripts/sync-skill-docs.ts` | 将数据库 Skill 镜像到 `skill-docs/`，便于开发查看。 |
-| `src/scripts/repair-current-snapshots.ts` | 从 committed events 修复 current snapshot。 |
+| 文件 / 目录                               | 作用                                                                                                                                                                                                                     |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `src/server.ts`                           | HTTP 服务启动入口，负责监听和退出处理。                                                                                                                                                                                  |
+| `src/app.ts`                              | Express app 工厂，注册 CORS、JSON 解析、健康检查、Runtime 配置端点、路由、404 和错误处理。                                                                                                                               |
+| `src/config.ts`                           | 读取环境变量，生成模型、Catalog、数据库和 Skill 配置。                                                                                                                                                                   |
+| `src/db.ts`                               | Prisma Client 初始化。                                                                                                                                                                                                   |
+| `src/routes/*.ts`                         | 参数和 body 校验层，转发到 service。                                                                                                                                                                                     |
+| `src/services/agent-run.service.ts`       | Agent run 核心编排，负责调用 Agent、提交结果、失败处理和 SSE 推送。                                                                                                                                                      |
+| `src/services/message.service.ts`         | 保存用户消息，并根据消息意图触发 Agent run 或推进 Agent Workflow。                                                                                                                                                       |
+| `src/services/workflow.service.ts`        | 编排 Agent Workflow 全流程：创建 workflow、plan / generate_a2ui / validate / preview / commit step 推进、artifact 版本、失败重试、可继续中断、启动修复，并调用 `runWorkflowTask` 执行 ReAct task、回写 Resource Ledger。 |
+| `src/services/cancellation.service.ts`    | 维护进程内 cancellation token，用于用户主动停止后让当前 AgentRun 在安全检查点退出。                                                                                                                                      |
+| `src/routes/workflows.ts`                 | 查询 workflow timeline / 详情，并接收 `submit_clarification`、`submit_decision`、`retry_step`、`cancel` 等 workflow action。                                                                                             |
+| `src/repositories/workflow.repository.ts` | AgentWorkflow / WorkflowStep / WorkflowArtifact 三张表的数据访问层。                                                                                                                                                     |
+| `src/services/snapshot.service.ts`        | 从 committed A2UI events 回放生成 surface snapshot。                                                                                                                                                                     |
+| `src/services/skill-resolver.service.ts`  | 合并 session 启用 Skill 和平台默认 Skill，供 Agent 输入使用。                                                                                                                                                            |
+| `src/services/skill.service.ts`           | Skill CRUD、Reference metadata、会话启用关系和内置 Skill upsert。                                                                                                                                                        |
+| `src/services/stream.service.ts`          | 管理 SSE 客户端连接和事件广播。                                                                                                                                                                                          |
+| `src/services/renderer-event.service.ts`  | 持久化 Renderer action/error。                                                                                                                                                                                           |
+| `src/services/export.service.ts`          | 导出会话、A2UI JSONL 和 snapshot。                                                                                                                                                                                       |
+| `src/repositories/*.ts`                   | 数据访问层，封装 Prisma CRUD 和查询。                                                                                                                                                                                    |
+| `src/scripts/sync-builtin-skills.ts`      | 将 Agent 包内置 Skill 同步到数据库。                                                                                                                                                                                     |
+| `src/scripts/sync-skill-docs.ts`          | 将数据库 Skill 镜像到 `skill-docs/`，便于开发查看。                                                                                                                                                                      |
+| `src/scripts/repair-current-snapshots.ts` | 从 committed events 修复 current snapshot。                                                                                                                                                                              |
 
 ## 6. 路由能力
 
-| 路由文件 | 主要能力 |
-| --- | --- |
-| `routes/sessions.ts` | 会话创建、列表、详情、更新、软删除。 |
-| `routes/messages.ts` | 消息列表、发送用户消息并按 UI 生成意图触发 workflow 或 Agent run。 |
+| 路由文件               | 主要能力                                                                                                |
+| ---------------------- | ------------------------------------------------------------------------------------------------------- |
+| `routes/sessions.ts`   | 会话创建、列表、详情、更新、软删除。                                                                    |
+| `routes/messages.ts`   | 消息列表、发送用户消息并按 UI 生成意图触发 workflow 或 Agent run。                                      |
 | `routes/agent-runs.ts` | Agent run 列表和详情，详情包含 tool calls、assistant message、相关 A2UI events 和 ReAct trace summary。 |
-| `routes/workflows.ts` | workflow 历史/详情查询，以及 workflow action 提交。 |
-| `routes/files.ts` | `.txt` 文件上传、列表、详情和删除。 |
-| `routes/skills.ts` | Skill CRUD、会话启用和禁用。 |
-| `routes/a2ui.ts` | A2UI events、surface snapshots 和 current snapshot 查询。 |
-| `routes/renderer.ts` | Renderer action/error 回传记录。 |
-| `routes/export.ts` | 完整会话、A2UI JSONL、snapshot 导出。 |
-| `routes/stream.ts` | 会话级 SSE 连接。 |
+| `routes/workflows.ts`  | workflow 历史/详情查询，以及 workflow action 提交。                                                     |
+| `routes/files.ts`      | `.txt` 文件上传、列表、详情和删除。                                                                     |
+| `routes/skills.ts`     | Skill CRUD、会话启用和禁用。                                                                            |
+| `routes/a2ui.ts`       | A2UI events、surface snapshots 和 current snapshot 查询。                                               |
+| `routes/renderer.ts`   | Renderer action/error 回传记录。                                                                        |
+| `routes/export.ts`     | 完整会话、A2UI JSONL、snapshot 导出。                                                                   |
+| `routes/stream.ts`     | 会话级 SSE 连接。                                                                                       |
 
 `src/app.ts` 还直接提供：
 
@@ -152,7 +154,7 @@ packages/backend/
 
 ### 7.1 Agent Workflow 流程
 
-1. `MessageService.createUserMessageAndAgentRun` 收到用户消息，先检查 session 是否已有 active workflow；否则用 UI 生成意图正则或前端 `intent` 判断是否新建 workflow。若 active workflow 为 `failed_retryable`，该普通消息会触发 `resumeFailedStepFromMessage()`，复用最新失败 step 并创建新的 AgentRun 继续执行。
+1. `MessageService.createUserMessageAndAgentRun` 收到用户消息，先检查 session 是否已有 active workflow；否则用 UI 生成意图正则或前端 `intent` 判断是否新建 workflow。若 active workflow 为 `failed_retryable`，该普通消息会触发 `resumeFailedStepFromMessage()`；若为 `interrupted`，触发 `resumeInterruptedWorkflowFromMessage()`。两者都会复用当前 step 并创建新的 AgentRun 继续执行。
 2. 新建 workflow 后立即 `startInitialPlanning()`：创建一个 `plan` step，通过 `runWorkflowTask(task="plan")` 用 ReAct 循环生成 clarification form 或 Markdown plan + decision form。
 3. 若返回 clarification form，step 进入 `awaiting_confirmation + awaiting_clarification`，保存 `clarification_form` artifact。
 4. 若返回 plan，step 进入 `awaiting_confirmation + awaiting_plan_confirmation`，保存 `plan_markdown` 与 `decision_form` artifact（decision 回填 `targetArtifactId`）。
@@ -163,10 +165,20 @@ packages/backend/
 9. `submit_decision` 在 `preview + awaiting_preview_confirmation` 下：`confirm` 走 `confirmCandidateCommit()` + `commitExactCandidate()` 提交 exact stored candidate；`revise` 走 `requestPreviewRevision()` 回到新的 `plan` 轮次（旧 candidate 标记 `invalidated`）。
 10. `commitExactCandidate()` 在单个 Prisma 事务内创建 assistant message、A2UI event、current snapshot，完成 commit step 和 workflow。
 11. 用户在 `failed_retryable` workflow 后追加普通消息时，恢复路径复用失败 step：`plan` 重新运行规划，`generate_a2ui` 复用已确认 plan 重新生成，`validate` 失败回到来源 `generate_a2ui` step；step 的 `attemptCount` 递增，新的 AgentRun 绑定原 step 与追加消息。
-12. `retry_step` 保留为 workflow action 入口，仍只支持重试最新失败的 `generate_a2ui` step。
-13. 每个 workflow task 通过 `runWorkflowTask` 的第三个回调把 ReAct trace 事件转发为 `agent_trace_event` SSE；trace summary 写入 `agent_runs.metadata.traceSummary`，Resource Ledger snapshot 写回 `agent_workflows.metadata.resourceLedger`。
+12. 用户通过 `cancel` action 主动停止 running workflow 时，后端调用 `interruptWorkflow()`：当前 AgentRun 置为 `cancelled`，当前 workflow 和 step 置为 `interrupted`，记录 `interruptionReason`，并推送 `workflow_interrupted` SSE。重复停止已 `interrupted` workflow 幂等返回当前状态。
+13. 用户在 `interrupted` workflow 后追加非空普通消息时，恢复路径复用 interrupted step：`plan` 重新运行规划，`generate_a2ui` 复用已确认 plan 重新生成；新的 AgentRun 绑定原 step 与追加消息，旧 AgentRun 保持 `cancelled`。
+14. `retry_step` 保留为 workflow action 入口，仍只支持重试最新失败的 `generate_a2ui` step。
+15. 每个 workflow task 通过 `runWorkflowTask` 的第三个回调把 ReAct trace 事件转发为 `agent_trace_event` SSE；trace summary 写入 `agent_runs.metadata.traceSummary`，Resource Ledger snapshot 写回 `agent_workflows.metadata.resourceLedger`。
 
-### 7.2 普通 Agent Run 流程
+### 7.2 启动修复与安全中断
+
+1. `server.ts` 在 Prisma 连接成功后调用 `workflowService.repairOrphanRunningWork()`。
+2. 该修复会把后端重启后残留的 running AgentRun 标记为 `cancelled`，并把关联 workflow / step 标记为 `interrupted`，`interruptionReason` 为 `server_restarted`。
+3. `runWorkflowTask()` 为每个 workflow AgentRun 注册进程内 cancellation token。
+4. `interruptWorkflow()` 会取消当前 token，并在数据库中立即持久化 `cancelled` / `interrupted` 状态；SSE 仅作为其他客户端同步通道。
+5. `runWorkflowTask()` 在工具调用完成后、提交结果前检查 token；`commitExactCandidate()` 在正式提交事务前再次检查 workflow 是否已 `interrupted`，避免用户停止后继续 commit。
+
+### 7.3 普通 Agent Run 流程
 
 1. 非 workflow 消息创建 pending Agent run。
 2. `AgentRunService.executeRun()` 将 run 标记为 running，并推送 `agent_run_started`。
@@ -215,5 +227,3 @@ packages/backend/
 - [A2UI v0.9 契约](../../../30-contracts/a2ui-v0.9.md)
 - [Agent 模块说明](../agent/README.md)
 - [Integration 模块说明](../integration/README.md)
-
-

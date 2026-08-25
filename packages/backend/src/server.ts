@@ -15,6 +15,7 @@ import { createApp } from "./app.js";
 import { config } from "./config.js";
 import { prisma } from "./db.js";
 import { logger } from "./logger.js";
+import { workflowService } from "./services/workflow.service.js";
 
 const app = createApp();
 let server: Server | null = null;
@@ -23,6 +24,7 @@ let shuttingDown = false;
 try {
   await prisma.$connect();
   logger.info("Prisma connected");
+  await workflowService.repairOrphanRunningWork();
 
   server = app.listen(config.port, () => {
     logger.info({ port: config.port }, "Backend server started");

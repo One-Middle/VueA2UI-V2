@@ -121,13 +121,13 @@ workflowsRouter.post(
       }
 
       if (body.action === "cancel") {
-        await workflowService.cancelWorkflow(workflow.id, sessionId);
-        const cancelledWorkflow = await workflowService.getWorkflowById(workflow.id);
-        if (!cancelledWorkflow) throw notFound("AgentWorkflow", workflow.id);
+        const interrupted = await workflowService.interruptWorkflow(workflow.id, sessionId);
 
         res.status(202).json({
-          workflow: cancelledWorkflow,
+          workflow: interrupted.workflow,
           message: toMessageDto(message),
+          agentRun: interrupted.agentRun,
+          step: interrupted.step,
         } satisfies WorkflowActionResponse);
         return;
       }

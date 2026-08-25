@@ -32,6 +32,7 @@ export type AgentRunPhase =
 
 /** SSE 事件名称，对应后端推送的各类事件。 */
 export type ServerSentEventName =
+  | "connected"
   | "heartbeat"
   | "agent_run_started"
   | "agent_run_attempt"
@@ -45,10 +46,16 @@ export type ServerSentEventName =
   | "workflow_step_updated"
   | "workflow_artifact_created"
   | "workflow_completed"
-  | "workflow_failed";
+  | "workflow_failed"
+  | "workflow_interrupted";
 
 /** 平台 SSE 事件的完整类型联合，按 event 字段区分数据载荷。 */
 export type PlatformSseEvent =
+  | {
+      /** SSE 连接建立事件 */
+      event: "connected";
+      data: { sessionId: string; time: string };
+    }
   | {
       /** 心跳事件 */
       event: "heartbeat";
@@ -57,7 +64,13 @@ export type PlatformSseEvent =
   | {
       /** Agent 运行开始事件 */
       event: "agent_run_started";
-      data: { sessionId: string; agentRun: Pick<AgentRunDto, "id" | "status" | "attemptCount" | "maxAttempts"> };
+      data: {
+        sessionId: string;
+        agentRun: Pick<
+          AgentRunDto,
+          "id" | "status" | "attemptCount" | "maxAttempts"
+        >;
+      };
     }
   | {
       /** Agent 运行单次尝试事件 */
@@ -77,7 +90,12 @@ export type PlatformSseEvent =
         sessionId: string;
         agentRun: Pick<
           AgentRunDto,
-          "id" | "status" | "attemptCount" | "assistantMessageId" | "outputSnapshotId" | "completedAt"
+          | "id"
+          | "status"
+          | "attemptCount"
+          | "assistantMessageId"
+          | "outputSnapshotId"
+          | "completedAt"
         >;
       };
     }
@@ -101,7 +119,10 @@ export type PlatformSseEvent =
       event: "agent_run_failed";
       data: {
         sessionId: string;
-        agentRun: Pick<AgentRunDto, "id" | "status" | "attemptCount" | "failureReason">;
+        agentRun: Pick<
+          AgentRunDto,
+          "id" | "status" | "attemptCount" | "failureReason"
+        >;
         message: MessageDto;
       };
     }
@@ -123,7 +144,11 @@ export type PlatformSseEvent =
   | {
       /** Workflow Artifact 创建事件 */
       event: "workflow_artifact_created";
-      data: { sessionId: string; workflowId: string; artifact: WorkflowArtifactDto };
+      data: {
+        sessionId: string;
+        workflowId: string;
+        artifact: WorkflowArtifactDto;
+      };
     }
   | {
       /** Agent Workflow 完成事件 */
@@ -133,5 +158,22 @@ export type PlatformSseEvent =
   | {
       /** Agent Workflow 失败事件 */
       event: "workflow_failed";
-      data: { sessionId: string; workflow: AgentWorkflowDto; failedStep?: WorkflowStepDto };
+      data: {
+        sessionId: string;
+        workflow: AgentWorkflowDto;
+        failedStep?: WorkflowStepDto;
+      };
+    }
+  | {
+      /** Agent Workflow 被用户或系统中断事件 */
+      event: "workflow_interrupted";
+      data: {
+        sessionId: string;
+        workflow: AgentWorkflowDto;
+        step: WorkflowStepDto;
+        agentRun?: Pick<
+          AgentRunDto,
+          "id" | "status" | "attemptCount" | "failureReason" | "completedAt"
+        >;
+      };
     };

@@ -78,22 +78,22 @@ packages/frontend/src/
 
 ## 5. 关键文件职责
 
-| 文件 / 目录 | 作用 |
-| --- | --- |
-| `src/main.ts` | Vue 应用入口，初始化 Pinia、Router、Naive UI 和全局样式。 |
-| `src/App.vue` | 根组件，承载路由出口。 |
-| `src/router.ts` | 前端路由定义，当前主要指向工作台页面。 |
-| `src/views/WorkspacePage.vue` | 工作台主布局，组织导航、顶部状态和各功能面板。 |
-| `src/services/api.ts` | HTTP API client，封装 JSON 请求、文件上传和下载。 |
-| `src/services/stream.ts` | SSE client，负责连接、重连和事件分发。 |
-| `src/stores/workspace.ts` | 工作台业务 store，管理会话、消息、文件、Skill、Agent run、A2UI event、snapshot 和 SSE 状态。 |
-| `src/stores/renderer.ts` | Renderer 桥接 store，仅保存待消费 A2UI messages、revision、changeKind 和 ready 状态。 |
-| `src/features/conversation/*` | 用户对话、初始创建、消息列表和输入框。 |
-| `src/features/preview/PreviewPanel.vue` | Renderer 集成点，创建 `SurfaceGroupModel` 和 `MessageProcessor`，监听 action/error，并提供 JSON inspector。 |
-| `src/features/history/HistoryPanel.vue` | 历史会话、A2UI events 和 snapshot 恢复入口。 |
-| `src/features/skills/SkillsPanel.vue` | Skill 创建、编辑、启用和禁用。 |
-| `src/features/runtime/RuntimePanel.vue` | Runtime 配置、Agent runs 和 tool calls 展示。 |
-| `src/features/import-export/ImportExportPanel.vue` | 会话、A2UI JSONL 和 snapshot 导出入口。 |
+| 文件 / 目录                                        | 作用                                                                                                        |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `src/main.ts`                                      | Vue 应用入口，初始化 Pinia、Router、Naive UI 和全局样式。                                                   |
+| `src/App.vue`                                      | 根组件，承载路由出口。                                                                                      |
+| `src/router.ts`                                    | 前端路由定义，当前主要指向工作台页面。                                                                      |
+| `src/views/WorkspacePage.vue`                      | 工作台主布局，组织导航、顶部状态和各功能面板。                                                              |
+| `src/services/api.ts`                              | HTTP API client，封装 JSON 请求、文件上传和下载。                                                           |
+| `src/services/stream.ts`                           | SSE client，负责连接、重连和事件分发。                                                                      |
+| `src/stores/workspace.ts`                          | 工作台业务 store，管理会话、消息、文件、Skill、Agent run、A2UI event、snapshot 和 SSE 状态。                |
+| `src/stores/renderer.ts`                           | Renderer 桥接 store，仅保存待消费 A2UI messages、revision、changeKind 和 ready 状态。                       |
+| `src/features/conversation/*`                      | 用户对话、初始创建、消息列表和输入框。                                                                      |
+| `src/features/preview/PreviewPanel.vue`            | Renderer 集成点，创建 `SurfaceGroupModel` 和 `MessageProcessor`，监听 action/error，并提供 JSON inspector。 |
+| `src/features/history/HistoryPanel.vue`            | 历史会话、A2UI events 和 snapshot 恢复入口。                                                                |
+| `src/features/skills/SkillsPanel.vue`              | Skill 创建、编辑、启用和禁用。                                                                              |
+| `src/features/runtime/RuntimePanel.vue`            | Runtime 配置、Agent runs 和 tool calls 展示。                                                               |
+| `src/features/import-export/ImportExportPanel.vue` | 会话、A2UI JSONL 和 snapshot 导出入口。                                                                     |
 
 ## 6. 状态模型
 
@@ -121,7 +121,7 @@ packages/frontend/src/
 2. `ConversationPanel` 调用 `workspace.sendMessage()`。
 3. 若当前没有会话，`workspace` 先自动创建会话，标题由消息前 24 个字符生成。
 4. `api.sendMessage()` 请求后端消息 API。
-5. 若后端返回 `workflow` 摘要（包括 `failed_retryable` workflow 被普通消息恢复为 `running`），`workspace` 会先 `upsertWorkflow()` 更新本地状态；`isGenerating` 不再手动赋值，而是从 workflow running step 或普通 running AgentRun 派生。
+5. 若后端返回 `workflow` 摘要（包括 `failed_retryable` 或 `interrupted` workflow 被普通消息恢复为 `running`），`workspace` 会先 `upsertWorkflow()` 更新本地状态；`isGenerating` 不再手动赋值，而是从 workflow running step 或普通 running AgentRun 派生。
 6. 后端创建 Agent run 后通过 SSE 推送进度。
 7. `stream.ts` 分发 `agent_run_started`、`agent_run_attempt`、`assistant_message`、`a2ui_messages`、`surface_snapshot` 等事件。
 8. `workspace` 更新业务状态，`renderer.processMessages()` 追加 A2UI messages。
@@ -132,9 +132,10 @@ packages/frontend/src/
 1. `WorkflowPanel` 读取 `workspace.workflows` 的当前 workflow 与最新 step/artifact。
 2. 依据 step 的 `status` / `stageState` 展示 clarification form 或 decision form。
 3. `submitWorkflowClarification` / `submitWorkflowDecision` / `retryWorkflowStep` 通过 `sendWorkflowAction` 调 `POST /workflow/actions`，并用返回的 workflow 更新本地状态；随后主动重拉 workflow 详情，兜底处理 SSE 无回放导致的状态缺口。
-4. candidate artifact 可通过「恢复候选预览」调用 `renderer.replaceMessages` 在 PreviewPanel 中预览。
-5. 会话流里的 `WorkflowMessage` 按 segment 展示：表单 action 仍折叠在当前 workflow 气泡内；`failed_retryable` 普通续跑消息保持为独立用户气泡，后续生成片段锚定在该用户消息之后。
-6. `agent_trace_event` SSE 会累积到 `runtimeTraceEvents`，供后续 trace 展示使用。
+4. `cancel` action 成功后，后端返回 `interrupted` workflow、`interrupted` step 和被取消的 AgentRun；前端停止生成动画，并保留输入框用于后续普通消息继续。
+5. candidate artifact 可通过「恢复候选预览」调用 `renderer.replaceMessages` 在 PreviewPanel 中预览。
+6. 会话流里的 `WorkflowMessage` 按 segment 展示：表单 action 仍折叠在当前 workflow 气泡内；`failed_retryable` / `interrupted` 普通续跑消息保持为独立用户气泡，后续生成片段锚定在该用户消息之后。
+7. `agent_trace_event` SSE 会累积到 `runtimeTraceEvents`，供后续 trace 展示使用。
 
 ### 会话切换与恢复
 
@@ -143,6 +144,7 @@ packages/frontend/src/
 3. 并行加载消息、文件、Agent runs、A2UI events、snapshots 和会话详情。
 4. `loadSessionDetail()` 读取 `currentSnapshot` 后，通过 `snapshotToRendererMessages()` 还原为 `createSurface → updateComponents → updateDataModel`。
 5. `renderer.replaceMessages()` 触发 `PreviewPanel` 全量重建 Renderer 状态。
+6. SSE 初始 `connected` 事件会立即把 `streamStatus` 置为 `connected`；若它发生在重连之后，`workspace.recoverSessionState()` 会重新拉取 messages、workflows、agent runs、A2UI events、snapshots 和 session detail，用 HTTP 事实源补齐断线期间可能漏掉的事件。
 
 ### Renderer 回传
 
@@ -158,6 +160,8 @@ packages/frontend/src/
 - `api.ts` 当前有 `updateRuntimeConfig()`，但后端尚未实现 `PATCH /api/runtime/config`。
 - 前端只把 committed A2UI messages 或 current snapshot 交给 Renderer；Agent 失败消息不会更新 Renderer 正式状态。
 - `agent_trace_event` SSE 事件已累积到 `workspace.runtimeTraceEvents`，但当前面板（Runtime / Workflow）尚未渲染该 trace；仅为后续 trace 展示预留状态。
+- `connected` SSE 事件已由 `stream.ts` 转换为连接生命周期回调，重连后触发 Session Resync；首次连接不额外重复拉取数据。
+- `workflow_interrupted` SSE 会更新本地 workflow、step 和 agent run，并让 `isGenerating` 从运行 step 派生为 false。
 
 ## 9. 测试与验收
 
@@ -183,5 +187,3 @@ packages/frontend/src/
 - [Shared 类型契约](../../../30-contracts/shared-types.md)
 - [Renderer 模块说明](../renderer/README.md)
 - [Integration 模块说明](../integration/README.md)
-
-

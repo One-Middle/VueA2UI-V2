@@ -29,9 +29,10 @@
 - Surface snapshot 必须由 committed A2UI events 物化得到。
 - 文件上传只允许用户上传的 `.txt` 文件，不允许任意路径读取。
 - API key 不得写入数据库。
-- 一个 session 可以保留多次 Agent Workflow 历史，但同一时刻只能有一个处于 active、running、awaiting confirmation 或 retryable 状态的 workflow。
+- 一个 session 可以保留多次 Agent Workflow 历史，但同一时刻只能有一个处于 active、running、awaiting confirmation、retryable 或 interrupted 状态的 workflow。
 - Agent run 和用户可见 message 可以关联到 workflow 和 workflow step，便于恢复完整 workflow timeline。
 - `failed_retryable` workflow 收到新的普通用户 message 时，可以复用最新失败 step 恢复执行；新的 Agent run 绑定原 `workflowStepId` 和新 `triggerMessageId`，`workflow_steps.attempt_count` 递增记录同一阶段的尝试次数。
+- `interrupted` workflow 收到新的非空普通用户 message 时，可以复用当前 interrupted step 继续执行；新的 Agent run 绑定原 `workflowStepId` 和新 `triggerMessageId`，旧 Agent run 保持 `cancelled`。
 - Candidate A2UI 只能作为 workflow artifact 保存；用户确认提交前不得写入 A2UI events 或 surface snapshots。
 - `workflow_steps.type` 集合为 `plan`、`generate_a2ui`、`validate`、`preview` 和 `commit`。
 - `workflow_steps.stage_state` 是主状态字段，用于保存领域等待态：`awaiting_clarification`、`awaiting_plan_confirmation`、`awaiting_preview_confirmation` 或 `null`。该字段是独立列，不放 `metadata`。
@@ -41,6 +42,9 @@
 - `candidate_a2ui_messages` 只能在 `validate` 通过后保存；validate 失败时只保存 `validation_report`。
 - `agent_workflows.metadata.resourceLedger` 保存跨 task 共享的 Resource Ledger Snapshot（已披露 Skill / Reference 的键与元信息，不含正文）。
 - `agent_runs.metadata.traceSummary` 保存 ReAct 循环 trace 摘要，供 AgentRun detail API 恢复；实时 trace 通过 `agent_trace_event` SSE 推送，不单独建表。
+- `agent_workflows.status` 和 `workflow_steps.status` 可取 `interrupted`，表示用户或运行环境中断当前执行但 workflow 可继续。
+- `agent_runs.status` 可取 `cancelled`，表示该次 AgentRun 被用户主动停止或被系统中断。
+- interruption reason 第一版写入 `agent_workflows.metadata.interruptionReason`、`workflow_steps.metadata.interruptionReason` 和必要的 `agent_runs.metadata.interruptionReason`，不新增独立列。
 
 ## 3.1 Agent Workflow 状态机
 
@@ -63,6 +67,13 @@ plan -> generate_a2ui -> validate -> preview -> commit
 - 用户选择 `revise` 后回到新的 `plan` 轮次，不覆盖旧 artifact。
 
 `commit` 阶段提交 exact stored `candidate_a2ui_messages` artifact，必须创建正式 A2UI event、surface snapshot，并完成 workflow。
+
+`interrupted` 状态：
+
+- 用户 `cancel` action 中断 running workflow 时，当前 AgentRun 置为 `cancelled`，当前 workflow 和 step 置为 `interrupted`。
+- `interrupted` 不等同于 `failed_retryable`。它不是模型失败，也不触发失败重试文案。
+- `interrupted` 不等同于 `cancelled` workflow 终态。用户后续发送非空普通消息时，后端应在同一 workflow 和 step 上创建新的 AgentRun 继续。
+- 取消不会删除已持久化 artifact；后续新 candidate 仍通过 freshness guard 和失效标记处理旧 candidate。
 
 ## 4. 提交事务
 
