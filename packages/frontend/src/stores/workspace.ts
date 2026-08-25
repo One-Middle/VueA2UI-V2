@@ -951,8 +951,10 @@ export const useWorkspaceStore = defineStore("workspace", {
               (run) => run.id === data.agentRun!.id,
             );
             if (existingIdx >= 0) {
+              const existingRun = this.agentRuns[existingIdx];
+              if (!existingRun) return;
               this.agentRuns[existingIdx] = {
-                ...this.agentRuns[existingIdx],
+                ...existingRun,
                 ...data.agentRun,
               };
             } else {
