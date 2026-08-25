@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { AgentObservation, ReactAgentRunInput } from "../react-agent-types.js";
 import { ReactPromptComposer } from "../react-prompt-composer.js";
+import { A2UI_GENERATION_SKILL_ID } from "../../skills/a2ui-v0.9-generation.js";
+import { createCatalogContext, recordCatalogComponents } from "../catalog-context.js";
 import {
   createResourceLedger,
   recordSkill,
@@ -99,6 +101,34 @@ describe("ReactPromptComposer 输出契约", () => {
     expect(prompt).toContain("referenceId: a2ui-generation-standards");
     expect(prompt).toContain("referenceTitle: A2UI 标准生成规则");
   });
+
+  it("workflow Skill 内容改写为 final_draft.draft.messages 协议", () => {
+    const ledger = createResourceLedger();
+    recordSkill(ledger, {
+      id: A2UI_GENERATION_SKILL_ID,
+      name: "A2UI v0.9 组件消息生成",
+      content: [
+        "# A2UI v0.9 组件消息生成",
+        "",
+        "## 1. 最终输出结构",
+        "{",
+        '  "assistantMessage": "说明",',
+        '  "a2uiMessages": []',
+        "}",
+        "",
+        "## 2. 必须先请求的 Reference",
+        "- ref",
+      ].join("\n"),
+    });
+    const composer = new ReactPromptComposer(ledger);
+
+    const prompt = composer.composeUserPrompt(createInput(), [], null);
+
+    expect(prompt).toContain("Workflow ReAct 输出结构");
+    expect(prompt).toContain('"type": "final_draft"');
+    expect(prompt).toContain('"messages": []');
+    expect(prompt).not.toContain('"a2uiMessages": []');
+  });
 });
 
 describe("ReactPromptComposer Working Resources", () => {
@@ -135,6 +165,31 @@ describe("ReactPromptComposer Working Resources", () => {
     expect(indexRef).toBeGreaterThan(-1);
     expect(indexA).toBeLessThan(indexB);
     expect(indexB).toBeLessThan(indexRef);
+  });
+});
+
+describe("ReactPromptComposer Catalog Context", () => {
+  it("组件详情渲染到 Catalog Context 而不是 observation 详情", () => {
+    const catalogContext = createCatalogContext();
+    recordCatalogComponents(catalogContext, ["Text", "TextField", "CheckBox"]);
+    const composer = new ReactPromptComposer(createResourceLedger(), catalogContext);
+    const observations: AgentObservation[] = [
+      {
+        kind: "tool_result",
+        message: "已获取 3 个组件的字段详情，已加入 Catalog Context。",
+        details: { components: ["Text", "TextField", "CheckBox"] },
+      },
+    ];
+
+    const prompt = composer.composeUserPrompt(createInput(), observations, null);
+
+    expect(prompt).toContain("## Catalog Context");
+    expect(prompt).toContain("### Text");
+    expect(prompt).toContain("禁止字段：label、value");
+    expect(prompt).toContain("TextField 的输入值字段是 text");
+    expect(prompt).toContain("CheckBox 的 value 表示是否选中");
+    expect(prompt).toContain("components: Text, TextField, CheckBox");
+    expect(prompt).not.toContain("componentDetails:");
   });
 });
 
@@ -178,5 +233,35 @@ describe("ReactPromptComposer observation 渲染", () => {
     expect(prompt).toContain("valid: false");
     expect(prompt).toContain("A2UI_STRUCTURE");
     expect(prompt).toContain("缺少 version");
+  });
+
+  it("结构化校验 diagnostics 会渲染为可修复提示", () => {
+    const composer = new ReactPromptComposer(createResourceLedger());
+    const observations: AgentObservation[] = [
+      {
+        kind: "validation_error",
+        message: "candidate_a2ui_messages 未通过 validateA2UI",
+        details: {
+          valid: false,
+          diagnostics: [
+            {
+              componentId: "draftField",
+              component: "TextField",
+              extraProperty: "value",
+              expected: "该字段不在组件允许字段列表中，应删除或改为正确字段",
+              actual: "{\"path\":\"/todo/draft\"}",
+              repairHint: "TextField 的输入值字段是 text；请把 value 改为 text。",
+            },
+          ],
+        },
+      },
+    ];
+
+    const prompt = composer.composeUserPrompt(createInput(), observations, null);
+
+    expect(prompt).toContain("diagnostics:");
+    expect(prompt).toContain("componentId=draftField");
+    expect(prompt).toContain("extraProperty=value");
+    expect(prompt).toContain("请把 value 改为 text");
   });
 });

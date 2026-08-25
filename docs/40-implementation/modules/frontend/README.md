@@ -121,7 +121,7 @@ packages/frontend/src/
 2. `ConversationPanel` 调用 `workspace.sendMessage()`。
 3. 若当前没有会话，`workspace` 先自动创建会话，标题由消息前 24 个字符生成。
 4. `api.sendMessage()` 请求后端消息 API。
-5. 若后端返回 `workflow` 摘要（包括 `failed_retryable` workflow 被普通消息恢复为 `running`），`workspace` 会先 `upsertWorkflow()` 更新本地状态；若返回 `agentRun` 或 workflow 已 running，则设置 `isGenerating = true`。
+5. 若后端返回 `workflow` 摘要（包括 `failed_retryable` workflow 被普通消息恢复为 `running`），`workspace` 会先 `upsertWorkflow()` 更新本地状态；`isGenerating` 不再手动赋值，而是从 workflow running step 或普通 running AgentRun 派生。
 6. 后端创建 Agent run 后通过 SSE 推送进度。
 7. `stream.ts` 分发 `agent_run_started`、`agent_run_attempt`、`assistant_message`、`a2ui_messages`、`surface_snapshot` 等事件。
 8. `workspace` 更新业务状态，`renderer.processMessages()` 追加 A2UI messages。
@@ -131,9 +131,10 @@ packages/frontend/src/
 
 1. `WorkflowPanel` 读取 `workspace.workflows` 的当前 workflow 与最新 step/artifact。
 2. 依据 step 的 `status` / `stageState` 展示 clarification form 或 decision form。
-3. `submitWorkflowClarification` / `submitWorkflowDecision` / `retryWorkflowStep` 通过 `sendWorkflowAction` 调 `POST /workflow/actions`，并用返回的 workflow 更新本地状态。
+3. `submitWorkflowClarification` / `submitWorkflowDecision` / `retryWorkflowStep` 通过 `sendWorkflowAction` 调 `POST /workflow/actions`，并用返回的 workflow 更新本地状态；随后主动重拉 workflow 详情，兜底处理 SSE 无回放导致的状态缺口。
 4. candidate artifact 可通过「恢复候选预览」调用 `renderer.replaceMessages` 在 PreviewPanel 中预览。
-5. `agent_trace_event` SSE 会累积到 `runtimeTraceEvents`，供后续 trace 展示使用。
+5. 会话流里的 `WorkflowMessage` 按 segment 展示：表单 action 仍折叠在当前 workflow 气泡内；`failed_retryable` 普通续跑消息保持为独立用户气泡，后续生成片段锚定在该用户消息之后。
+6. `agent_trace_event` SSE 会累积到 `runtimeTraceEvents`，供后续 trace 展示使用。
 
 ### 会话切换与恢复
 

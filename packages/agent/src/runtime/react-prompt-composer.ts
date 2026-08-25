@@ -9,6 +9,8 @@
  */
 
 import type { JsonObject } from "@a2ui-platform/shared";
+import { A2UI_GENERATION_SKILL_ID } from "../skills/a2ui-v0.9-generation.js";
+import { formatCatalogContext, type CatalogContext } from "./catalog-context.js";
 import type {
   AgentDraft,
   AgentObservation,
@@ -38,7 +40,10 @@ export interface ReactPrompt {
  * user prompt 每轮根据最新 observation、currentDraft 与 Resource Ledger 重新生成。
  */
 export class ReactPromptComposer {
-  constructor(private readonly resourceLedger?: ResourceLedger) {}
+  constructor(
+    private readonly resourceLedger?: ResourceLedger,
+    private readonly catalogContext?: CatalogContext,
+  ) {}
 
   /**
    * 合成 system + user prompt。
@@ -110,6 +115,7 @@ export class ReactPromptComposer {
     }
 
     this.appendWorkingResources(parts);
+    this.appendCatalogContext(parts);
 
     parts.push("## 观察（Observations）");
     if (observations.length === 0) {
@@ -154,6 +160,9 @@ export class ReactPromptComposer {
     parts.push(
       "请基于以上上下文，输出单个 JSON 动作：调用一个授权工具（tool_call）、产出最终草稿（final_draft），或放弃（give_up）。",
     );
+    parts.push(
+      '如果产出 candidate_a2ui_messages，必须使用 final_draft，并把说明放入 draft.assistantMessage，把 A2UI 消息数组放入 draft.messages；不要把 { "assistantMessage", "a2uiMessages" } 作为顶层输出。',
+    );
     parts.push("本轮只输出 JSON object；不要写“好的”“下面是”“我将”等自然语言前缀。");
     parts.push("不要输出 observation，不要输出隐藏推理过程，只能通过 reasoningSummary 给出简短审计摘要。");
 
@@ -178,7 +187,7 @@ export class ReactPromptComposer {
       parts.push(`### Skill: ${skill.name}`);
       parts.push(`skillId: ${skill.skillId}`);
       parts.push("");
-      parts.push(skill.content);
+      parts.push(adaptWorkflowResourceContent(skill.skillId, undefined, skill.content));
       parts.push("");
     }
 
@@ -187,12 +196,73 @@ export class ReactPromptComposer {
       parts.push(`skillId: ${reference.skillId}`);
       parts.push(`referenceId: ${reference.referenceId}`);
       parts.push("");
-      parts.push(reference.content);
+      parts.push(
+        adaptWorkflowResourceContent(reference.skillId, reference.referenceId, reference.content),
+      );
       parts.push("");
     }
 
     parts.push("");
   }
+
+  /** 追加已披露 Catalog 组件规范，和观察日志分离。 */
+  private appendCatalogContext(parts: string[]): void {
+    if (!this.catalogContext) {
+      return;
+    }
+    const rendered = formatCatalogContext(this.catalogContext);
+    if (!rendered) {
+      return;
+    }
+    parts.push(rendered);
+    parts.push("");
+  }
+}
+
+/** 把普通生成路径的 A2UI Skill 输出协议改写为 workflow ReAct 协议。 */
+function adaptWorkflowResourceContent(
+  skillId: string,
+  referenceId: string | undefined,
+  content: string,
+): string {
+  if (skillId !== A2UI_GENERATION_SKILL_ID) {
+    return content;
+  }
+
+  const workflowOutputContract = [
+    "## Workflow ReAct 输出结构",
+    "",
+    "当前是 workflow ReAct 路径。你的顶层回复必须始终是 tool_call、final_draft 或 give_up action envelope。",
+    "生成候选 A2UI 时，不要把普通生成路径的 { assistantMessage, a2uiMessages } 作为顶层输出；应输出：",
+    "",
+    "{",
+    '  "type": "final_draft",',
+    '  "reasoningSummary": "生成候选 A2UI",',
+    '  "finalKind": "candidate_a2ui_messages",',
+    '  "draft": {',
+    '    "assistantMessage": "先简要复述理解，再说明生成或修改了什么",',
+    '    "messages": []',
+    "  }",
+    "}",
+    "",
+    "A2UI server-to-client 消息数组只放在 draft.messages 中。",
+  ].join("\n");
+
+  if (referenceId === "a2ui-generation-standards") {
+    return content.replace(
+      /## 1\. 完整消息结构[\s\S]*?(?=## 2\. 组件树标准)/,
+      `${workflowOutputContract}\n\n`,
+    );
+  }
+
+  if (!referenceId) {
+    return content.replace(
+      /## 1\. 最终输出结构[\s\S]*?(?=## 2\. 必须先请求的 Reference)/,
+      `${workflowOutputContract}\n\n`,
+    );
+  }
+
+  return content;
 }
 
 // ─── Observation 详情渲染（白名单小字段，禁止盲目序列化任意详情） ───────
@@ -210,6 +280,7 @@ const OBSERVATION_DETAIL_SCALARS = new Set([
   "type",
   "tool",
   "finalKind",
+  "errorCount",
 ]);
 
 /**
@@ -259,8 +330,22 @@ function renderObservationDetails(details: JsonObject | undefined): string {
     lines.push(`    alreadyDisclosed: ${alreadyDisclosed.join(", ")}`);
   }
 
-  if (typeof details["componentDetails"] === "string") {
-    lines.push(`    componentDetails:\n${details["componentDetails"]}`);
+  const components = renderStringArray(details["components"]);
+  if (components.length > 0) {
+    lines.push(`    components: ${components.join(", ")}`);
+  }
+
+  const catalogContextComponents = renderStringArray(details["catalogContextComponents"]);
+  if (catalogContextComponents.length > 0) {
+    lines.push(`    catalogContextComponents: ${catalogContextComponents.join(", ")}`);
+  }
+
+  const diagnostics = renderDiagnostics(details["diagnostics"]);
+  if (diagnostics.length > 0) {
+    lines.push("    diagnostics:");
+    for (const diagnostic of diagnostics) {
+      lines.push(`      - ${diagnostic}`);
+    }
   }
 
   return lines.join("\n");
@@ -277,6 +362,43 @@ function renderReferenceLike(value: unknown): string[] {
       const id = typeof item["id"] === "string" ? item["id"] : "";
       const title = typeof item["title"] === "string" ? item["title"] : "";
       return id ? `${id}:${title}` : title;
+    })
+    .filter((text) => text.length > 0);
+}
+
+/** 渲染字符串数组字段。 */
+function renderStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter((item): item is string => typeof item === "string" && item.length > 0);
+}
+
+/** 渲染结构化校验诊断，保留模型修复所需的关键信息。 */
+function renderDiagnostics(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter(isRecord)
+    .map((item) => {
+      const parts: string[] = [];
+      for (const key of [
+        "componentId",
+        "component",
+        "property",
+        "extraProperty",
+        "expected",
+        "actual",
+        "repairHint",
+      ]) {
+        const raw = item[key];
+        if (typeof raw === "string" || typeof raw === "number" || typeof raw === "boolean") {
+          parts.push(`${key}=${String(raw)}`);
+        }
+      }
+      return parts.join("; ");
     })
     .filter((text) => text.length > 0);
 }

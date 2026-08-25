@@ -136,6 +136,64 @@ describe("buildDisplayItems", () => {
     expect(items[0]).toMatchObject({ kind: "message", message: opener });
     expect(items[1]).toMatchObject({ kind: "workflow", workflowId: "wf-1", stepLogMessages: [], actionMessages: [] });
   });
+
+  it("anchors retryable resume generation after the resume user message", () => {
+    const oldPlan = makeArtifact({
+      id: "art-plan",
+      kind: "plan_markdown",
+      createdAt: "2026-01-01T00:00:02.000Z",
+    });
+    const candidate = makeArtifact({
+      id: "art-candidate",
+      kind: "candidate_a2ui_messages",
+      createdAt: "2026-01-01T00:00:06.000Z",
+    });
+    const action = makeMessage({
+      id: "action-confirm",
+      role: "user",
+      workflowId: "wf-1",
+      createdAt: "2026-01-01T00:00:03.000Z",
+      metadata: { workflowAction: "submit_decision", payload: { selectedOption: "confirm" } },
+    });
+    const resume = makeMessage({
+      id: "message-resume",
+      role: "user",
+      workflowId: "wf-1",
+      content: "请继续",
+      createdAt: "2026-01-01T00:00:04.000Z",
+      metadata: { workflowResume: true },
+    });
+    const agent = makeMessage({
+      id: "agent-resume",
+      role: "assistant",
+      workflowId: "wf-1",
+      createdAt: "2026-01-01T00:00:05.000Z",
+    });
+    const workflow = makeWorkflow({
+      id: "wf-1",
+      steps: [makeStep({ type: "generate_a2ui", status: "running" })],
+      artifacts: [oldPlan, candidate],
+    });
+
+    const items = buildDisplayItems([action, resume, agent], [workflow]);
+
+    expect(items).toHaveLength(3);
+    expect(items[0]).toMatchObject({
+      kind: "workflow",
+      segmentId: "wf-1:initial",
+      actionMessages: [action],
+      timelineArtifacts: [oldPlan],
+      showGenerating: false,
+    });
+    expect(items[1]).toMatchObject({ kind: "message", message: resume });
+    expect(items[2]).toMatchObject({
+      kind: "workflow",
+      segmentId: "wf-1:resume:message-resume",
+      stepLogMessages: [agent],
+      timelineArtifacts: [candidate],
+      showGenerating: true,
+    });
+  });
 });
 
 describe("isWorkflowActionMessage", () => {

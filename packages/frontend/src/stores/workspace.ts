@@ -303,9 +303,6 @@ export const useWorkspaceStore = defineStore("workspace", {
         if (result.workflow) {
           this.upsertWorkflow(result.workflow);
         }
-        if (["pending", "running"].includes(result.agentRun?.status ?? "") || result.workflow?.status === "running") {
-          this.isGenerating = true;
-        }
         // 消息发送成功后，SSE 会自动推送 assistant 消息和 A2UI 结果
         // 这里先重新加载消息列表确保 user 消息出现在列表中
         await this.loadMessages();
@@ -500,6 +497,7 @@ export const useWorkspaceStore = defineStore("workspace", {
       if (result.message && !this.messages.some((message) => message.id === result.message!.id)) {
         this.messages.push(result.message);
       }
+      await this.loadWorkflows();
     },
 
     /** 提交 workflow decision form 的三选一结果。 */
@@ -523,6 +521,7 @@ export const useWorkspaceStore = defineStore("workspace", {
       if (result.message && !this.messages.some((message) => message.id === result.message!.id)) {
         this.messages.push(result.message);
       }
+      await this.loadWorkflows();
     },
 
     /** 重试当前失败的 workflow step。 */
@@ -539,6 +538,7 @@ export const useWorkspaceStore = defineStore("workspace", {
       if (result.agentRun) {
         this.upsertAgentRun(result.agentRun);
       }
+      await this.loadWorkflows();
     },
 
     /** 插入或更新 Workflow。 */

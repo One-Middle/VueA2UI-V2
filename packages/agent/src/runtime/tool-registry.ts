@@ -31,10 +31,13 @@ import type {
   WorkflowDecisionOption,
 } from "@a2ui-platform/shared";
 import { validateA2UI } from "../tools/validate-a2ui.js";
+import { getComponentDef } from "../tools/catalog-schema.js";
 import {
-  formatCatalogComponentDetails,
-  getComponentDef,
-} from "../tools/catalog-schema.js";
+  hasCatalogComponent,
+  listCatalogComponentNames,
+  recordCatalogComponents,
+  type CatalogContext,
+} from "./catalog-context.js";
 import {
   hasSkill,
   hasSkillReference,
@@ -66,6 +69,8 @@ export interface ToolRegistryDependencies {
   currentSnapshot?: SurfaceSnapshotData | null;
   /** 当前 workflow task 的 Resource Ledger，用于记录已披露资源并做去重。 */
   resourceLedger: ResourceLedger;
+  /** 当前 workflow task 的 Catalog Context，用于记录已披露组件规范并做去重。 */
+  catalogContext?: CatalogContext;
 }
 
 /** 受控工具注册表。 */
@@ -275,10 +280,26 @@ export class ToolRegistry {
       });
     }
 
+    const alreadyDisclosed = this.deps.catalogContext
+      ? names.filter((n) => hasCatalogComponent(this.deps.catalogContext!, n))
+      : [];
+    const newlyDisclosed = this.deps.catalogContext
+      ? recordCatalogComponents(this.deps.catalogContext, names)
+      : names;
+
     return completed({
       kind: "tool_result",
-      message: `已获取 ${names.length} 个组件的字段详情。`,
-      details: { componentDetails: formatCatalogComponentDetails(names) },
+      message:
+        alreadyDisclosed.length > 0
+          ? `已获取 ${newlyDisclosed.length} 个组件的字段详情，跳过 ${alreadyDisclosed.length} 个已在 Catalog Context 的组件。`
+          : `已获取 ${newlyDisclosed.length} 个组件的字段详情，已加入 Catalog Context。`,
+      details: {
+        components: newlyDisclosed,
+        ...(alreadyDisclosed.length > 0 ? { alreadyDisclosed } : {}),
+        ...(this.deps.catalogContext
+          ? { catalogContextComponents: listCatalogComponentNames(this.deps.catalogContext) }
+          : {}),
+      },
     });
   }
 
@@ -307,11 +328,7 @@ export class ToolRegistry {
       message: `A2UI 校验未通过，共 ${result.errors.length} 个错误。`,
       details: {
         valid: false,
-        errors: result.errors.map((e) => ({
-          code: e.code,
-          path: e.path ?? null,
-          message: e.message,
-        })),
+        ...buildValidationObservationDetails(result, messages as unknown[]),
       },
     });
   }
@@ -557,4 +574,181 @@ function failedRecoverable(message: string): ToolExecutionResult {
     observation: { kind: "tool_result", message },
     recoverable: true,
   };
+}
+
+/** 为 validateA2UI 失败 observation 构建面向模型修复的结构化详情。 */
+export function buildValidationObservationDetails(
+  result: ValidateA2UIResult,
+  messages: unknown[],
+): JsonObject {
+  return {
+    errorCount: result.errors.length,
+    errors: result.errors.map((e) => ({
+      code: e.code,
+      path: e.path ?? null,
+      message: e.message,
+    })),
+    diagnostics: result.errors.map((issue) => buildValidationDiagnostic(issue, messages)),
+  };
+}
+
+function buildValidationDiagnostic(
+  issue: ValidateA2UIResult["errors"][number],
+  messages: unknown[],
+): JsonObject {
+  const diagnostic: JsonObject = {
+    code: issue.code,
+    message: issue.message,
+  };
+  if (issue.path) {
+    diagnostic.path = issue.path;
+  }
+
+  const location = parseComponentLocation(issue.path);
+  if (!location) {
+    return diagnostic;
+  }
+
+  const component = getComponentAt(messages, location.messageIndex, location.componentIndex);
+  if (!component) {
+    return diagnostic;
+  }
+
+  const componentName = typeof component["component"] === "string" ? component["component"] : "";
+  const componentId = typeof component["id"] === "string" ? component["id"] : "";
+  if (componentId) diagnostic.componentId = componentId;
+  if (componentName) diagnostic.component = componentName;
+  if (location.property) diagnostic.property = location.property;
+
+  const extraProperty = isAdditionalPropertyIssue(issue.message) ? location.leafProperty : "";
+  if (extraProperty) {
+    diagnostic.extraProperty = extraProperty;
+  }
+
+  const actualValue =
+    location.property && location.property in component
+      ? component[location.property]
+      : extraProperty && extraProperty in component
+        ? component[extraProperty]
+        : undefined;
+  if (actualValue !== undefined) {
+    diagnostic.actual = summarizeJsonValue(actualValue);
+  }
+
+  const expected = expectedPropertyShape(componentName, location.property || extraProperty);
+  if (expected) {
+    diagnostic.expected = expected;
+  }
+
+  const repairHint = repairHintFor(componentName, location.property || extraProperty, extraProperty);
+  if (repairHint) {
+    diagnostic.repairHint = repairHint;
+  }
+
+  return diagnostic;
+}
+
+function parseComponentLocation(path: string | undefined):
+  | {
+      messageIndex: number;
+      componentIndex: number;
+      property: string;
+      leafProperty: string;
+    }
+  | null {
+  if (!path) {
+    return null;
+  }
+  const parts = path.split("/").filter(Boolean);
+  const updateComponentsIndex = parts.indexOf("updateComponents");
+  const componentsIndex = parts.indexOf("components");
+  if (updateComponentsIndex !== 1 || componentsIndex !== 2) {
+    return null;
+  }
+  const messageIndex = Number(parts[0]);
+  const componentIndex = Number(parts[3]);
+  if (!Number.isInteger(messageIndex) || !Number.isInteger(componentIndex)) {
+    return null;
+  }
+
+  const property = parts[4] ?? "";
+  const leafProperty = parts[parts.length - 1] ?? property;
+  return { messageIndex, componentIndex, property, leafProperty };
+}
+
+function getComponentAt(
+  messages: unknown[],
+  messageIndex: number,
+  componentIndex: number,
+): Record<string, unknown> | null {
+  const msg = messages[messageIndex];
+  if (!msg || typeof msg !== "object" || Array.isArray(msg)) {
+    return null;
+  }
+  const updateComponents = (msg as Record<string, unknown>)["updateComponents"];
+  if (!updateComponents || typeof updateComponents !== "object" || Array.isArray(updateComponents)) {
+    return null;
+  }
+  const components = (updateComponents as Record<string, unknown>)["components"];
+  if (!Array.isArray(components)) {
+    return null;
+  }
+  const component = components[componentIndex];
+  return component && typeof component === "object" && !Array.isArray(component)
+    ? (component as Record<string, unknown>)
+    : null;
+}
+
+function isAdditionalPropertyIssue(message: string): boolean {
+  return message.includes("must NOT have additional properties");
+}
+
+function expectedPropertyShape(componentName: string, property: string): string {
+  if (!componentName || !property) {
+    return "";
+  }
+  const def = getComponentDef(componentName);
+  const prop = def?.properties.find((p) => p.name === property);
+  if (!prop) {
+    return "该字段不在组件允许字段列表中，应删除或改为正确字段";
+  }
+  const values = prop.values?.length ? `；可选值：${prop.values.join(" | ")}` : "";
+  return `${prop.type}${prop.required ? "；必填" : "；可选"}${values}`;
+}
+
+function repairHintFor(componentName: string, property: string, extraProperty: string): string {
+  if (componentName === "Text" && property === "text") {
+    return 'Text.text 必须是字符串、{ "path": "..." } 或 { "script": { "code", "deps", "fallback?" } }；如果使用 path 绑定，不要额外添加 fallback。';
+  }
+  if (componentName === "Text" && extraProperty) {
+    return "Text 只负责展示文本；请删除 label/value/placeholder 等输入类字段，展示内容放入 text。";
+  }
+  if (componentName === "TextField" && (property === "value" || extraProperty === "value")) {
+    return "TextField 的输入值字段是 text；请把 value 改为 text。";
+  }
+  if (componentName === "CheckBox" && (property === "text" || extraProperty === "text")) {
+    return "CheckBox 展示文字使用 label；勾选状态使用 value。";
+  }
+  if (componentName === "CheckBox" && (property === "checked" || extraProperty === "checked")) {
+    return "CheckBox 不使用 checked；请改为 boolean value 或 { path } 绑定。";
+  }
+  if (componentName === "Card" && (property === "children" || extraProperty === "children")) {
+    return "Card 只支持 child；多个子元素请先放入 Column 或 Row，再让 Card.child 指向该容器。";
+  }
+  if (extraProperty) {
+    return `删除 ${componentName}.${extraProperty}，或根据 Catalog Context 改为该组件允许的字段。`;
+  }
+  return "";
+}
+
+function summarizeJsonValue(value: unknown): string {
+  if (typeof value === "string") {
+    return value.length > 120 ? `${value.slice(0, 117)}...` : value;
+  }
+  try {
+    const text = JSON.stringify(value);
+    return text.length > 160 ? `${text.slice(0, 157)}...` : text;
+  } catch {
+    return String(value);
+  }
 }

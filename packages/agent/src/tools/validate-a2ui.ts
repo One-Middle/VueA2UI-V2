@@ -388,14 +388,29 @@ function getOperationName(msg: A2UIServerMessage): string {
   return "未知操作";
 }
 
-/** 不安全内容正则模式，用于防止 XSS / 脚本注入 */
-const UNSAFE_PATTERNS = [
+/** 字符串内容不安全模式，用于防止 XSS / 脚本注入。 */
+const UNSAFE_STRING_PATTERNS = [
   /<script/i,
   /innerHTML/i,
   /eval\s*\(/i,
   /javascript\s*:/i,
-  /on\w+\s*=/i,
+  /<[^>]*\son[a-z]+\s*=/i,
 ] as const;
+
+/** 明确禁止的浏览器事件属性名。 */
+const UNSAFE_PROPERTY_NAMES = new Set([
+  "onclick",
+  "onchange",
+  "oninput",
+  "onsubmit",
+  "onload",
+  "onerror",
+  "onmouseover",
+  "onkeydown",
+  "onkeyup",
+  "onfocus",
+  "onblur",
+]);
 
 /**
  * 校验消息中是否包含潜在的不安全内容（script、innerHTML、eval 等）。
@@ -405,16 +420,53 @@ function validateSafetyConstraints(
   errors: ValidationIssue[],
 ): void {
   for (let i = 0; i < messages.length; i++) {
-    const jsonStr = JSON.stringify(messages[i]);
-    for (const pattern of UNSAFE_PATTERNS) {
-      const match = pattern.exec(jsonStr);
-      if (!match) continue;
-      errors.push({
-        code: "UNSAFE_CONTENT",
-        path: `/${i}`,
-        message: `消息包含不安全内容："${match[0]}"。`,
-      });
-      break;
+    const issue = findUnsafeContent(messages[i]);
+    if (!issue) {
+      continue;
+    }
+    errors.push({
+      code: "UNSAFE_CONTENT",
+      path: `/${i}${issue.path}`,
+      message: `消息包含不安全内容："${issue.match}"。`,
+    });
+  }
+}
+
+function findUnsafeContent(value: unknown, path = ""): { path: string; match: string } | null {
+  if (typeof value === "string") {
+    for (const pattern of UNSAFE_STRING_PATTERNS) {
+      const match = pattern.exec(value);
+      if (match) {
+        return { path, match: match[0] };
+      }
+    }
+    return null;
+  }
+
+  if (Array.isArray(value)) {
+    for (let i = 0; i < value.length; i++) {
+      const issue = findUnsafeContent(value[i], `${path}/${i}`);
+      if (issue) {
+        return issue;
+      }
+    }
+    return null;
+  }
+
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  for (const [key, child] of Object.entries(value)) {
+    const normalizedKey = key.toLowerCase();
+    if (/^on[A-Z]/.test(key) || UNSAFE_PROPERTY_NAMES.has(normalizedKey)) {
+      return { path: `${path}/${key}`, match: key };
+    }
+    const issue = findUnsafeContent(child, `${path}/${key}`);
+    if (issue) {
+      return issue;
     }
   }
+
+  return null;
 }

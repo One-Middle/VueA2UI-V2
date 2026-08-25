@@ -479,7 +479,7 @@ describe("workflowService new workflow contract", () => {
     }) as never);
     vi.mocked(workflowRepository.findLatestStep).mockResolvedValue(stepRecord({ sequence: 1 }) as never);
     vi.mocked(workflowRepository.createStep)
-      .mockResolvedValueOnce(stepRecord({ id: "step-generate", type: "generate_a2ui", sequence: 2, status: "pending" }) as never);
+      .mockResolvedValueOnce(stepRecord({ id: "step-generate", type: "generate_a2ui", sequence: 2, status: "running" }) as never);
     const executeSpy = vi.spyOn(workflowService, "executeGenerateA2UI").mockResolvedValue();
 
     await workflowService.submitDecision({
@@ -497,7 +497,8 @@ describe("workflowService new workflow contract", () => {
     }));
     expect(workflowRepository.createStep).toHaveBeenCalledWith(expect.objectContaining({
       type: "generate_a2ui",
-      status: "pending",
+      status: "running",
+      startedAt: expect.any(Date),
     }));
     expect(executeSpy).toHaveBeenCalledWith(expect.objectContaining({
       workflowStepId: "step-generate",

@@ -24,6 +24,9 @@ type PropertyJsonType =
   | "boolean"
   | "array"
   | "string[]"
+  | "string|binding"
+  | "boolean|binding"
+  | "number|binding"
   | "object";
 
 interface InternalPropertyDef {
@@ -154,7 +157,7 @@ const COMPONENT_DEFS: InternalComponentDef[] = [
     properties: [
       {
         name: "text",
-        type: "string",
+        type: "string|binding",
         required: true,
         description: "显示的文本内容，支持字符串或 { path } 数据绑定",
       },
@@ -888,7 +891,7 @@ const COMPONENT_DEFS: InternalComponentDef[] = [
       },
       {
         name: "text",
-        type: "string",
+        type: "string|binding",
         required: true,
         description: "输入框值，支持字符串或 { path } 数据绑定",
       },
@@ -950,9 +953,9 @@ const COMPONENT_DEFS: InternalComponentDef[] = [
       },
       {
         name: "value",
-        type: "string",
+        type: "boolean|binding",
         required: true,
-        description: "复选框值，支持字符串或 { path } 数据绑定",
+        description: "复选框勾选状态，支持 boolean 或 { path } 数据绑定",
       },
       {
         name: "description",

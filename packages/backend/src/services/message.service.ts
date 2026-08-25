@@ -121,6 +121,9 @@ export const messageService = {
       kind: "chat",
       content,
       attachments: attachmentFileIds ?? [],
+      metadata: activeWorkflow?.status === "failed_retryable"
+        ? { workflowResume: true, resumeWorkflowId: activeWorkflow.id }
+        : undefined,
     });
 
     if (workflow) {

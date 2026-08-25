@@ -12,6 +12,7 @@
 - 渲染 Agent Workflow timeline、主工作区产物和工具调用产生的特殊 UI block。
 - 在会话流中展示 `clarification_form` 和 `decision_form` 对应的交互表单，并通过 `workflow/actions` 提交澄清、决策、重试或取消。
 - 当用户在 `failed_retryable` workflow 后追加普通消息时，接收后端返回的 workflow 摘要并更新本地运行态；是否允许恢复由 Backend 决定。
+- 将普通续跑消息作为独立用户气泡展示，并把后续 workflow 生成片段锚定在该消息之后，避免生成状态出现在触发消息上方。
 - 消费 `agent_trace_event` 实时展示 ReAct 循环进度。
 - 通过 Renderer 预览已校验 candidate A2UI。
 

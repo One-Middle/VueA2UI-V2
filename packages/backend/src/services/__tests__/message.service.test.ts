@@ -117,6 +117,10 @@ describe("messageService.createUserMessageAndAgentRun", () => {
     expect(messageRepository.create).toHaveBeenCalledWith(expect.objectContaining({
       workflow: { connect: { id: "workflow-a" } },
       content: "继续",
+      metadata: {
+        workflowResume: true,
+        resumeWorkflowId: "workflow-a",
+      },
     }));
     expect(workflowService.resumeFailedStepFromMessage).toHaveBeenCalledWith({
       sessionId: "session-a",

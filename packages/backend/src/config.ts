@@ -28,7 +28,7 @@ export const config = {
     apiKey: process.env.OPENAI_COMPAT_API_KEY ?? "",
     model: process.env.OPENAI_COMPAT_MODEL ?? "gpt-4.1",
     temperature: Number(process.env.OPENAI_COMPAT_TEMPERATURE ?? 0.2),
-    maxTokens: Number(process.env.OPENAI_COMPAT_MAX_TOKENS ?? 8192),
+    maxTokens: Number(process.env.OPENAI_COMPAT_MAX_TOKENS ?? 16384 ),
     timeoutMs: Number(process.env.OPENAI_COMPAT_TIMEOUT_MS ?? 60000)
   },
   catalog: {

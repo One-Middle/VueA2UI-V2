@@ -37,13 +37,15 @@ watch(() => props.isPlainGenerating, (val) => {
     <div class="message-stack">
       <div v-if="displayItems.length === 0 && !isPlainGenerating" class="message-empty">当前会话还没有消息。</div>
 
-      <template v-for="item in displayItems" :key="item.kind === 'workflow' ? `workflow-${item.workflowId}` : `message-${item.message.id}`">
+      <template v-for="item in displayItems" :key="item.kind === 'workflow' ? `workflow-${item.segmentId}` : `message-${item.message.id}`">
         <WorkflowMessage
           v-if="item.kind === 'workflow'"
           :workflow-id="item.workflowId"
           :workflow="item.workflow"
           :step-log-messages="item.stepLogMessages"
           :action-messages="item.actionMessages"
+          :timeline-artifacts="item.timelineArtifacts"
+          :show-generating="item.showGenerating"
         />
         <div v-else :class="['message-bubble', item.message.role]">
           <div class="message-role">{{ item.message.role === 'user' ? '你' : 'AI' }}</div>

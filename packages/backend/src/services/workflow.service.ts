@@ -74,6 +74,7 @@ export type CreateWorkflowStepInput = {
   status?: WorkflowStepStatus;
   stageState?: WorkflowStageState;
   maxAttempts?: number;
+  startedAt?: Date | null;
   metadata?: Prisma.InputJsonValue;
 };
 
@@ -804,6 +805,7 @@ export const workflowService = {
       status: input.status ?? "pending",
       stageState: input.stageState ?? null,
       maxAttempts: input.maxAttempts ?? 3,
+      startedAt: input.startedAt,
       metadata: input.metadata ?? {},
     });
 
@@ -1758,7 +1760,8 @@ export const workflowService = {
         sessionId: input.sessionId,
         type: "generate_a2ui",
         sequence: (latestStep?.sequence ?? step.sequence) + 1,
-        status: "pending",
+        status: "running",
+        startedAt: new Date(),
         metadata: {
           gate: "generate_a2ui",
           precondition: "confirmed_plan",
