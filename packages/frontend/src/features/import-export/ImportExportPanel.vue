@@ -89,11 +89,10 @@ const handleExportSnapshot = () => {
   justify-content: space-between;
   min-height: 170px;
   padding: 16px;
-  border: 1px solid #dbe5f2;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
-  background:
-    linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
-  box-shadow: 0 8px 20px rgb(15 23 42 / 4%);
+  background: #ffffff;
+  box-shadow: 0 8px 18px rgb(15 23 42 / 3%);
   transition:
     border-color 160ms ease,
     box-shadow 160ms ease,
@@ -101,8 +100,8 @@ const handleExportSnapshot = () => {
 }
 
 .export-card:hover {
-  border-color: #bfd3f4;
-  box-shadow: 0 14px 28px rgb(15 23 42 / 7%);
+  border-color: rgb(45 212 191 / 34%);
+  box-shadow: 0 10px 22px rgb(15 159 143 / 6%);
   transform: translateY(-1px);
 }
 
@@ -130,7 +129,7 @@ const handleExportSnapshot = () => {
 
 .export-stats span {
   padding: 5px 9px;
-  border: 1px solid #dbe5f2;
+  border: 1px solid #e2e8f0;
   border-radius: 999px;
   background: #ffffff;
 }

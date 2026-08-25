@@ -61,7 +61,7 @@ const send = async () => {
 
 .initial-composer {
   display: grid;
-  width: min(780px, 100%);
+  width: min(640px, 100%);
   gap: 18px;
   justify-items: center;
   transform: translateY(-8vh);
@@ -82,13 +82,13 @@ const send = async () => {
   gap: 10px;
   align-items: center;
   padding: 8px 10px 8px 18px;
-  border: 1px solid rgb(255 255 255 / 76%);
+  border: 1px solid #e2e8f0;
   border-radius: 999px;
-  background: rgb(255 255 255 / 58%);
+  background: rgb(255 255 255 / 82%);
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 78%),
-    0 20px 55px rgb(43 61 59 / 12%);
-  backdrop-filter: blur(26px);
+    0 18px 40px rgb(15 23 42 / 8%);
+  backdrop-filter: blur(18px);
 }
 
 .composer-input :deep(.n-input) {
@@ -111,7 +111,7 @@ const send = async () => {
 
 .composer-meta {
   margin: 0;
-  color: #6b6476;
+  color: #64748b;
   font-size: 12px;
 }
 

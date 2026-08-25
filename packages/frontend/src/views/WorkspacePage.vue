@@ -24,12 +24,13 @@ const workspace = useWorkspaceStore();
 // ─── 两栏拖拽分割线 ───
 // 会话区与组件展示区之间的分割线可拖动调整宽度比例。
 const creationShellRef = ref<HTMLElement | null>(null);
-const chatWidthPercent = ref(42);
+const chatWidthPercent = ref(34);
 const isDraggingDivider = ref(false);
 
-const MIN_CHAT_WIDTH = 340;
-const MIN_PREVIEW_WIDTH = 460;
-const DIVIDER_WIDTH = 12;
+const MIN_CHAT_WIDTH = 360;
+const MAX_CHAT_WIDTH = 430;
+const MIN_PREVIEW_WIDTH = 560;
+const DIVIDER_WIDTH = 10;
 
 /** 拖拽起点快照（null 表示未在拖拽）。 */
 let dragStart: { x: number; percent: number } | null = null;
@@ -43,8 +44,9 @@ const chatStyle = computed(() => ({ width: `${chatWidthPercent.value}%` }));
  */
 function clampChatPercent(value: number, shellWidth: number): number {
   const minPercent = (MIN_CHAT_WIDTH / shellWidth) * 100;
+  const preferredMaxPercent = (MAX_CHAT_WIDTH / shellWidth) * 100;
   const maxPercent = ((shellWidth - DIVIDER_WIDTH - MIN_PREVIEW_WIDTH) / shellWidth) * 100;
-  return Math.min(Math.max(value, minPercent), Math.max(minPercent, maxPercent));
+  return Math.min(Math.max(value, minPercent), Math.max(minPercent, Math.min(preferredMaxPercent, maxPercent)));
 }
 
 function startDividerDrag(event: PointerEvent) {
@@ -83,10 +85,10 @@ const themeOverrides: GlobalThemeOverrides = {
     primaryColor: "#0f9f8f",
     primaryColorHover: "#0f766e",
     primaryColorPressed: "#115e59",
-    primaryColorSuppl: "#2dd4bf",
+    primaryColorSuppl: "#34d399",
     borderRadius: "8px",
-    borderColor: "rgba(255, 255, 255, 0.66)",
-    dividerColor: "rgba(120, 113, 108, 0.12)",
+    borderColor: "#e5e7eb",
+    dividerColor: "#eef2f7",
     textColorBase: "#0f172a",
   },
   Button: {
@@ -143,7 +145,7 @@ const createSession = () => {
 <template>
   <n-config-provider :theme-overrides="themeOverrides">
     <n-layout has-sider class="workspace">
-      <n-layout-sider bordered :width="248" class="workspace-sider">
+      <n-layout-sider bordered :width="232" class="workspace-sider">
         <div class="brand">
           <div class="brand-mark">A2</div>
           <div>

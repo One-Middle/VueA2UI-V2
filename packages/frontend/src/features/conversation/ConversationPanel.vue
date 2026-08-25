@@ -96,8 +96,7 @@ const send = async (content: string) => {
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  background:
-    linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+  background: rgb(255 255 255 / 78%);
 }
 
 .conversation-toolbar {
@@ -105,10 +104,10 @@ const send = async (content: string) => {
   gap: 12px;
   align-items: flex-start;
   justify-content: space-between;
-  padding: 18px 18px 16px;
-  border-bottom: 1px solid #e2eaf5;
-  background:
-    linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+  padding: 16px 16px 14px;
+  border-bottom: 1px solid #e5e7eb;
+  background: rgb(255 255 255 / 84%);
+  backdrop-filter: blur(14px);
 }
 
 .conversation-toolbar h2 {
@@ -120,7 +119,7 @@ const send = async (content: string) => {
 
 .conversation-toolbar p {
   margin: 6px 0 0;
-  color: #5d6f89;
+  color: #64748b;
   font-size: 13px;
   line-height: 1.5;
 }
@@ -149,14 +148,12 @@ const send = async (content: string) => {
   min-height: 0;
   padding: 36px 24px;
   text-align: center;
-  background:
-    radial-gradient(circle at 50% 35%, rgb(15 159 143 / 8%), transparent 32%),
-    linear-gradient(180deg, rgb(255 255 255 / 78%) 0%, rgb(251 253 251 / 70%) 100%);
+  background: #ffffff;
 }
 
 .start-content {
   max-width: 440px;
-  padding: 24px;
+  padding: 20px;
 }
 
 .start-content h2 {

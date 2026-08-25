@@ -23,6 +23,7 @@ let consumedMessageCount = 0;
 const componentError = ref("");
 const dataModelError = ref("");
 const isSyncingEditors = ref(false);
+const inspectorExpanded = ref(false);
 const applyTimers: Partial<Record<"components" | "dataModel", ReturnType<typeof setTimeout>>> = {};
 let unsubscribeDataModel: (() => void) | undefined;
 
@@ -237,65 +238,101 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
           <div v-if="!hasContent && !workspace.isGenerating" class="panel-center">
             <n-empty description="暂无 UI 内容，请在左侧输入需求生成页面。" />
           </div>
-          <div v-else-if="hasContent" class="preview-canvas">
-            <A2uiSurface
-              v-for="sid in surfaceIds"
-              :key="sid"
-              :surface-id="sid"
-              :surface-group="surfaceGroup"
-            />
+          <div v-else-if="hasContent" class="preview-stage">
+            <div class="device-toolbar">
+              <span>iPhone 14</span>
+              <span>390 x 844</span>
+              <span>100%</span>
+            </div>
+
+            <div class="phone-frame">
+              <div class="phone-status">
+                <span>9:41</span>
+                <span class="dynamic-island"></span>
+                <span>5G</span>
+              </div>
+              <div class="phone-nav">
+                <span class="phone-nav-icon">&lt;</span>
+                <strong>实时预览</strong>
+                <span class="phone-nav-icon">...</span>
+              </div>
+              <div class="phone-content">
+                <A2uiSurface
+                  v-for="sid in surfaceIds"
+                  :key="sid"
+                  :surface-id="sid"
+                  :surface-group="surfaceGroup"
+                />
+              </div>
+              <div class="phone-tabs">
+                <span class="phone-tab phone-tab--active">Home</span>
+                <span class="phone-tab">Explore</span>
+                <span class="phone-tab">Library</span>
+                <span class="phone-tab">Profile</span>
+              </div>
+            </div>
           </div>
           <div v-else class="preview-generating">
             <div class="generating-hint">AI 正在分析需求并生成 UI 组件...</div>
           </div>
 
-          <div class="a2ui-inspector">
-            <section class="inspector-card">
-              <div class="inspector-heading">
-                <div>
-                  <h3>component</h3>
-                  <p>当前 Surface 的组件树，修改合法 JSON 后会实时更新渲染。</p>
-                </div>
-                <n-tag size="small" :type="componentError ? 'error' : hasContent ? 'success' : 'default'">
-                  {{ componentError ? "JSON 错误" : hasContent ? "同源数据" : "等待数据" }}
-                </n-tag>
-              </div>
-              <n-alert v-if="componentError" type="error" class="json-error">
-                {{ componentError }}
-              </n-alert>
-              <n-input
-                v-model:value="componentJson"
-                class="json-editor"
-                type="textarea"
-                placeholder="等待 component 数据..."
-                :disabled="!hasContent"
-                :autosize="{ minRows: 9, maxRows: 16 }"
-              />
-            </section>
+          <section class="inspector-drawer">
+            <button class="inspector-toggle" type="button" @click="inspectorExpanded = !inspectorExpanded">
+              <span>
+                <strong>Inspector</strong>
+                <small>component / dataModel</small>
+              </span>
+              <span class="inspector-state">{{ inspectorExpanded ? "收起" : "展开" }}</span>
+            </button>
 
-            <section class="inspector-card">
-              <div class="inspector-heading">
-                <div>
-                  <h3>dataModel</h3>
-                  <p>当前 Surface 的数据模型，修改合法 JSON 后会实时更新绑定内容。</p>
+            <div v-if="inspectorExpanded" class="a2ui-inspector">
+              <section class="inspector-card">
+                <div class="inspector-heading">
+                  <div>
+                    <h3>component</h3>
+                    <p>当前 Surface 的组件树，修改合法 JSON 后会实时更新渲染。</p>
+                  </div>
+                  <n-tag size="small" :type="componentError ? 'error' : hasContent ? 'success' : 'default'">
+                    {{ componentError ? "JSON 错误" : hasContent ? "同源数据" : "等待数据" }}
+                  </n-tag>
                 </div>
-                <n-tag size="small" :type="dataModelError ? 'error' : hasContent ? 'success' : 'default'">
-                  {{ dataModelError ? "JSON 错误" : hasContent ? "同源数据" : "等待数据" }}
-                </n-tag>
-              </div>
-              <n-alert v-if="dataModelError" type="error" class="json-error">
-                {{ dataModelError }}
-              </n-alert>
-              <n-input
-                v-model:value="dataModelJson"
-                class="json-editor"
-                type="textarea"
-                placeholder="等待 dataModel 数据..."
-                :disabled="!hasContent"
-                :autosize="{ minRows: 9, maxRows: 16 }"
-              />
-            </section>
-          </div>
+                <n-alert v-if="componentError" type="error" class="json-error">
+                  {{ componentError }}
+                </n-alert>
+                <n-input
+                  v-model:value="componentJson"
+                  class="json-editor"
+                  type="textarea"
+                  placeholder="等待 component 数据..."
+                  :disabled="!hasContent"
+                  :autosize="{ minRows: 9, maxRows: 16 }"
+                />
+              </section>
+
+              <section class="inspector-card">
+                <div class="inspector-heading">
+                  <div>
+                    <h3>dataModel</h3>
+                    <p>当前 Surface 的数据模型，修改合法 JSON 后会实时更新绑定内容。</p>
+                  </div>
+                  <n-tag size="small" :type="dataModelError ? 'error' : hasContent ? 'success' : 'default'">
+                    {{ dataModelError ? "JSON 错误" : hasContent ? "同源数据" : "等待数据" }}
+                  </n-tag>
+                </div>
+                <n-alert v-if="dataModelError" type="error" class="json-error">
+                  {{ dataModelError }}
+                </n-alert>
+                <n-input
+                  v-model:value="dataModelJson"
+                  class="json-editor"
+                  type="textarea"
+                  placeholder="等待 dataModel 数据..."
+                  :disabled="!hasContent"
+                  :autosize="{ minRows: 9, maxRows: 16 }"
+                />
+              </section>
+            </div>
+          </section>
         </div>
       </n-spin>
     </div>
@@ -308,8 +345,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   flex-direction: column;
   height: 100%;
   min-height: 0;
-  background:
-    linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+  background: rgb(255 255 255 / 72%);
 }
 
 .preview-toolbar {
@@ -317,10 +353,10 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   gap: 12px;
   align-items: flex-start;
   justify-content: space-between;
-  padding: 18px 18px 16px;
-  border-bottom: 1px solid #e2eaf5;
-  background:
-    linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
+  padding: 16px 18px 14px;
+  border-bottom: 1px solid #e5e7eb;
+  background: rgb(255 255 255 / 82%);
+  backdrop-filter: blur(14px);
 }
 
 .preview-toolbar h2 {
@@ -332,61 +368,228 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 
 .preview-toolbar p {
   margin: 6px 0 0;
-  color: #5d6f89;
+  color: #64748b;
   font-size: 13px;
 }
 
 .preview-body {
   flex: 1;
   min-height: 0;
-  padding: 16px;
+  padding: 18px;
   overflow: auto;
-  background:
-    radial-gradient(circle at 50% 0%, rgb(15 159 143 / 7%), transparent 34%),
-    linear-gradient(180deg, rgb(248 252 250 / 74%) 0%, rgb(241 247 244 / 72%) 100%);
+  background: #f6f7f9;
 }
 
 .preview-stack {
   display: grid;
-  gap: 14px;
+  gap: 12px;
   min-height: 100%;
-  grid-template-rows: minmax(320px, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr) auto;
 }
 
-.preview-canvas {
-  min-height: 320px;
-  border: 1px solid #dbe5f2;
-  border-radius: 8px;
+.preview-stage {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+  padding: 20px;
+  overflow: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 76%), rgb(248 250 252 / 88%)),
+    #ffffff;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 78%);
+}
+
+.device-toolbar {
+  display: inline-flex;
+  flex-shrink: 0;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+  border-radius: 9px;
+  background: rgb(255 255 255 / 88%);
+  box-shadow: 0 8px 20px rgb(15 23 42 / 5%);
+}
+
+.device-toolbar span {
+  padding: 9px 15px;
+  border-right: 1px solid #e2e8f0;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.device-toolbar span:last-child {
+  border-right: 0;
+}
+
+.phone-frame {
+  display: grid;
+  flex-shrink: 0;
+  width: 390px;
+  min-height: 844px;
+  grid-template-rows: 42px 48px 1fr 68px;
+  overflow: hidden;
+  border: 8px solid #111827;
+  border-radius: 38px;
   background: #ffffff;
   box-shadow:
-    0 18px 38px rgb(15 23 42 / 6%),
-    inset 0 1px 0 rgb(255 255 255 / 88%);
-  overflow: hidden;
+    0 28px 70px rgb(15 23 42 / 16%),
+    0 0 0 1px rgb(15 23 42 / 8%);
 }
 
-.preview-canvas :deep(.a2ui-surface),
-.preview-canvas :deep([data-a2ui-surface]) {
+.phone-status,
+.phone-nav,
+.phone-tabs {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  background: #ffffff;
+}
+
+.phone-status {
+  position: relative;
+  color: #111827;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.dynamic-island {
+  position: absolute;
+  top: 9px;
+  left: 50%;
+  width: 112px;
+  height: 24px;
+  border-radius: 999px;
+  background: #020617;
+  transform: translateX(-50%);
+}
+
+.phone-nav {
+  border-bottom: 1px solid #eef2f7;
+}
+
+.phone-nav strong {
+  color: #0f172a;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.phone-nav-icon {
+  color: #0f9f8f;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.phone-content {
+  min-height: 0;
+  overflow: auto;
+  background: #f8fafc;
+}
+
+.phone-content :deep(.a2ui-surface),
+.phone-content :deep([data-a2ui-surface]) {
   min-height: 100%;
+}
+
+.phone-content :deep(.a2ui-surface) {
+  padding: 16px;
+  background: transparent;
+}
+
+.phone-content :deep(.a2ui-list) {
+  gap: 10px;
+  padding-left: 0;
+  list-style: none;
+}
+
+.phone-content :deep(.a2ui-list > li) {
+  min-width: 0;
+}
+
+.phone-tabs {
+  border-top: 1px solid #eef2f7;
+  color: #64748b;
+}
+
+.phone-tab {
+  min-width: 58px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.phone-tab--active {
+  color: #0f9f8f;
 }
 
 .compact .preview-body {
-  padding: 14px;
+  padding: 16px;
+}
+
+.inspector-drawer {
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: rgb(255 255 255 / 84%);
+}
+
+.inspector-toggle {
+  display: flex;
+  width: 100%;
+  min-height: 42px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 14px;
+  border: 0;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+  cursor: pointer;
+}
+
+.inspector-toggle span:first-child {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+
+.inspector-toggle strong {
+  color: #0f172a;
+  font-size: 13px;
+}
+
+.inspector-toggle small,
+.inspector-state {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.inspector-state {
+  flex-shrink: 0;
+  font-weight: 700;
 }
 
 .a2ui-inspector {
   display: grid;
-  gap: 14px;
+  gap: 12px;
+  padding: 12px;
+  border-top: 1px solid #eef2f7;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .inspector-card {
   min-width: 0;
   padding: 14px;
-  border: 1px solid #dbe5f2;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
-  background:
-    linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
-  box-shadow: 0 10px 24px rgb(15 23 42 / 5%);
+  background: #ffffff;
+  box-shadow: 0 8px 20px rgb(15 23 42 / 4%);
 }
 
 .inspector-heading {
@@ -430,13 +633,13 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   align-items: center;
   justify-content: center;
   min-height: 240px;
-  border: 1px solid #dbe5f2;
-  border-radius: 8px;
-  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: rgb(255 255 255 / 82%);
 }
 
 .generating-hint {
-  color: #5d6f89;
+  color: #64748b;
   font-size: 14px;
   animation: hint-pulse 2s infinite ease-in-out;
 }
@@ -449,6 +652,26 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 @media (max-width: 1200px) {
   .a2ui-inspector {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .preview-stage {
+    padding: 14px;
+  }
+
+  .phone-frame {
+    width: min(390px, calc(100vw - 52px));
+    min-height: 760px;
+  }
+
+  .device-toolbar {
+    max-width: calc(100vw - 52px);
+  }
+
+  .device-toolbar span {
+    padding: 8px 10px;
+    white-space: nowrap;
   }
 }
 </style>

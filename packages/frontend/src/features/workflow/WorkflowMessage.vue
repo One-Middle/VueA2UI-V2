@@ -178,12 +178,11 @@ const nodeKey = (node: TimelineNode): string =>
 .workflow-message {
   align-self: flex-start;
   width: 100%;
-  max-width: 92%;
-  border: 1px solid #dbe5f2;
+  max-width: 76%;
+  border: 1px solid #e2e8f0;
   border-radius: 10px;
-  background:
-    linear-gradient(180deg, #ffffff 0%, #fbfdff 100%);
-  box-shadow: 0 10px 26px rgb(15 23 42 / 6%);
+  background: #ffffff;
+  box-shadow: 0 10px 24px rgb(15 23 42 / 5%);
 }
 
 .workflow-header {
@@ -191,8 +190,8 @@ const nodeKey = (node: TimelineNode): string =>
   gap: 12px;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 14px;
-  border-bottom: 1px solid #e2eaf5;
+  padding: 11px 13px;
+  border-bottom: 1px solid #eef2f7;
 }
 
 .workflow-title {
@@ -217,13 +216,13 @@ const nodeKey = (node: TimelineNode): string =>
   color: #0f766e;
   font-size: 11px;
   font-weight: 700;
-  background: rgb(45 212 191 / 14%);
+  background: rgb(45 212 191 / 12%);
 }
 
 .workflow-body {
   display: grid;
-  gap: 10px;
-  padding: 12px 14px;
+  gap: 9px;
+  padding: 12px 13px;
 }
 
 .timeline {
@@ -340,7 +339,7 @@ const nodeKey = (node: TimelineNode): string =>
   gap: 6px;
   align-items: center;
   padding: 8px 10px;
-  border: 1px dashed #dbe5f2;
+  border: 1px dashed #cbd5e1;
   border-radius: 8px;
   background: #f8fafc;
 }
