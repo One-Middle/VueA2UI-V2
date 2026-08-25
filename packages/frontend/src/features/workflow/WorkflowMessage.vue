@@ -30,6 +30,8 @@ const props = defineProps<{
   workflow: AgentWorkflowDetailDto | null;
   stepLogMessages: MessageDto[];
   actionMessages: MessageDto[];
+  timelineArtifacts: WorkflowArtifactDto[];
+  showGenerating: boolean;
 }>();
 
 const workspace = useWorkspaceStore();
@@ -56,7 +58,13 @@ const waitingArtifactIds = computed(() => {
 
 /** 事件时间线：agent 过程、artifact 产出、用户动作按 createdAt 合并排序。 */
 const timeline = computed(() =>
-  buildWorkflowTimeline(props.workflow, props.stepLogMessages, props.actionMessages, waitingArtifactIds.value),
+  buildWorkflowTimeline(
+    props.workflow,
+    props.stepLogMessages,
+    props.actionMessages,
+    waitingArtifactIds.value,
+    props.timelineArtifacts,
+  ),
 );
 
 const statusMeta = computed(() => {
@@ -80,11 +88,6 @@ const statusMeta = computed(() => {
 });
 
 const retryAvailable = computed(() => latestStep.value?.status === "failed");
-
-/** 该 workflow 是否正在生成（存在 running 的 step），用于在消息末尾显示加载动画。 */
-const isGenerating = computed(() =>
-  props.workflow?.steps.some((step) => step.status === "running") ?? false,
-);
 
 const previewCandidate = (artifact: WorkflowArtifactDto) => {
   const content = artifact.contentJson as { messages?: unknown };
@@ -161,7 +164,7 @@ const nodeKey = (node: TimelineNode): string =>
       </section>
 
       <!-- 生成中动画（时间线末尾） -->
-      <div v-if="isGenerating" class="generating-indicator">
+      <div v-if="showGenerating" class="generating-indicator">
         <span class="dot"></span>
         <span class="dot"></span>
         <span class="dot"></span>

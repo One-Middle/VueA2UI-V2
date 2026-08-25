@@ -52,11 +52,17 @@ export interface DecisionFormData {
 export interface WorkflowDisplayItem {
   kind: "workflow";
   workflowId: string;
+  /** 同一 workflow 在会话流中的展示片段 ID。 */
+  segmentId: string;
   workflow: AgentWorkflowDetailDto | null;
   /** 该 workflow 下的 assistant 消息（按时间序，作为步骤日志）。 */
   stepLogMessages: MessageDto[];
   /** 该 workflow 下由 WorkflowAction 产生的用户消息（折叠反馈，不渲染为独立气泡）。 */
   actionMessages: MessageDto[];
+  /** 当前展示片段内的 artifact，避免续跑片段重复展示旧 plan。 */
+  timelineArtifacts: WorkflowArtifactDto[];
+  /** 是否在该展示片段末尾显示生成中动画。 */
+  showGenerating: boolean;
 }
 
 /** 消息流中的展示项：普通消息或 AI Workflow Message。 */
@@ -89,6 +95,17 @@ export function isWorkflowActionMessage(message: MessageDto): boolean {
 }
 
 /**
+ * 判断一条普通用户消息是否触发了 retryable workflow 的续跑。
+ *
+ * 后端在普通消息恢复失败 workflow 时写入 metadata.workflowResume。它不是表单 action，
+ * 因此仍渲染为独立用户气泡，但后续 AI 生成片段应锚定在这条消息之后。
+ */
+export function isWorkflowResumeMessage(message: MessageDto): boolean {
+  if (message.role !== "user" || isWorkflowActionMessage(message)) return false;
+  return (message.metadata as { workflowResume?: unknown } | undefined)?.workflowResume === true;
+}
+
+/**
  * 将消息列表 + workflow 列表聚合为展示项列表。
  *
  * 规则（由 workflow 驱动，而非仅由消息驱动）：
@@ -107,65 +124,176 @@ export function buildDisplayItems(
   workflows: AgentWorkflowDetailDto[],
 ): DisplayItem[] {
   const workflowById = new Map(workflows.map((workflow) => [workflow.id, workflow]));
-  const buckets = new Map<string, { stepLogMessages: MessageDto[]; actionMessages: MessageDto[] }>();
-  const anchorIndex = new Map<string, number>();
+  type Segment = {
+    id: string;
+    workflowId: string;
+    anchorIndex: number;
+    startAt: string | null;
+    insertAfterAnchor: boolean;
+  };
+  type Bucket = {
+    stepLogMessages: MessageDto[];
+    actionMessages: MessageDto[];
+    timelineArtifacts: WorkflowArtifactDto[];
+  };
 
-  // 第一遍：按 workflowId 收集 assistant / action 消息，并记录每个 workflow 第一条关联消息的位置
+  const segmentsByWorkflow = new Map<string, Segment[]>();
+
+  const ensureInitialSegment = (workflowId: string, anchorIndex: number): Segment => {
+    let segments = segmentsByWorkflow.get(workflowId);
+    if (!segments) {
+      segments = [];
+      segmentsByWorkflow.set(workflowId, segments);
+    }
+    const initial = segments.find((segment) => segment.id === `${workflowId}:initial`);
+    if (initial) return initial;
+    const segment = {
+      id: `${workflowId}:initial`,
+      workflowId,
+      anchorIndex,
+      startAt: null,
+      insertAfterAnchor: false,
+    };
+    segments.push(segment);
+    return segment;
+  };
+
+  const addResumeSegment = (message: MessageDto, anchorIndex: number): void => {
+    if (!message.workflowId) return;
+    const segments = segmentsByWorkflow.get(message.workflowId) ?? [];
+    segmentsByWorkflow.set(message.workflowId, segments);
+    if (segments.some((segment) => segment.id === `${message.workflowId}:resume:${message.id}`)) return;
+    segments.push({
+      id: `${message.workflowId}:resume:${message.id}`,
+      workflowId: message.workflowId,
+      anchorIndex,
+      startAt: message.createdAt,
+      insertAfterAnchor: true,
+    });
+  };
+
+  // 第一遍：识别 workflow 展示片段锚点。初始片段仍锚定到第一条 assistant/action，
+  // retryable 普通续跑消息则创建新的片段并锚定在该用户消息之后。
   messages.forEach((message, index) => {
     const workflowId = message.workflowId;
     if (!workflowId) return;
     const isAssistant = message.role === "assistant";
     const isAction = isWorkflowActionMessage(message);
+    if (isWorkflowResumeMessage(message)) addResumeSegment(message, index);
     if (!isAssistant && !isAction) return;
+    ensureInitialSegment(workflowId, index);
+  });
 
-    let bucket = buckets.get(workflowId);
-    if (!bucket) {
-      bucket = { stepLogMessages: [], actionMessages: [] };
-      buckets.set(workflowId, bucket);
+  for (const segments of segmentsByWorkflow.values()) {
+    segments.sort((a, b) => a.anchorIndex - b.anchorIndex);
+  }
+
+  const findSegmentForTime = (workflowId: string, createdAt: string): Segment | null => {
+    const segments = segmentsByWorkflow.get(workflowId);
+    if (!segments?.length) return null;
+    let matched = segments[0]!;
+    for (const segment of segments) {
+      if (segment.startAt && createdAt >= segment.startAt) matched = segment;
     }
+    return matched;
+  };
+
+  const buckets = new Map<string, Bucket>();
+  const ensureBucket = (segment: Segment): Bucket => {
+    let bucket = buckets.get(segment.id);
+    if (!bucket) {
+      bucket = { stepLogMessages: [], actionMessages: [], timelineArtifacts: [] };
+      buckets.set(segment.id, bucket);
+    }
+    return bucket;
+  };
+
+  // 第二遍：按时间把 assistant/action 消息分配到对应片段。
+  messages.forEach((message) => {
+    const workflowId = message.workflowId;
+    if (!workflowId) return;
+    const isAssistant = message.role === "assistant";
+    const isAction = isWorkflowActionMessage(message);
+    if (!isAssistant && !isAction) return;
+    const segment = findSegmentForTime(workflowId, message.createdAt);
+    if (!segment) return;
+    const bucket = ensureBucket(segment);
     if (isAssistant) {
       bucket.stepLogMessages.push(message);
     } else {
       bucket.actionMessages.push(message);
     }
-    if (!anchorIndex.has(workflowId)) anchorIndex.set(workflowId, index);
   });
+
+  // 第三遍：按时间把 artifact 分配到对应片段，避免续跑片段重复展示旧产物。
+  for (const workflow of workflows) {
+    const segments = segmentsByWorkflow.get(workflow.id);
+    if (!segments?.length) continue;
+    for (const artifact of workflow.artifacts) {
+      const segment = findSegmentForTime(workflow.id, artifact.createdAt);
+      if (!segment) continue;
+      ensureBucket(segment).timelineArtifacts.push(artifact);
+    }
+  }
 
   const items: DisplayItem[] = [];
   const emitted = new Set<string>();
 
-  // 第二遍：按消息顺序输出。到达某 workflow 的 anchor 时输出 Workflow Message；
+  const makeWorkflowItem = (segment: Segment): WorkflowDisplayItem => {
+    const workflow = workflowById.get(segment.workflowId) ?? null;
+    const bucket = buckets.get(segment.id) ?? { stepLogMessages: [], actionMessages: [], timelineArtifacts: [] };
+    const segments = segmentsByWorkflow.get(segment.workflowId) ?? [segment];
+    const isLatestSegment = segments.at(-1)?.id === segment.id;
+    return {
+      kind: "workflow",
+      workflowId: segment.workflowId,
+      segmentId: segment.id,
+      workflow,
+      stepLogMessages: bucket.stepLogMessages,
+      actionMessages: bucket.actionMessages,
+      timelineArtifacts: bucket.timelineArtifacts,
+      showGenerating: isLatestSegment && (workflow?.steps.some((step) => step.status === "running") ?? false),
+    };
+  };
+
+  // 第四遍：按消息顺序输出。到达某 workflow segment 的 anchor 时输出 Workflow Message；
   // 已归入 workflow 的消息跳过，其余消息作为普通气泡输出。
   messages.forEach((message, index) => {
-    for (const [workflowId, anchor] of anchorIndex) {
-      if (anchor !== index) continue;
-      const bucket = buckets.get(workflowId)!;
-      items.push({
-        kind: "workflow",
-        workflowId,
-        workflow: workflowById.get(workflowId) ?? null,
-        stepLogMessages: bucket.stepLogMessages,
-        actionMessages: bucket.actionMessages,
-      });
-      emitted.add(workflowId);
+    const anchoredBefore = [...segmentsByWorkflow.values()]
+      .flat()
+      .filter((segment) => segment.anchorIndex === index && !segment.insertAfterAnchor);
+    for (const segment of anchoredBefore) {
+      items.push(makeWorkflowItem(segment));
+      emitted.add(segment.id);
     }
 
     const isAssistant = message.role === "assistant";
     const isAction = isWorkflowActionMessage(message);
     if (message.workflowId && (isAssistant || isAction)) return;
     items.push({ kind: "message", message });
+
+    const anchoredAfter = [...segmentsByWorkflow.values()]
+      .flat()
+      .filter((segment) => segment.anchorIndex === index && segment.insertAfterAnchor);
+    for (const segment of anchoredAfter) {
+      items.push(makeWorkflowItem(segment));
+      emitted.add(segment.id);
+    }
   });
 
-  // 第三遍：没有关联消息的 workflow（如初始 plan 等待态），追加为 Workflow Message。
+  // 第五遍：没有关联消息的 workflow（如初始 plan 等待态），追加为 Workflow Message。
   for (const workflow of workflows) {
-    if (emitted.has(workflow.id)) continue;
-    const bucket = buckets.get(workflow.id);
+    const segments = segmentsByWorkflow.get(workflow.id);
+    if (segments?.some((segment) => emitted.has(segment.id))) continue;
     items.push({
       kind: "workflow",
       workflowId: workflow.id,
+      segmentId: `${workflow.id}:detached`,
       workflow,
-      stepLogMessages: bucket?.stepLogMessages ?? [],
-      actionMessages: bucket?.actionMessages ?? [],
+      stepLogMessages: [],
+      actionMessages: [],
+      timelineArtifacts: workflow.artifacts,
+      showGenerating: workflow.steps.some((step) => step.status === "running"),
     });
   }
 
@@ -349,6 +477,7 @@ export function buildWorkflowTimeline(
   stepLogMessages: MessageDto[],
   actionMessages: MessageDto[],
   waitingArtifactIds: ReadonlySet<string>,
+  timelineArtifacts: WorkflowArtifactDto[] = workflow?.artifacts ?? [],
 ): TimelineNode[] {
   const nodes: TimelineNode[] = [];
 
@@ -358,11 +487,9 @@ export function buildWorkflowTimeline(
   for (const message of actionMessages) {
     nodes.push({ kind: "user-action", message, at: message.createdAt });
   }
-  if (workflow) {
-    for (const artifact of workflow.artifacts) {
-      if (waitingArtifactIds.has(artifact.id)) continue;
-      nodes.push({ kind: "artifact", artifact, at: artifact.createdAt });
-    }
+  for (const artifact of timelineArtifacts) {
+    if (waitingArtifactIds.has(artifact.id)) continue;
+    nodes.push({ kind: "artifact", artifact, at: artifact.createdAt });
   }
 
   nodes.sort((a, b) => a.at.localeCompare(b.at));

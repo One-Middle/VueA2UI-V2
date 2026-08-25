@@ -157,7 +157,7 @@ packages/backend/
 3. 若返回 clarification form，step 进入 `awaiting_confirmation + awaiting_clarification`，保存 `clarification_form` artifact。
 4. 若返回 plan，step 进入 `awaiting_confirmation + awaiting_plan_confirmation`，保存 `plan_markdown` 与 `decision_form` artifact（decision 回填 `targetArtifactId`）。
 5. `submit_clarification` action 重新运行 `task="plan"`（带 `clarificationAnswers`），生成新版 plan 或 clarification。
-6. `submit_decision` 在 `plan + awaiting_plan_confirmation` 下：`confirm` 完成 plan 并创建 `generate_a2ui` step；`revise` 走 `requestPlanRevision()` 生成新版 plan；`reject` 停留。
+6. `submit_decision` 在 `plan + awaiting_plan_confirmation` 下：`confirm` 完成 plan 并创建已进入 `running` 的 `generate_a2ui` step，确保前端确认响应内即可显示生成态；`revise` 走 `requestPlanRevision()` 生成新版 plan；`reject` 停留。
 7. `executeGenerateA2UI()` 通过 `runWorkflowTask(task="generate_a2ui")` 生成 candidate，然后在独立的 `validate` step 里用后端 `validateA2UI` 二次校验，保存 `validation_report` artifact。
 8. 校验通过后保存 `candidate_a2ui_messages` artifact，并 `createPreviewDecision()` 用 `runWorkflowTask(task="preview_decision")` 生成 decision form，进入 `preview + awaiting_preview_confirmation`。
 9. `submit_decision` 在 `preview + awaiting_preview_confirmation` 下：`confirm` 走 `confirmCandidateCommit()` + `commitExactCandidate()` 提交 exact stored candidate；`revise` 走 `requestPreviewRevision()` 回到新的 `plan` 轮次（旧 candidate 标记 `invalidated`）。

@@ -308,6 +308,7 @@ describe("workspace store session restore", () => {
       },
     });
     expect(workspace.messages[0]).toMatchObject({ id: "message-clarification" });
+    expect(api.listWorkflows).toHaveBeenCalledWith("session-a");
   });
 
   it("submits decision form with submit_decision payload", async () => {
@@ -331,6 +332,7 @@ describe("workspace store session restore", () => {
       },
     });
     expect(workspace.messages[0]).toMatchObject({ id: "message-decision" });
+    expect(api.listWorkflows).toHaveBeenCalledWith("session-a");
   });
 
   it("updates workflow state when sendMessage resumes a running workflow", async () => {
@@ -354,6 +356,14 @@ describe("workspace store session restore", () => {
     vi.mocked(api.listMessages).mockResolvedValue({
       items: [makeMessage("message-resume")],
       pageInfo: { nextCursor: null, hasMore: false },
+    });
+    vi.mocked(api.listWorkflows).mockResolvedValue({
+      items: [{
+        ...makeWorkflow(),
+        status: "running",
+        currentStepType: "plan",
+        steps: [makeStep({ status: "running" })],
+      }],
     });
 
     const workspace = useWorkspaceStore();
@@ -395,6 +405,14 @@ describe("workspace store session restore", () => {
         currentStepType: "plan",
       },
       streamUrl: "/api/sessions/session-a/stream",
+    });
+    vi.mocked(api.listWorkflows).mockResolvedValue({
+      items: [{
+        ...makeWorkflow(),
+        status: "awaiting_confirmation",
+        currentStepType: "plan",
+        steps: [makeStep({ status: "awaiting_confirmation" })],
+      }],
     });
 
     const workspace = useWorkspaceStore();

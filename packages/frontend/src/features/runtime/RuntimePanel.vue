@@ -130,7 +130,7 @@ function formatToolCallSummary(row: ToolCallDto): string {
       </div>
       <div class="summary-item">
         <span>Max Tokens</span>
-        <strong>{{ (runtimeConfig as any)?.maxTokens ?? 8192 }}</strong>
+        <strong>{{ (runtimeConfig as any)?.maxTokens ?? 16384 }}</strong>
       </div>
       <div class="summary-item">
         <span>Catalog</span>
