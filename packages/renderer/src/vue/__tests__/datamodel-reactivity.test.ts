@@ -25,7 +25,7 @@ afterEach(() => {
 
 function mountSurface(
   dataModel: JsonValue,
-  components: A2UIComponent[]
+  components: A2UIComponent[],
 ): { container: HTMLElement; surface: SurfaceModel } {
   registerBasicCatalog();
   const surfaceGroup = new SurfaceGroupModel();
@@ -43,16 +43,13 @@ function mountSurface(
 
 describe("Renderer dataModel 响应式渲染", () => {
   it("深层 updateDataModel 会刷新绑定文本", async () => {
-    const { container, surface } = mountSurface(
-      { form: { name: "A" } },
-      [
-        {
-          id: "root",
-          component: "Text",
-          text: { path: "/form/name" },
-        },
-      ]
-    );
+    const { container, surface } = mountSurface({ form: { name: "A" } }, [
+      {
+        id: "root",
+        component: "Text",
+        text: { path: "/form/name" },
+      },
+    ]);
 
     await nextTick();
     expect(container.textContent).toContain("A");
@@ -66,10 +63,7 @@ describe("Renderer dataModel 响应式渲染", () => {
   it("动态 List 会用 item 作用域解析模板组件的相对路径", async () => {
     const { container, surface } = mountSurface(
       {
-        items: [
-          { title: "第一项" },
-          { title: "第二项" },
-        ],
+        items: [{ title: "第一项" }, { title: "第二项" }],
       },
       [
         {
@@ -82,7 +76,7 @@ describe("Renderer dataModel 响应式渲染", () => {
           component: "Text",
           text: { path: "title" },
         },
-      ]
+      ],
     );
 
     await nextTick();
@@ -110,7 +104,7 @@ describe("Renderer dataModel 响应式渲染", () => {
           component: "Text",
           text: { path: "title" },
         },
-      ]
+      ],
     );
 
     await nextTick();
@@ -154,7 +148,7 @@ describe("Renderer dataModel 响应式渲染", () => {
             },
           },
         },
-      ]
+      ],
     );
 
     await nextTick();
@@ -208,7 +202,7 @@ describe("Renderer dataModel 响应式渲染", () => {
             },
           },
         },
-      ]
+      ],
     );
 
     await nextTick();
@@ -234,5 +228,63 @@ describe("Renderer dataModel 响应式渲染", () => {
         },
       },
     });
+  });
+
+  it("TextField 的动态 text 字段会映射为 modelValue 并写回 dataModel", async () => {
+    const { container, surface } = mountSurface({ form: { name: "初始值" } }, [
+      {
+        id: "root",
+        component: "TextField",
+        label: "名称",
+        text: { path: "/form/name" },
+      },
+    ]);
+
+    await nextTick();
+    const input = container.querySelector("input");
+    expect(input?.value).toBe("初始值");
+
+    if (input) {
+      input.value = "已修改";
+      input.dispatchEvent(new Event("input"));
+    }
+    await nextTick();
+
+    expect(surface.dataModel.get("/form/name")).toBe("已修改");
+  });
+
+  it("Tabs 只渲染当前 active panel，并能通过标签切换", async () => {
+    const { container } = mountSurface({}, [
+      {
+        id: "root",
+        component: "Tabs",
+        tabItems: [
+          { key: "first", title: "第一", child: "firstPanel" },
+          { key: "second", title: "第二", child: "secondPanel" },
+        ],
+      },
+      {
+        id: "firstPanel",
+        component: "Text",
+        text: "第一面板",
+      },
+      {
+        id: "secondPanel",
+        component: "Text",
+        text: "第二面板",
+      },
+    ]);
+
+    await nextTick();
+    expect(container.textContent).toContain("第一面板");
+    expect(container.textContent).not.toContain("第二面板");
+
+    container
+      .querySelectorAll("button")[1]
+      ?.dispatchEvent(new MouseEvent("click"));
+    await nextTick();
+
+    expect(container.textContent).not.toContain("第一面板");
+    expect(container.textContent).toContain("第二面板");
   });
 });

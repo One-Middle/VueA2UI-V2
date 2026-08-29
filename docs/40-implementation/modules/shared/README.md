@@ -61,26 +61,27 @@ packages/shared/src/
 
 ## 6. 核心类型
 
-| 类型 / 常量                              | 位置                     | 作用                                                                   |
-| ---------------------------------------- | ------------------------ | ---------------------------------------------------------------------- |
-| `A2UI_VERSION`                           | `src/a2ui.ts`            | 当前协议版本常量，值为 `v0.9`。                                        |
-| `A2UIServerMessage`                      | `src/a2ui.ts`            | 后端传给 Renderer 的 server-to-client 消息联合。                       |
-| `A2UIClientMessage`                      | `src/a2ui.ts`            | Renderer 回传 action/error 的 client-to-server 消息联合。              |
-| `A2UIComponentActionDeclaration`         | `src/a2ui.ts`            | 组件 action 声明，包含 `event`、`script` 和未来保留的 `functionCall`。 |
-| `A2UIPropertyScriptDeclaration`          | `src/a2ui.ts`            | 组件属性脚本声明，包含 `code`、`deps` 和 `fallback`。                  |
-| `BASIC_CATALOG_COMPONENTS`               | `src/a2ui.ts`            | 当前 Basic Catalog 的 21 个组件名称。                                  |
-| `SurfaceSnapshotData`                    | `src/a2ui.ts`            | 后端持久化和前端恢复 Renderer 状态的数据结构。                         |
-| `SessionDto` / `MessageDto` / `SkillDto` | `src/api.ts`             | 前后端主要业务 DTO。                                                   |
-| `AgentRunDto` / `ToolCallDto`            | `src/api.ts`             | Runtime 面板和后端 run 记录使用的 DTO。                                |
-| `RuntimeConfigDto`                       | `src/api.ts`             | Runtime 配置展示 DTO。                                                 |
-| `ExportSessionDto`                       | `src/api.ts`             | 完整会话导出结构。                                                     |
-| `AgentRunInput`                          | `src/agent.ts`           | 后端注入给 Agent Runtime 的完整上下文输入。                            |
-| `AgentRunResult`                         | `src/agent.ts`           | Agent 返回结果，包含 `COMMITTED`、`TEXT_ONLY`、`FAILED`。              |
-| `ToolCallRecord`                         | `src/agent.ts`           | Agent 工具调用回调记录，后端会持久化为 tool call。                     |
-| `PlatformSseEvent`                       | `src/sse.ts`             | 后端推给前端的 SSE 事件联合类型。                                      |
-| `AgentTraceEventDto`                     | `src/api.ts`             | ReAct 循环单条实时 trace 事件，通过 `agent_trace_event` SSE 推送。     |
-| `AgentRunTraceSummaryDto`                | `src/api.ts`             | ReAct 循环持久化 trace 摘要，写入 `agent_runs.metadata.traceSummary`。 |
-| `ResourceLedgerSnapshot`                 | `src/resource-ledger.ts` | 跨 workflow task 共享的已披露资源快照（不含正文）。                    |
+| 类型 / 常量                              | 位置                                      | 作用                                                                                             |
+| ---------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `A2UI_VERSION`                           | `src/a2ui.ts`                             | 当前协议版本常量，值为 `v0.9`。                                                                  |
+| `A2UIServerMessage`                      | `src/a2ui.ts`                             | 后端传给 Renderer 的 server-to-client 消息联合。                                                 |
+| `A2UIClientMessage`                      | `src/a2ui.ts`                             | Renderer 回传 action/error 的 client-to-server 消息联合。                                        |
+| `A2UIComponentActionDeclaration`         | `src/a2ui.ts`                             | 组件 action 声明，包含 `event`、`script` 和未来保留的 `functionCall`。                           |
+| `A2UIPropertyScriptDeclaration`          | `src/a2ui.ts`                             | 组件属性脚本声明，包含 `code`、`deps` 和 `fallback`。                                            |
+| `BASIC_CATALOG_DEFINITION`               | `src/basic-catalog/catalog-definition.ts` | 当前正式 Basic Catalog 的组件、字段 schema、字段语义和 Renderer 映射单一事实源，不包含 `Modal`。 |
+| `BASIC_CATALOG_COMPONENTS`               | `src/basic-catalog/catalog-definition.ts` | 从 `BASIC_CATALOG_DEFINITION` 派生的当前正式 Basic Catalog 20 个组件名称。                       |
+| `SurfaceSnapshotData`                    | `src/a2ui.ts`                             | 后端持久化和前端恢复 Renderer 状态的数据结构。                                                   |
+| `SessionDto` / `MessageDto` / `SkillDto` | `src/api.ts`                              | 前后端主要业务 DTO。                                                                             |
+| `AgentRunDto` / `ToolCallDto`            | `src/api.ts`                              | Runtime 面板和后端 run 记录使用的 DTO。                                                          |
+| `RuntimeConfigDto`                       | `src/api.ts`                              | Runtime 配置展示 DTO。                                                                           |
+| `ExportSessionDto`                       | `src/api.ts`                              | 完整会话导出结构。                                                                               |
+| `AgentRunInput`                          | `src/agent.ts`                            | 后端注入给 Agent Runtime 的完整上下文输入。                                                      |
+| `AgentRunResult`                         | `src/agent.ts`                            | Agent 返回结果，包含 `COMMITTED`、`TEXT_ONLY`、`FAILED`。                                        |
+| `ToolCallRecord`                         | `src/agent.ts`                            | Agent 工具调用回调记录，后端会持久化为 tool call。                                               |
+| `PlatformSseEvent`                       | `src/sse.ts`                              | 后端推给前端的 SSE 事件联合类型。                                                                |
+| `AgentTraceEventDto`                     | `src/api.ts`                              | ReAct 循环单条实时 trace 事件，通过 `agent_trace_event` SSE 推送。                               |
+| `AgentRunTraceSummaryDto`                | `src/api.ts`                              | ReAct 循环持久化 trace 摘要，写入 `agent_runs.metadata.traceSummary`。                           |
+| `ResourceLedgerSnapshot`                 | `src/resource-ledger.ts`                  | 跨 workflow task 共享的已披露资源快照（不含正文）。                                              |
 
 Workflow 生命周期类型包含可继续中断状态：
 

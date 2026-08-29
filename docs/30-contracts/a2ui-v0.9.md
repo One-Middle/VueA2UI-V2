@@ -164,7 +164,7 @@ Frontend 负责监听并转发 Renderer action/error，Backend 负责记录，Ag
 
 ## 5. Basic Catalog
 
-当前 Basic Catalog 共 21 个组件（与 `packages/shared/src/a2ui.ts` 的 `BASIC_CATALOG_COMPONENTS` 一致）：
+当前正式 Basic Catalog 共 20 个组件（与 `packages/shared/src/basic-catalog/catalog-definition.ts` 的 `BASIC_CATALOG_DEFINITION` 一致）：
 
 - `Text`
 - `Image`
@@ -180,7 +180,6 @@ Frontend 负责监听并转发 Renderer action/error，Backend 负责记录，Ag
 - `List`
 - `Card`
 - `Tabs`
-- `Modal`
 - `Button`
 - `TextField`
 - `CheckBox`
@@ -191,16 +190,18 @@ Frontend 负责监听并转发 Renderer action/error，Backend 负责记录，Ag
 注意：
 
 - 本节说明 Basic Catalog 的协议层组件集合和字段校验来源。
+- `Modal` 不属于当前正式 Basic Catalog；旧 Renderer 源码可保留历史实现，但 Agent prompt 和 `validateA2UI` 不再暴露或放行它。
 - 字段通过校验只表示该字段是合法 A2UI 输入，不等于当前 Renderer 已完整消费该字段。
 - Renderer 对各字段的实际渲染支持程度见 [Renderer Basic Catalog 能力矩阵](../40-implementation/modules/renderer/basic-catalog-capabilities.md)。
 
-组件字段和校验约束由以下文件共同维护：
+组件字段、字段语义、普通组件映射和校验约束以 TypeScript Catalog Definition 为单一事实源：
 
+- `packages/shared/src/basic-catalog/catalog-definition.ts`
+- `packages/shared/src/basic-catalog/json-schema.ts`
 - `packages/shared/src/a2ui.ts`
 - `packages/agent/src/schemas/a2ui-v0.9-schema.json`
-- `packages/agent/src/schemas/basic-catalog-schema.json`
 - `packages/agent/src/tools/catalog-schema.ts`
-- `packages/renderer/src/catalog-registry.ts`
+- `packages/renderer/src/render/*`
 
 ## 6. Agent 输出约束
 
@@ -251,4 +252,3 @@ Workflow 路径中，`getCatalogComponentDetails` 披露的组件字段约束属
 - 新增组件时，必须同步 shared 类型、Agent schema、Catalog schema、Renderer 注册和本文档。
 - 修改消息结构时，必须同步 API/SSE 契约和 Agent 校验逻辑。
 - Renderer 可为历史数据做兼容，但正式新事件必须通过当前契约校验。
-

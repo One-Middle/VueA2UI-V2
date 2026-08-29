@@ -34,9 +34,7 @@ export type {
   RunActionScriptInput,
   RunPropertyScriptInput,
 } from "./core/js-runtime";
-export {
-  ComponentContextImpl,
-} from "./core/component-context";
+export { ComponentContextImpl } from "./core/component-context";
 export type {
   ComponentContext,
   ComponentRenderInfo,
@@ -50,6 +48,23 @@ export {
   catalogRegistry,
 } from "./core/catalog";
 export { registerBasicCatalog } from "./components/index";
+
+// ─── 新 Renderer 中间层 ─────────────────────────────────────
+export { buildRenderNode, buildRenderTree } from "./render/build-render-node";
+export { RenderDependencyCollector } from "./render/dependency-collector";
+export { renderVueNode } from "./render/vue-renderer";
+export type {
+  BuildRenderTreeResult,
+  RenderEventIntent,
+  RenderNode,
+  RenderNodeMeta,
+  RenderPanelSlot,
+  RenderSlotValue,
+} from "./render/render-node";
+export type { RenderContext } from "./render/render-context";
+
+// ─── 普通 Basic UI 组件 ─────────────────────────────────────
+export * from "./ui/basic";
 
 // ─── Vue 组件 ───────────────────────────────────────────────
 export { default as A2uiSurface } from "./vue/A2uiSurface.vue";

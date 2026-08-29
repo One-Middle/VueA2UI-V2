@@ -68,11 +68,44 @@ packages/renderer/src/
       implementations/
         function-js-runtime.ts
         ses-js-runtime.ts
+  render/
+    build-render-node.ts
+    dependency-collector.ts
+    render-context.ts
+    render-node.ts
+    resolve-action-bindings.ts
+    resolve-dynamic.ts
+    resolve-model-bindings.ts
+    resolve-props.ts
+    resolve-slots.ts
+    resolve-style.ts
+    vue-renderer.ts
   vue/
-    A2uiComponent.vue
     A2uiSurface.vue
-    context.ts
+    RenderRoot.ts
     __tests__/
+  ui/
+    basic/
+      AudioPlayer.vue
+      Button.vue
+      Card.vue
+      CheckBox.vue
+      ChoicePicker.vue
+      Column.vue
+      Container.vue
+      DateTimeInput.vue
+      Divider.vue
+      Grid.vue
+      Icon.vue
+      Image.vue
+      List.vue
+      Row.vue
+      Slider.vue
+      Spacer.vue
+      Tabs.vue
+      Text.vue
+      TextField.vue
+      Video.vue
   components/
     index.ts
     basic/
@@ -101,26 +134,34 @@ packages/renderer/src/
       __tests__/
 ```
 
+`components/basic/*.vue` 和 `vue/A2uiComponent.vue` 是 legacy Basic 链路保留文件，用作历史参考和旧测试覆盖；新的 `A2uiSurface.vue` 不再通过它们递归渲染。
+
 ## 5. 关键文件职责
 
-| 文件 / 目录 | 作用 |
-| --- | --- |
-| `src/index.ts` | 包导出入口，暴露核心模型、消息处理器、action 工具、JSRuntime API、Catalog 注册和 Vue 组件。 |
-| `src/core/message-processor.ts` | A2UI server messages 消费入口，只接受 `version === "v0.9"`。 |
-| `src/core/surface-model.ts` | `SurfaceGroupModel` 和 `SurfaceModel`，管理 surface、组件集合和 dataModel。 |
-| `src/core/component-model.ts` | 保存组件类型、原始属性和 children 引用。 |
-| `src/core/data-model.ts` | JSON Pointer 数据读写和订阅通知。 |
-| `src/core/data-context.ts` | 渲染时数据读取、写入、相对路径解析和子作用域。 |
-| `src/core/dynamic-value.ts` | 解析 `{ path }` 和脚本动态值。 |
-| `src/core/action.ts` | 解析 `action.event`、`action.script`、`action.functionCall`，并创建标准 action message。 |
-| `src/core/component-context.ts` | 组件渲染上下文，封装 action/error 派发和动态值解析能力。 |
-| `src/core/js-runtime.ts` | JSRuntime 兼容导出。 |
-| `src/core/js-runtime/` | 受限脚本运行时，包含 AST guard、JSON 校验、配置、SES 和 `new Function` 两种实现。 |
-| `src/vue/A2uiSurface.vue` | 单个 surface 的 Vue 渲染入口。 |
-| `src/vue/A2uiComponent.vue` | 递归渲染组件模型，处理 unknown component fallback 和 action/error 派发。 |
-| `src/catalog-registry.ts` | 注册 Basic Catalog 组件类型到 Vue 组件映射。 |
-| `src/components/basic/*.vue` | Basic Catalog 组件实现。 |
-| `src/components/basic/visual-props.ts` | 通用受控视觉属性解析。 |
+| 文件 / 目录                            | 作用                                                                                                            |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `src/index.ts`                         | 包导出入口，暴露核心模型、消息处理器、action 工具、JSRuntime API、新 Renderer 中间层、普通 UI 组件和 Vue 组件。 |
+| `src/core/message-processor.ts`        | A2UI server messages 消费入口，只接受 `version === "v0.9"`。                                                    |
+| `src/core/surface-model.ts`            | `SurfaceGroupModel` 和 `SurfaceModel`，管理 surface、组件集合和 dataModel。                                     |
+| `src/core/component-model.ts`          | 保存组件类型、原始属性和 children 引用。                                                                        |
+| `src/core/data-model.ts`               | JSON Pointer 数据读写和订阅通知。                                                                               |
+| `src/core/data-context.ts`             | 渲染时数据读取、写入、相对路径解析和子作用域。                                                                  |
+| `src/core/dynamic-value.ts`            | 解析 `{ path }` 和脚本动态值。                                                                                  |
+| `src/core/action.ts`                   | 解析 `action.event`、`action.script`、`action.functionCall`，并创建标准 action message。                        |
+| `src/core/component-context.ts`        | legacy Basic 组件渲染上下文；新链路不通过 provide/inject 向普通 UI 组件注入 A2UI context。                      |
+| `src/core/js-runtime.ts`               | JSRuntime 兼容导出。                                                                                            |
+| `src/core/js-runtime/`                 | 受限脚本运行时，包含 AST guard、JSON 校验、配置、SES 和 `new Function` 两种实现。                               |
+| `src/render/render-node.ts`            | Renderer 内部渲染模型，保存普通组件类型、props、事件意图、slots、依赖调试 meta。                                |
+| `src/render/build-render-node.ts`      | 将 `ComponentModel` 和 dataModel 作用域解析为 RenderNode tree。                                                 |
+| `src/render/resolve-*.ts`              | 通用解析器：处理动态值、普通 props、model binding、action binding、slots 和受控 style。                         |
+| `src/render/dependency-collector.ts`   | 收集 `{ path }`、属性脚本 deps、List path 等 dataModel 依赖，并输出排序去重后的订阅列表。                       |
+| `src/render/vue-renderer.ts`           | 将 RenderNode 翻译为 Vue VNode，并把事件意图转换成普通 Vue event handler。                                      |
+| `src/vue/A2uiSurface.vue`              | 单个 surface 的 Vue 渲染入口，构建 RenderNode tree、同步依赖订阅并挂载 RenderRoot。                             |
+| `src/vue/RenderRoot.ts`                | RenderNode 到 Vue VNode 的轻量根组件。                                                                          |
+| `src/ui/basic/*.vue`                   | 不感知 A2UI 的普通 Basic UI 组件，只接收普通 props、slot 和 Vue 事件。                                          |
+| `src/catalog-registry.ts`              | legacy Basic 组件注册表。新渲染链路不依赖它。                                                                   |
+| `src/components/basic/*.vue`           | legacy Basic 组件实现，保留作参考。                                                                             |
+| `src/components/basic/visual-props.ts` | legacy 受控视觉属性解析；新链路使用 `src/render/resolve-style.ts`。                                             |
 
 ## 6. 公共 API
 
@@ -130,7 +171,9 @@ packages/renderer/src/
 - action 工具：`createActionMessage`、`resolveActionContext`、`resolveComponentAction`。
 - JSRuntime：`initializeJsRuntime`、`isActionScriptDeclaration`、`isPropertyScriptValue`、`runActionScript`、`runPropertyScript`。
 - 组件上下文：`ComponentContextImpl` 及相关类型。
-- Catalog：`getCatalogComponent`、`getLoadedCatalogComponent`、`isCatalogComponent`、`catalogRegistry`、`registerBasicCatalog`。
+- Catalog：legacy `getCatalogComponent`、`getLoadedCatalogComponent`、`isCatalogComponent`、`catalogRegistry`、`registerBasicCatalog`。
+- 新 Renderer 中间层：`buildRenderTree`、`buildRenderNode`、`RenderDependencyCollector`、`renderVueNode` 和 RenderNode 相关类型。
+- 普通 Basic UI 组件：`ui/basic` 导出的 20 个正式组件。
 - Vue 组件：`A2uiSurface`。
 
 ## 7. 消息处理流程
@@ -142,13 +185,14 @@ packages/renderer/src/
 5. `updateComponents` 增量更新组件集合；目标 surface 不存在时忽略并记录 warning。
 6. `updateDataModel` 按 JSON Pointer 写入数据；目标 surface 不存在时忽略并记录 warning。
 7. `deleteSurface` 删除指定 surface。
-8. `A2uiSurface` 和 `A2uiComponent` 读取模型并渲染组件树。
+8. `A2uiSurface` 读取模型并构建 RenderNode tree。
+9. `RenderRoot` 调用 `renderVueNode`，将 RenderNode tree 渲染为普通 Vue Basic UI 组件。
 
 ## 8. 数据与交互能力
 
-- `{ path: "/some/value" }` 会从当前 `DataContext` 读取 dataModel。
-- `List` 可用 `{ path, componentId }` 遍历数组，并为每个 item 创建相对路径作用域。
-- 表单类组件在绑定值为 `{ path }` 时可写回 dataModel。
+- `{ path: "/some/value" }` 由 RenderNode builder 从当前 `DataContext` 读取 dataModel，并记录订阅依赖。
+- `List` 可用 `{ path, componentId }` 遍历数组，并由 `resolveSlots` 为每个 item 创建相对路径作用域。
+- 表单类组件在绑定值为 `{ path }` 时，由 `resolveModelBindings` 转为 `modelValue + update:modelValue`，Vue renderer 写回 dataModel。
 - 属性脚本使用 `{ script: { code, deps, fallback } }`，只注入 `dataModel.get`；`deps` 和 `dataModel.get(path)` 都按当前 `DataContext` 解析路径。
 - `action.script` 可读写当前 surface 的 dataModel，并通过 `actions.emit` 派发标准 action；`dataModel.get/set(path)` 同样支持当前组件作用域下的相对路径。
 - 默认脚本执行路径是 `new Function` + AST guard；SES `Compartment` 实现保留在配置中可切换。
@@ -156,9 +200,11 @@ packages/renderer/src/
 
 ## 9. Basic Catalog
 
-当前已注册 21 个 Basic Catalog 组件：
+当前正式 Basic Catalog 包含 20 个普通 UI 组件：
 
-`Text`、`Image`、`Icon`、`Video`、`AudioPlayer`、`Divider`、`Row`、`Column`、`Grid`、`Container`、`Spacer`、`List`、`Card`、`Tabs`、`Modal`、`Button`、`TextField`、`CheckBox`、`ChoicePicker`、`Slider`、`DateTimeInput`。
+`Text`、`Image`、`Icon`、`Video`、`AudioPlayer`、`Divider`、`Row`、`Column`、`Grid`、`Container`、`Spacer`、`List`、`Card`、`Tabs`、`Button`、`TextField`、`CheckBox`、`ChoicePicker`、`Slider`、`DateTimeInput`。
+
+`Modal` 不进入新的正式组件库和新 Renderer 链路；旧 `ModalComponent.vue` 文件保留为 legacy 参考。
 
 各组件字段消费状态、通用视觉属性支持范围和已知缺口维护在 [Renderer Basic Catalog 能力矩阵](./basic-catalog-capabilities.md)。
 
@@ -176,7 +222,7 @@ packages/renderer/src/
 
 ## 11. 维护规则
 
-- 新增 Basic 组件时，同步更新 `catalog-registry.ts`、Agent schema、Shared 类型、A2UI 契约和能力矩阵。
+- 新增 Basic 组件时，同步更新 `packages/shared/src/basic-catalog/catalog-definition.ts`、普通 UI 组件、Renderer resolver 或 slot rule、A2UI 契约和能力矩阵。
 - 修改消息处理逻辑时，同步更新 A2UI 契约和 Integration 文档。
 - 修改脚本运行时能力时，同步更新 Agent schema、A2UI 契约、安全说明和相关测试。
 - 修改通用视觉属性时，同步更新 `visual-props.ts`、`styles.css`、能力矩阵和组件测试。
@@ -187,5 +233,3 @@ packages/renderer/src/
 - [Shared 类型契约](../../../30-contracts/shared-types.md)
 - [Integration 模块说明](../integration/README.md)
 - [Renderer Basic Catalog 能力矩阵](./basic-catalog-capabilities.md)
-
-

@@ -17,8 +17,8 @@ import type {
   ValidateA2UIResult,
   ValidationIssue,
 } from "@a2ui-platform/shared";
+import { getBasicCatalogJsonSchema } from "@a2ui-platform/shared";
 import a2uiSchema from "../schemas/a2ui-v0.9-schema.json" with { type: "json" };
-import catalogSchema from "../schemas/basic-catalog-schema.json" with { type: "json" };
 import { logger } from "../logger.js";
 
 /** Ajv 实例（懒加载单例） */
@@ -145,6 +145,7 @@ function validateComponentProperties(
   errors: ValidationIssue[],
 ): void {
   const ajv = getAjv();
+  const catalogSchema = getBasicCatalogJsonSchema();
   const catalogDefs = (catalogSchema as { $defs?: Record<string, unknown> })
     .$defs;
   const componentDefs = (
@@ -271,7 +272,15 @@ function validateChildReferences(
       const compId = comp["id"];
 
       if ("child" in comp) {
-        validateChildRef(comp["child"], knownIds, errors, i, ci, compId, surfaceId);
+        validateChildRef(
+          comp["child"],
+          knownIds,
+          errors,
+          i,
+          ci,
+          compId,
+          surfaceId,
+        );
       }
 
       if (Array.isArray(comp["children"])) {
@@ -432,7 +441,10 @@ function validateSafetyConstraints(
   }
 }
 
-function findUnsafeContent(value: unknown, path = ""): { path: string; match: string } | null {
+function findUnsafeContent(
+  value: unknown,
+  path = "",
+): { path: string; match: string } | null {
   if (typeof value === "string") {
     for (const pattern of UNSAFE_STRING_PATTERNS) {
       const match = pattern.exec(value);

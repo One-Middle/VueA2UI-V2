@@ -13,6 +13,24 @@ Agent 与 UI renderer 之间传递界面结构、数据模型和交互意图的�
 **Basic Catalog**:
 A2UI renderer 支持的一组基础组件能力集合。
 
+**Basic Catalog Definition**:
+Basic Catalog 的单一 TypeScript 事实源，描述当前正式支持的组件集合、字段 schema、字段语义以及字段到普通组件 props/events/slots 的映射。它同时约束 Agent 可生成内容、Validator 可通过内容、Renderer 可渲染内容和 Docs 应记录内容。
+
+**Plain UI Component**:
+不感知 A2UI 协议的普通 Vue 组件。它只接收 Vue props、Vue slots，并 emit 普通事件；不得依赖 `ComponentModel`、`DataContext`、`componentContextKey`、`A2uiComponent`、A2UI `action` 或 `{ path }` binding。
+
+**RenderNode**:
+Renderer 内部的 A2UI 协议解析结果，用于连接 `ComponentModel` 和 Vue VNode。RenderNode 不是公开协议，也不是跨端 UI DSL；它记录普通组件类型、props、事件意图、内容区域和最小 meta。
+
+**RenderNode Meta**:
+RenderNode 上用于 Renderer 内部诊断和协议处理的最小上下文，包含 `surfaceId`、`componentId` 和 `basePath`。Meta 不透传给普通 UI 组件。
+
+**RenderNode Slot**:
+RenderNode 内部的内容区域模型，不等同于 Vue runtime slot。Vue renderer 负责把 RenderNode slot 翻译成真实 Vue slot，例如 default 内容、Tabs panels 内容或其他结构化内容区域。
+
+**Dependency-collected Tree Rebuild**:
+Renderer 构建 RenderNode tree 时收集实际读取的 dataModel 路径和 script deps，并在 surface 层订阅这些路径；依赖变化后重建整棵 RenderNode tree。它用细粒度依赖控制刷新触发，但不在第一版引入每节点独立生命周期。
+
 **Agent Runtime**:
 受控执行 Agent 推理、工具调用、解析、校验和结果返回的运行层。它不直接访问数据库，也不直接提交正式 A2UI 状态。
 
