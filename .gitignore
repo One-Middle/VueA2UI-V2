@@ -2,6 +2,9 @@ node_modules/
 dist/
 coverage/
 logs/
+.claude/
+.codex/
+.tmp-renderer-test/
 .env
 .env.local
 .env.*.local
