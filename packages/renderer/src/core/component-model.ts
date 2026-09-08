@@ -1,10 +1,9 @@
 /**
- * ComponentModel 类：单个 A2UI 组件的响应式模型。
+ * ComponentModel 类：单个 A2UI 组件模型。
  *
  * 提供对组件原始属性的访问，以及 children 中静态/动态子引用的解析。
  */
 
-import { reactive } from "vue";
 import type { A2UIComponent, JsonValue } from "@a2ui-platform/shared";
 
 export class ComponentModel {
@@ -21,7 +20,7 @@ export class ComponentModel {
     const { id, component, ...props } = raw;
     this.id = id;
     this._componentType = component;
-    this._raw = reactive({ ...props }) as Record<string, unknown>;
+    this._raw = { ...props };
   }
 
   // ─── 属性 ─────────────────────────────────────────────────

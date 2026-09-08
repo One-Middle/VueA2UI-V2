@@ -4,6 +4,8 @@
 
 本文档是项目内 A2UI v0.9 协议、消息顺序和 Basic Catalog 使用约束的唯一权威入口。
 
+A2UI 协议不绑定任何前端框架。Renderer 的目标实现边界是消费本契约定义的消息和 Basic Catalog，在浏览器中维护 surface/dataModel 状态并渲染交互 DOM；Vue、React 或其他宿主框架不是协议的一部分。
+
 历史参考资料已归档：
 
 - `docs/90-notes/archive/renderer/a2ui-protocol-notes.md`

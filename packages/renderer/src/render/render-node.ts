@@ -5,7 +5,7 @@
  * - 描述 A2UI ComponentModel 解析后的普通组件树
  * - 保存普通 props、事件意图、内容区域和最小诊断 meta
  *
- * 不负责：创建 Vue VNode、执行事件意图或管理 DataModel 订阅。
+ * 不负责：创建 DOM 节点、执行事件意图或管理 DataModel 订阅。
  */
 
 import type { JsonObject } from "@a2ui-platform/shared";

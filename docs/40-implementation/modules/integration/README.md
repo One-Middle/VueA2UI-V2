@@ -53,7 +53,7 @@ MessageInput
   -> submit_decision(confirm) -> commitExactCandidate()
   -> Backend 在同一事务创建 assistant message + A2UI event + current surface snapshot，完成 workflow
   -> SSE assistant_message / a2ui_messages / surface_snapshot / workflow_completed
-  -> workspace store -> renderer store -> PreviewPanel MessageProcessor -> A2uiSurface 渲染
+  -> workspace store -> renderer store -> PreviewPanel MessageProcessor -> DomSurfaceHost 渲染
 ```
 
 普通非 workflow 消息路径：
@@ -70,7 +70,7 @@ MessageInput
   -> AgentRunService.commitRun()
   -> message + A2UI event + current snapshot
   -> SSE assistant_message / a2ui_messages / surface_snapshot / agent_run_completed
-  -> workspace store -> renderer store -> PreviewPanel MessageProcessor -> A2uiSurface 渲染
+  -> workspace store -> renderer store -> PreviewPanel MessageProcessor -> DomSurfaceHost 渲染
 ```
 
 ## 4. TEXT_ONLY 路径
@@ -160,7 +160,8 @@ Workflow 普通消息续跑：
 ### Frontend -> Renderer
 
 - Frontend 只向 Renderer 输入后端 committed A2UI messages 或由 current snapshot 还原的 messages。
-- Renderer 内部的 `SurfaceGroupModel` 只在 `PreviewPanel.vue` 内部存在。
+- Renderer 内部的 `SurfaceGroupModel` 和 DOM surface handles 只在 `PreviewPanel.vue` 内部存在。
+- `PreviewPanel.vue` 只提供挂载容器并调用 `mountA2uiSurface()` / `unmount()`，不重新解释 A2UI 协议。
 - 历史恢复使用 current snapshot 还原，不依赖前端重新回放全部历史 events。
 
 ### Renderer -> Backend

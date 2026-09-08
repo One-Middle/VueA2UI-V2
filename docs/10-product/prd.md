@@ -6,7 +6,7 @@
 
 ## 2. 解决方案
 
-构建一个面向单用户的全栈 Agent 无代码 A2UI 创作平台。用户通过对话或上传 `.txt` 文件描述 UI 需求，后端中的受控 Agent Runtime 在固定 Basic Catalog 约束内生成 A2UI v0.9 消息，并在提交前完成校验和修复；前端使用 Vue3 Renderer 实时渲染合法 UI。
+构建一个面向单用户的全栈 Agent 无代码 A2UI 创作平台。用户通过对话或上传 `.txt` 文件描述 UI 需求，后端中的受控 Agent Runtime 在固定 Basic Catalog 约束内生成 A2UI v0.9 消息，并在提交前完成校验和修复；前端通过框架无关的 A2UI Renderer 实时渲染合法 UI。
 
 ## 3. 用户角色
 

@@ -2,40 +2,40 @@
  * DataModel 响应式回归测试。
  *
  * 职责：
- * - 验证 JSON Pointer 深层写入能进入 Vue 响应式系统
+ * - 验证 JSON Pointer 深层写入能触发显式路径订阅
  * - 验证根替换、自动创建路径和路径订阅的关键边界
  *
- * 不负责：组件渲染和 DOM 行为，这部分由 Vue 组件测试覆盖。
+ * 不负责：组件渲染和 DOM 行为。
  */
 
-import { computed, nextTick } from "vue";
 import { describe, expect, it } from "vitest";
 import { DataContext } from "../data-context";
 import { DataModel } from "../data-model";
 
 describe("DataModel", () => {
-  it("深层路径更新会触发 Vue computed 重新计算", async () => {
+  it("深层路径更新会触发路径订阅并让 DataContext 读到新值", () => {
     const dataModel = new DataModel({ form: { name: "A" } });
     const dataContext = new DataContext(dataModel);
-    const name = computed(() => dataContext.resolve({ path: "/form/name" }));
+    let changes = 0;
+    dataModel.subscribe("/form/name", () => {
+      changes++;
+    });
 
-    expect(name.value).toBe("A");
+    expect(dataContext.resolve({ path: "/form/name" })).toBe("A");
 
     dataModel.set("/form/name", "B");
-    await nextTick();
 
-    expect(name.value).toBe("B");
+    expect(changes).toBe(1);
+    expect(dataContext.resolve({ path: "/form/name" })).toBe("B");
   });
 
-  it("根节点替换后旧 DataContext 仍能读取新数据", async () => {
+  it("根节点替换后旧 DataContext 仍能读取新数据", () => {
     const dataModel = new DataModel({ title: "旧标题" });
     const dataContext = new DataContext(dataModel);
-    const title = computed(() => dataContext.resolve({ path: "/title" }));
 
     dataModel.set("/", { title: "新标题" });
-    await nextTick();
 
-    expect(title.value).toBe("新标题");
+    expect(dataContext.resolve({ path: "/title" })).toBe("新标题");
   });
 
   it("根节点不是对象时，深层写入会自动创建对象路径", () => {

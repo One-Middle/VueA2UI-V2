@@ -5,7 +5,7 @@
  * - 根据 Catalog slot rule 解析 child/children/List/Tabs 结构字段
  * - 将 A2UI componentId 引用递归构建为 RenderNode 内容区域
  *
- * 不负责：创建 Vue runtime slots 或让普通 UI 组件读取 A2UI 结构字段。
+ * 不负责：创建宿主框架 runtime slots 或让普通 UI 组件读取 A2UI 结构字段。
  */
 
 import type { BasicCatalogComponentDefinition } from "@a2ui-platform/shared";

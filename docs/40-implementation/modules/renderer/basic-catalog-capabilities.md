@@ -30,8 +30,8 @@ Renderer 只接受 `version === "v0.9"` 的服务端消息。已支持的消息�
 | ------------------ | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
 | `createSurface`    | 创建或更新一个 `SurfaceModel`，记录 `surfaceId`、`catalogId`。               | 当前只声明 surface 与 Catalog 的绑定关系。                                           |
 | `updateDataModel`  | 按 JSON Pointer 路径写入数据，支持替换根数据、写入对象路径和数组下标路径。   | `path` 为空、未提供或为 `/` 时替换整个 dataModel；深层路径会自动创建中间对象或数组。 |
-| `updateComponents` | 增量更新组件集合，新增、更新或删除 surface 内的组件，并触发 Vue 响应式渲染。 | 组件 `id` 不变且 `component` 类型不变时更新属性；类型变化时重建组件模型。            |
-| `deleteSurface`    | 删除指定 surface，清理组件集合和 dataModel 订阅。                            | 删除后对应 `A2uiSurface` 会显示 surface 缺失状态。                                   |
+| `updateComponents` | 增量更新组件集合，新增、更新或删除 surface 内的组件，并通过显式订阅触发 DOM 重渲染。 | 组件 `id` 不变且 `component` 类型不变时更新属性；类型变化时重建组件模型。            |
+| `deleteSurface`    | 删除指定 surface，清理组件集合和 dataModel 订阅。                                | 删除后对应 DOM surface host 会显示 surface 缺失状态。                                |
 
 消息处理结果会返回本次接受的消息数和涉及的 `surfaceIds`。目标 surface 不存在的 `updateComponents`、`updateDataModel` 会被忽略并记录 warning。
 
@@ -39,8 +39,8 @@ Renderer 只接受 `version === "v0.9"` 的服务端消息。已支持的消息�
 
 Renderer 当前按以下规则渲染 A2UI surface：
 
-- 每个 surface 由 `A2uiSurface.vue` 承载，必须存在 `id: "root"` 的根组件才会进入正常渲染。
-- 单个组件先由 RenderNode builder 解析 A2UI 字段语义，再由 `renderVueNode` 映射到 `src/ui/basic` 普通 Vue 组件。
+- 每个 surface 由 `DomSurfaceHost` 承载，必须存在 `id: "root"` 的根组件才会进入正常渲染。
+- 单个组件先由 RenderNode builder 解析 A2UI 字段语义，再由 `renderDomNode` 映射到 `src/ui/dom-basic` 普通 DOM 组件。
 - 未找到组件实例时显示“组件未找到”，组件类型未注册时显示“未注册的组件类型”。
 - 正式 Basic Catalog 的 20 个组件：`Text`、`Image`、`Icon`、`Video`、`AudioPlayer`、`Divider`、`Row`、`Column`、`Grid`、`Container`、`Spacer`、`List`、`Card`、`Tabs`、`Button`、`TextField`、`CheckBox`、`ChoicePicker`、`Slider`、`DateTimeInput`。
 - `Modal` 不属于新正式 Basic Catalog；legacy 源文件保留但新 Renderer 链路不依赖它。
@@ -53,7 +53,7 @@ Renderer 当前支持基于 JSON Pointer 的数据模型能力：
 | A2UI 信息                                               | 当前功能                                                                                                                                                                                                                                           | 典型用途                                                                                          |
 | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
 | `updateDataModel.path` + `value`                        | 写入或替换数据模型中的指定路径。                                                                                                                                                                                                                   | 初始化表单值、列表数据、状态值。                                                                  |
-| `{ "path": "/some/value" }` 动态引用                    | 组件属性中只有 `path` 一个字段的对象会被解析为 dataModel 取值，根替换和深层路径更新都会触发 Vue 响应式刷新；路径由当前 `DataContext` 解析，支持绝对路径和相对路径。                                                                                | `Text.text`、`Image.url`、`Button.action.context`、表单 `value/text` 等动态绑定。                 |
+| `{ "path": "/some/value" }` 动态引用                    | 组件属性中只有 `path` 一个字段的对象会被解析为 dataModel 取值，根替换和深层路径更新都会通过显式订阅触发 DOM 重渲染；路径由当前 `DataContext` 解析，支持绝对路径和相对路径。                                                                            | `Text.text`、`Image.url`、`Button.action.context`、表单 `value/text` 等动态绑定。                 |
 | `{ "script": { "code", "deps", "fallback" } }` 属性脚本 | 组件属性可通过 JSRuntime 只读访问 `dataModel.get` 并返回 JSON-compatible 值；默认执行路径为 `new Function` + AST guard，SES `Compartment` 路径可配置切换；`deps` 变化会触发重新执行；`deps` 和 `dataModel.get(path)` 都按当前 `DataContext` 解析。 | `Text.text`、已接入通用视觉属性的 `style.<白名单字段>`。                                          |
 | 相对路径上下文                                          | `DataContext` 支持绝对路径和相对路径拼接，递归渲染时会向子组件传递当前 dataModel 作用域。                                                                                                                                                          | 动态列表模板、嵌套容器内的相对路径绑定。                                                          |
 | 表单类组件写回                                          | 部分输入组件在绑定值为 `{ path }` 时，会把用户输入写回 dataModel。                                                                                                                                                                                 | `TextField.text`、`CheckBox.value`、`ChoicePicker.value`、`Slider.value`、`DateTimeInput.value`。 |
@@ -72,11 +72,11 @@ Renderer 当前支持基于 JSON Pointer 的数据模型能力：
 | 基础布局       | 水平/垂直 flex 布局、二维栅格、页面容器、受控空隙、间距、换行、对齐、分布、卡片包裹、静态列表和基础标签页。                                                           | `Row`、`Column`、`Grid`、`Container`、`Spacer`、`Card`、`List`、`Tabs`、`Divider` |
 | 表单输入       | 文本输入、长文本、数字输入、密码输入、复选框、下拉选择、滑块、日期/时间/日期时间输入，并可写回 dataModel。                                                            | `TextField`、`CheckBox`、`ChoicePicker`、`Slider`、`DateTimeInput`                |
 | 用户操作       | 按钮点击后派发 `a2ui:action` 浏览器事件，事件 detail 为标准 A2UI client message，包含 `version` 和 `action`；`action.script` 可通过注入的 `actions.emit` 复用该链路。 | `Button`                                                                          |
-| 视觉样式       | 受控 `style` 白名单、`variant`、`size`、`tone`、`preset` 修饰类，形成按钮、卡片、文本、布局等基础视觉变化。                                                           | 已接入 `visual-props.ts` 的组件                                                   |
+| 视觉样式       | 受控 `style` 白名单、`variant`、`size`、`tone`、`preset` 修饰类，形成按钮、卡片、文本、布局等基础视觉变化。                                                           | `resolve-style.ts` + `src/ui/dom-basic`                                          |
 
 ### 3.5 支持的 action 类型与实现原理
 
-当前 Renderer 只有 `Button` 会消费组件声明中的 `action` 字段。action 解析由 `packages/renderer/src/core/action.ts` 和 `packages/renderer/src/render/resolve-action-bindings.ts` 负责，点击派发由 `packages/renderer/src/render/vue-renderer.ts` 转成普通 Vue `click` handler 完成。
+当前 Renderer 只有 `Button` 会消费组件声明中的 `action` 字段。action 解析由 `packages/renderer/src/core/action.ts` 和 `packages/renderer/src/render/resolve-action-bindings.ts` 负责，点击派发由 `packages/renderer/src/render/dom-renderer.ts` 转成普通 DOM `click` handler 完成。
 
 | action 声明类型                                 | 示例                                                                                                                                                                                                   | 当前行为                                                                                                                                                                                                                                                                      |
 | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -92,7 +92,7 @@ Renderer 当前支持基于 JSON Pointer 的数据模型能力：
 3. 点击按钮时，如果按钮处于 `disabled` 或 `loading` 状态，直接中止，不派发 action。
 4. 解析结果为 `kind: "event"` 时直接派发；解析结果为 `kind: "script"` 时执行受限脚本；`functionCall` 当前被明确跳过。
 5. `resolveActionContext` 会逐项解析 `context` 中的 `{ path }` 动态引用，得到点击时刻的 dataModel 值；解析结果为 `undefined` 的字段会被丢弃。
-6. `A2uiSurface.vue` 通过 `createActionMessage` 组装标准回传消息，并在 `window` 上派发 `CustomEvent("a2ui:action")`。`action.script` 中的 `actions.emit` 也复用该派发能力。
+6. `DomSurfaceHost` 通过 `createActionMessage` 组装标准回传消息，并从 mount container 派发可冒泡的 `CustomEvent("a2ui:action")`。`action.script` 中的 `actions.emit` 也复用该派发能力。
 
 派发出的事件 detail 结构为：
 
@@ -136,7 +136,7 @@ Renderer 支持只读属性脚本：
 - `deps` 必填，Renderer 会先按当前 `DataContext` 把相对或绝对路径规整为绝对 JSON Pointer，再通过 `DataModel.subscribe` 建立最小订阅，依赖变化后触发组件属性重新计算。
 - 属性脚本中的 `dataModel.get(path)` 与 `deps` 使用同一套路径规则；List item 内 `dataModel.get("done")` 会读取当前 item 的 `done`。
 - 属性脚本必须显式 `return` JSON-compatible 值；异常时使用 `fallback` 并派发 `a2ui:error`。
-- 样式脚本第一版只支持 `style.<白名单字段>.script`，解析结果仍经过 `visual-props.ts` 白名单。
+- 样式脚本第一版只支持 `style.<白名单字段>.script`，解析结果仍经过 `resolve-style.ts` 白名单。
 
 ### 3.7 当前不支持的信息
 
@@ -149,13 +149,13 @@ Renderer 支持只读属性脚本：
 
 ## 4. 通用视觉属性
 
-Renderer 新链路已提供通用视觉属性解析工具：`packages/renderer/src/render/resolve-style.ts`。legacy 组件仍保留 `packages/renderer/src/components/basic/visual-props.ts`。
+Renderer 新链路已提供通用视觉属性解析工具：`packages/renderer/src/render/resolve-style.ts`，DOM Basic UI 组件统一消费解析后的 class 和 inline style。
 
 已支持的通用字段：
 
 | 字段      | 当前行为                                            |
 | --------- | --------------------------------------------------- |
-| `style`   | 解析受控白名单字段并绑定为 Vue `style`。            |
+| `style`   | 解析受控白名单字段并应用为 DOM inline style。       |
 | `variant` | 转换为 `a2ui-<component>--variant-<value>` 修饰类。 |
 | `size`    | 转换为 `a2ui-<component>--size-<value>` 修饰类。    |
 | `tone`    | 转换为 `a2ui-<component>--tone-<value>` 修饰类。    |
@@ -192,9 +192,9 @@ Renderer 新链路已提供通用视觉属性解析工具：`packages/renderer/s
 | `Container`     | 部分完整 | `child`、`width`、`padding`、`align`、通用视觉字段                                                                                                                      | 无动态子项遍历。                                                                                                              |
 | `Spacer`        | 基础     | `axis`、`size`、`flex`                                                                                                                                                  | 未接入通用视觉字段。                                                                                                          |
 | `List`          | 部分完整 | 静态 `children`、动态 `{ path, componentId }`、动态 item 相对路径作用域、`direction`、`marker`、`gap`、`divided/dividers`、`wrap`、`loading`、`emptyText`、通用视觉字段 | 选择态仍主要是视觉类。                                                                                                        |
-| `Card`          | 部分完整 | `child`、兼容 `children`、`title`、通用视觉字段                                                                                                                         | `variant/preset` 只有部分默认样式。                                                                                           |
-| `Tabs`          | 基础     | `tabItems`、兼容 `tabs`、本地选中态                                                                                                                                     | `align`、`fullWidth`、`variant`、`size`、`tone`、通用视觉字段尚未接入。                                                       |
-| `Button`        | 部分完整 | `child`、`action.event`、`action.script`、识别但不执行 `action.functionCall`、`fullWidth`、`disabled`、`loading`、通用视觉字段                                          | 历史扁平 `action` 不再兼容；`action.functionCall` 暂不执行；`iconPosition` 尚未实现；loading 只有禁用语义，未显示加载指示器。 |
+| `Card`          | 部分完整 | `child`、`media`、`header/title`、`subtitle`、`footer`、通用视觉字段                                                                                                                                           | `variant/preset` 只有部分默认样式。                                                                                           |
+| `Tabs`          | 部分完整 | `tabItems`、兼容 `tabs`、本地选中态、`align`、`fullWidth`、`variant`、`size`、`tone`、通用视觉字段                                                                       | 受控 active key 写回仍只保留基础行为。                                                                                        |
+| `Button`        | 部分完整 | `child`、`action.event`、`action.script`、识别但不执行 `action.functionCall`、`fullWidth`、`disabled`、`loading`、`icon`、`iconPosition`、通用视觉字段                  | 历史扁平 `action` 不再兼容；`action.functionCall` 暂不执行；loading 使用基础文本指示。                                       |
 | `TextField`     | 部分完整 | `label`、`text -> modelValue`、`usageHint`、`placeholder`、`disabled`、`required`、`readonly`、`helpText`、`errorText`、通用视觉字段                                    | 原生输入格式限制较基础。                                                                                                      |
 | `CheckBox`      | 部分完整 | `label`、`value -> modelValue`、`description`、`labelPosition`、`disabled`、`helpText`、`errorText`、通用视觉字段                                                       | 多选组不在当前组件范围内。                                                                                                    |
 | `ChoicePicker`  | 部分完整 | `options`、`value -> modelValue`、`label`、`placeholder`、`disabled`、`helpText`、`errorText`、`mode`、通用视觉字段                                                     | `multiple` 仅保留 props，交互仍是单值。                                                                                       |
@@ -209,20 +209,9 @@ Renderer 新链路已提供通用视觉属性解析工具：`packages/renderer/s
 
 ## 6. 已接入受控视觉属性的组件
 
-以下组件已经接入 `visual-props.ts`：
+DOM renderer 通过 `packages/renderer/src/render/resolve-style.ts` 解析受控视觉字段，再由 `src/ui/dom-basic` 组件应用 class 和 inline style。
 
-- `TextComponent.vue`
-- `ImageComponent.vue`
-- `IconComponent.vue`
-- `RowComponent.vue`
-- `ColumnComponent.vue`
-- `GridComponent.vue`
-- `ContainerComponent.vue`
-- `CardComponent.vue`
-- `ButtonComponent.vue`
-- `SliderComponent.vue`
-
-这些组件会消费通用视觉字段，并由 `styles.css` 提供基础样式、修饰类和部分预设表现。`SpacerComponent.vue` 暂未接入通用视觉字段，只消费 `axis` / `size` / `flex`。
+已覆盖通用视觉字段的组件包括 `Text`、`Image`、`Icon`、`Row`、`Column`、`Grid`、`Container`、`Card`、`Button`、`Slider` 等当前 DOM Basic UI 组件。`Spacer` 主要消费 `axis` / `size` / `flex`。
 
 ## 7. 当前音乐卡片场景支持情况
 
@@ -244,15 +233,18 @@ Renderer 新链路已提供通用视觉属性解析工具：`packages/renderer/s
 
 ## 8. 测试与验收
 
+迁移回归补充：`src/dom/__tests__/migration-regression.test.ts` 覆盖 surface 切换/同 ID 重建、微任务批处理、同步更新、卸载清理、焦点与选区、IME 输入、Grid/Container/Row/Column/Spacer 布局、ChoicePicker 三种模式与值类型、日期时间及表单写回、Card 文案和媒体样式。Frontend 的 `PreviewPanel.test.ts` 覆盖追加消息保留状态、完整替换恢复原始值和卸载竞态。
+
+Card 已恢复 `header`、`subtitle`、`footer` 和 `media` slot；ChoicePicker 的 select/radio/segmented 模式保留选项的字符串、数值或布尔类型。DateTimeInput 使用协议值 `usageHint="datetime"`，恢复 `readonly`、`name` 及原有 CSS 类名。组件能力的既有缺口（例如 ChoicePicker.multiple、functionCall 和完整主题支持）不在此次迁移修复范围内。
+
 当前已覆盖：
 
 - `packages/renderer/src/core/surface-model.test.ts`
 - `packages/renderer/src/core/data-model.test.ts`
 - `packages/renderer/src/core/js-runtime.test.ts`
-- `packages/renderer/src/vue/datamodel-reactivity.test.ts`
-- `packages/renderer/src/components/basic/visual-props.test.ts`
+- `packages/renderer/src/dom/__tests__/dom-surface-host.test.ts`
 
-其中 `visual-props.test.ts` 已覆盖：
+其中 `dom-surface-host.test.ts` 已覆盖：
 
 - 按正式 `action.event` 派发标准 A2UI action 消息。
 - 解析 `action.event.context` 中的 `{ path }` 动态绑定。
@@ -265,11 +257,12 @@ Renderer 新链路已提供通用视觉属性解析工具：`packages/renderer/s
 - 确认 `action.functionCall` 当前不会执行、不会派发。
 - 确认 `TextField.text` 动态绑定可通过 `update:modelValue` 写回 dataModel。
 - 确认 `Tabs` 只渲染当前 active panel，并可通过标签切换。
+- 确认 20 个正式 Basic Catalog 组件均可通过 DOM registry 渲染。
+- 确认 Web Component registry 注入、surfaceId 切换、property surfaceGroup 切换和 unmount 清理。
 
 建议后续补充：
 
 - 为普通 UI 组件的视觉属性逐步补截图或 DOM 测试。
-- 增加包含 20 个正式组件的 Basic Catalog 样例 surface。
 - 增加音乐卡片回归样例，验证图标、图片比例、按钮变体和 Slider 数值隐藏。
 - 增加视觉截图验收，防止 CSS 变体回退为默认浏览器控件。
 

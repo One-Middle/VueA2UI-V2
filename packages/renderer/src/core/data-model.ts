@@ -1,15 +1,14 @@
 /**
  * DataModel 类：基于 JSON Pointer (RFC 6901) 的数据模型。
  *
- * 内部使用 Vue3 `reactive` 包裹数据，路径变更时通知所有祖先路径和
- * 已注册的路径订阅者。
+ * 内部使用普通对象保存数据，路径变更时通知所有祖先路径和已注册的
+ * 路径订阅者。
  *
  * RFC 6901 编码规则：
  *   - "~0" 表示 "~"
  *   - "~1" 表示 "/"
  */
 
-import { reactive } from "vue";
 import { logger } from "../logger.js";
 import type { JsonValue } from "@a2ui-platform/shared";
 
@@ -39,8 +38,14 @@ function encodePath(segments: string[]): string {
 
 type SubscriberCallback = () => void;
 
+function cloneJson(value: JsonValue): JsonValue {
+  return value !== null && typeof value === "object"
+    ? JSON.parse(JSON.stringify(value)) as JsonValue
+    : value;
+}
+
 export class DataModel {
-  /** 根数据，使用 Vue3 reactive 保持响应式；存储类型为 unknown 避免递归类型展开 */
+  /** 根数据；存储类型为 unknown 避免递归类型展开 */
   private _data: { root: unknown };
   /** 路径 → 订阅者映射 */
   private _subscribers = new Map<string, Set<SubscriberCallback>>();
@@ -48,8 +53,7 @@ export class DataModel {
   private _destroyed = false;
 
   constructor(initialData?: JsonValue) {
-    const state: { root: unknown } = { root: initialData ?? null };
-    this._data = reactive(state) as { root: unknown };
+    this._data = { root: cloneJson(initialData ?? null) };
   }
 
   // ─── 公开 API ─────────────────────────────────────────────
@@ -67,12 +71,14 @@ export class DataModel {
   set(path: string, value: JsonValue): void {
     this._ensureNotDestroyed();
     const segments = parsePath(path);
+    // Own the runtime value; edits must not mutate replayable server messages.
+    const ownedValue = cloneJson(value);
     if (segments.length === 0) {
-      this._data.root = value;
+      this._data.root = ownedValue;
       this._notifyAffected([]);
       return;
     }
-    this._setBySegments(segments, value);
+    this._setBySegments(segments, ownedValue);
     this._notifyAffected(segments);
   }
 

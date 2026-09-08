@@ -5,7 +5,7 @@
  * - 收集本次 RenderNode tree 构建读取过的 dataModel 绝对路径
  * - 输出去重、排序后的依赖数组，供 surface 层同步订阅
  *
- * 不负责：订阅 DataModel 或触发 Vue 响应式刷新。
+ * 不负责：订阅 DataModel 或触发 DOM 刷新。
  */
 
 import type { DataContext } from "../core/data-context";

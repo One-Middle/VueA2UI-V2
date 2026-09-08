@@ -5,7 +5,7 @@
  * - 向 resolver 提供 surface、dataModel、basePath 和事件/错误派发能力
  * - 持有本次构建的依赖收集器
  *
- * 不负责：普通 UI 组件 props 定义或 Vue VNode 创建。
+ * 不负责：普通 UI 组件 props 定义或 DOM 节点创建。
  */
 
 import type { JsonObject } from "@a2ui-platform/shared";

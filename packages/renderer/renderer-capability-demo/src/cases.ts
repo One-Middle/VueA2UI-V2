@@ -12,7 +12,7 @@
  * 引用：
  * - @a2ui-platform/shared
  * 被引用：
- * - App.vue
+ * - main.ts
  * 注意：
  * - 示例优先使用组件语义字段，避免通过 style 模拟业务含义。
  * - 保留 3 个高质量标杆 case：Live Commerce（亮色电商）、Work Board（清爽工具）、Finance Brief（黑金金融）。

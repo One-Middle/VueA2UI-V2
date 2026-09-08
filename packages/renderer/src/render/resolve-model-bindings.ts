@@ -5,7 +5,7 @@
  * - 将 Catalog model 字段映射为普通组件 modelValue
  * - 仅在 A2UI 值为 `{ path }` 时生成写回事件意图
  *
- * 不负责：普通 props 解析或执行 Vue emit。
+ * 不负责：普通 props 解析或执行 DOM emit。
  */
 
 import type { BasicCatalogComponentDefinition } from "@a2ui-platform/shared";

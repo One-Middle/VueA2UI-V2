@@ -2,16 +2,17 @@
  * 受控视觉 style 解析。
  *
  * 职责：
- * - 将 A2UI style 白名单字段转换为 Vue CSSProperties
+ * - 将 A2UI style 白名单字段转换为普通 DOM style 对象
  * - 解析 style 子字段中的 `{ path }` 和属性脚本
  *
  * 不负责：透传任意 CSS、className 或事件处理器。
  */
 
-import type { CSSProperties } from "vue";
 import { DataContext } from "../core/data-context";
 import type { RenderContext } from "./render-context";
 import { resolveRenderValue } from "./resolve-dynamic";
+
+export type DomStyleProperties = Record<string, string | number>;
 
 const DIRECT_STYLE_KEYS = [
   "width",
@@ -52,7 +53,7 @@ export function resolveControlledStyle(input: {
   dataContext: DataContext;
   renderContext: RenderContext;
   sourceComponentId: string;
-}): CSSProperties {
+}): DomStyleProperties {
   if (
     !input.value ||
     typeof input.value !== "object" ||
@@ -76,7 +77,7 @@ export function resolveControlledStyle(input: {
     }
   }
 
-  const style: CSSProperties = {};
+  const style: DomStyleProperties = {};
   for (const key of DIRECT_STYLE_KEYS) {
     const value = source[key];
     if (

@@ -6,7 +6,7 @@
  * - 串联 props/model/action/slots resolver
  * - 返回可订阅依赖集合
  *
- * 不负责：创建 Vue VNode 或同步 DataModel 订阅副作用。
+ * 不负责：创建 DOM 节点或同步 DataModel 订阅副作用。
  */
 
 import { getBasicCatalogComponentDefinition } from "@a2ui-platform/shared";

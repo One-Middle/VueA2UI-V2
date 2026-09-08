@@ -1,8 +1,6 @@
-import vue from "@vitejs/plugin-vue";
 import { defineConfig } from "vite";
 
 export default defineConfig({
-  plugins: [vue()],
   build: {
     lib: {
       entry: "src/index.ts",
@@ -10,7 +8,7 @@ export default defineConfig({
       fileName: "index"
     },
     rollupOptions: {
-      external: ["vue", "@a2ui-platform/shared"]
+      external: ["@a2ui-platform/shared"]
     }
   },
   test: {

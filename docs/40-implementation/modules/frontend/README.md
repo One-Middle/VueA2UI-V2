@@ -89,7 +89,7 @@ packages/frontend/src/
 | `src/stores/workspace.ts`                          | 工作台业务 store，管理会话、消息、文件、Skill、Agent run、A2UI event、snapshot 和 SSE 状态。                |
 | `src/stores/renderer.ts`                           | Renderer 桥接 store，仅保存待消费 A2UI messages、revision、changeKind 和 ready 状态。                       |
 | `src/features/conversation/*`                      | 用户对话、初始创建、消息列表和输入框。                                                                      |
-| `src/features/preview/PreviewPanel.vue`            | Renderer 集成点，创建 `SurfaceGroupModel` 和 `MessageProcessor`，监听 action/error，并提供 JSON inspector。 |
+| `src/features/preview/PreviewPanel.vue`            | Renderer 集成点，创建 `SurfaceGroupModel`、`MessageProcessor` 和 DOM surface handles，监听 action/error，并提供 JSON inspector。 |
 | `src/features/history/HistoryPanel.vue`            | 历史会话、A2UI events 和 snapshot 恢复入口。                                                                |
 | `src/features/skills/SkillsPanel.vue`              | Skill 创建、编辑、启用和禁用。                                                                              |
 | `src/features/runtime/RuntimePanel.vue`            | Runtime 配置、Agent runs 和 tool calls 展示。                                                               |
@@ -111,7 +111,9 @@ packages/frontend/src/
 - `changeKind`：`append`、`replace` 或 `reset`。
 - `rendererReady`：Renderer 是否就绪。
 
-`SurfaceGroupModel` 和 `MessageProcessor` 只在 `PreviewPanel.vue` 内部持有，避免把复杂响应式模型混入全局业务 store。
+`SurfaceGroupModel`、`MessageProcessor` 和 DOM surface handles 只在 `PreviewPanel.vue` 内部持有，避免把 Renderer 运行时模型混入全局业务 store。Frontend 的 Vue 组件只提供挂载容器，Renderer 子树由 `mountA2uiSurface()` 接管。
+
+Preview 按 surfaceId 保存挂载句柄。追加数据或组件消息时保留已有 host，仅对新增/删除 surface 执行挂载/卸载；完整替换消息集或切换会话时清理旧 host。本地 Tabs 状态和输入焦点由 host 保持，卸载后的排队回调不会再次挂载。
 
 ## 7. 核心流程
 
@@ -149,7 +151,7 @@ packages/frontend/src/
 ### Renderer 回传
 
 1. Basic 组件触发 action 或 error。
-2. Renderer 在 `window` 上派发 `a2ui:action` 或 `a2ui:error`。
+2. Renderer 从挂载容器派发可冒泡的 `a2ui:action` 或 `a2ui:error`，宿主仍可在 `window` 上监听。
 3. `PreviewPanel` 校验事件结构为 A2UI v0.9 client message。
 4. 前端调用 `api.recordAction()` 或 `api.recordError()`。
 5. 后端只记录 Renderer event，不在当前链路内执行业务副作用。

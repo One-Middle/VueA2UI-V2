@@ -69,8 +69,7 @@ renderer-capability-demo/
 ├── vite.config.ts    # 独立的 Vite 配置，别名指向 ../src
 ├── tsconfig.json     # 继承父包 tsconfig，仅类型检查不产出
 ├── src/
-│   ├── main.ts       # Vue 应用挂载入口
-│   ├── App.vue       # 测试台主界面：页面切换、手机框预览、事件面板
+│   ├── main.ts       # DOM 测试台入口：页面切换、手机框预览、事件面板
 │   ├── cases.ts      # 预置 A2UI 示例消息（6 个场景的完整 dataModel + components）
 │   └── styles.css    # 测试台样式
 └── dist/             # 构建产物（gitignore）
@@ -87,4 +86,4 @@ renderer-capability-demo/
 
 - 本目录仅用于 renderer 能力测试，不参与正式包导出。
 - 示例消息为本地可信数据，不走后端 Agent，适合快速回归和视觉验收。
-- 修改 `cases.ts` 即可添加新场景，无需改动 App.vue 结构。
+- 修改 `cases.ts` 即可添加新场景，测试台结构集中在 `main.ts`。
