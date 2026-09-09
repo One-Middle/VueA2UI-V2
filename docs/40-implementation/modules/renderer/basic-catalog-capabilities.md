@@ -2,7 +2,7 @@
 
 ## 1. 定位
 
-本文档记录 `packages/renderer` 对 A2UI v0.9 Basic Catalog 的当前实际渲染能力，是 Renderer 组件实现状态的权威说明。
+本文档记录 Renderer packages 对 A2UI v0.9 Basic Catalog 的当前实际渲染能力，是组件实现状态的权威说明。协议解析、动态值、数据依赖和事件意图由 `renderer-core` 共享；DOM、Vue、React 分别消费同一 RenderPlan。
 
 本文档只描述 Renderer 已实现的行为，不定义 A2UI 协议合法性。协议字段、校验约束和 Agent 可输出字段以 [A2UI v0.9 契约](../../../30-contracts/a2ui-v0.9.md) 为准。
 
@@ -20,7 +20,7 @@
 
 ## 3. 当前支持的 A2UI 信息与对应功能
 
-当前 `packages/renderer` 可以消费的 A2UI 信息分为消息层、Surface 层、组件层、数据层和交互回传层。
+当前 `renderer-core` 可以消费的 A2UI 信息分为消息层、Surface 层、组件层、数据层和交互回传层；本矩阵中的 DOM 路径特指 `renderer-dom` 的映射实现。
 
 ### 3.1 服务端消息
 
@@ -39,8 +39,8 @@ Renderer 只接受 `version === "v0.9"` 的服务端消息。已支持的消息�
 
 Renderer 当前按以下规则渲染 A2UI surface：
 
-- 每个 surface 由 `DomSurfaceHost` 承载，必须存在 `id: "root"` 的根组件才会进入正常渲染。
-- 单个组件先由 RenderNode builder 解析 A2UI 字段语义，再由 `renderDomNode` 映射到 `src/ui/dom-basic` 普通 DOM 组件。
+- 每个 surface 由 `SurfaceRuntime` 承载，必须存在 `id: "root"` 的根组件才会进入正常渲染。
+- 单个组件先由 RenderPlan builder 解析 A2UI 字段语义，再由目标 Adapter 映射到 DOM、Vue 或 React Basic UI 组件。
 - 未找到组件实例时显示“组件未找到”，组件类型未注册时显示“未注册的组件类型”。
 - 正式 Basic Catalog 的 20 个组件：`Text`、`Image`、`Icon`、`Video`、`AudioPlayer`、`Divider`、`Row`、`Column`、`Grid`、`Container`、`Spacer`、`List`、`Card`、`Tabs`、`Button`、`TextField`、`CheckBox`、`ChoicePicker`、`Slider`、`DateTimeInput`。
 - `Modal` 不属于新正式 Basic Catalog；legacy 源文件保留但新 Renderer 链路不依赖它。
@@ -76,7 +76,7 @@ Renderer 当前支持基于 JSON Pointer 的数据模型能力：
 
 ### 3.5 支持的 action 类型与实现原理
 
-当前 Renderer 只有 `Button` 会消费组件声明中的 `action` 字段。action 解析由 `packages/renderer/src/core/action.ts` 和 `packages/renderer/src/render/resolve-action-bindings.ts` 负责，点击派发由 `packages/renderer/src/render/dom-renderer.ts` 转成普通 DOM `click` handler 完成。
+当前 Renderer 只有 `Button` 会消费组件声明中的 `action` 字段。action 解析由 `packages/renderer-core/src/core/action.ts` 和 `packages/renderer-core/src/render/resolve-action-bindings.ts` 负责；目标 Adapter 只将点击回传为 AdapterEvent，再由 `SurfaceRuntime` 统一处理。
 
 | action 声明类型                                 | 示例                                                                                                                                                                                                   | 当前行为                                                                                                                                                                                                                                                                      |
 | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -149,7 +149,7 @@ Renderer 支持只读属性脚本：
 
 ## 4. 通用视觉属性
 
-Renderer 新链路已提供通用视觉属性解析工具：`packages/renderer/src/render/resolve-style.ts`，DOM Basic UI 组件统一消费解析后的 class 和 inline style。
+Renderer 新链路已提供通用视觉属性解析工具：`packages/renderer-core/src/render/resolve-style.ts`，各 Adapter 消费解析后的 class 和 inline style。
 
 已支持的通用字段：
 
@@ -174,7 +174,7 @@ Renderer 新链路已提供通用视觉属性解析工具：`packages/renderer/s
 
 - Renderer 不消费 `className`、`css`、`innerHTML`、非受控脚本或事件处理器字段。
 - `style` 只做白名单字段转换，不透传任意 CSS 块。
-- `variant`、`size`、`tone`、`preset` 只生成 Renderer 自有修饰类，具体视觉由 `packages/renderer/src/styles.css` 决定。
+- `variant`、`size`、`tone`、`preset` 只生成 Renderer 自有修饰类；DOM、Vue、React Adapter 各自携带相同的基础样式资源。
 
 ## 5. 组件能力总览
 
@@ -209,7 +209,7 @@ Renderer 新链路已提供通用视觉属性解析工具：`packages/renderer/s
 
 ## 6. 已接入受控视觉属性的组件
 
-DOM renderer 通过 `packages/renderer/src/render/resolve-style.ts` 解析受控视觉字段，再由 `src/ui/dom-basic` 组件应用 class 和 inline style。
+Core 通过 `packages/renderer-core/src/render/resolve-style.ts` 解析受控视觉字段；DOM Adapter 的 `src/ui/dom-basic` 组件应用 class 和 inline style，Vue/React Adapter 消费同一 props。
 
 已覆盖通用视觉字段的组件包括 `Text`、`Image`、`Icon`、`Row`、`Column`、`Grid`、`Container`、`Card`、`Button`、`Slider` 等当前 DOM Basic UI 组件。`Spacer` 主要消费 `axis` / `size` / `flex`。
 
@@ -239,10 +239,10 @@ Card 已恢复 `header`、`subtitle`、`footer` 和 `media` slot；ChoicePicker 
 
 当前已覆盖：
 
-- `packages/renderer/src/core/surface-model.test.ts`
-- `packages/renderer/src/core/data-model.test.ts`
-- `packages/renderer/src/core/js-runtime.test.ts`
-- `packages/renderer/src/dom/__tests__/dom-surface-host.test.ts`
+- `packages/renderer-core/src/core/__tests__/surface-model.test.ts`
+- `packages/renderer-core/src/core/__tests__/data-model.test.ts`
+- `packages/renderer-core/src/core/__tests__/js-runtime.test.ts`
+- `packages/renderer-dom/src/dom/__tests__/dom-surface-host.test.ts`
 
 其中 `dom-surface-host.test.ts` 已覆盖：
 

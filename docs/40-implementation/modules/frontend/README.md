@@ -4,7 +4,7 @@
 
 `packages/frontend` 是平台工作台，负责用户可见的创作、调试和管理体验：创建和切换会话、发送需求、上传文件、管理 Skills、接收 SSE、驱动 Renderer 预览、查看历史、查看 Runtime 过程、导出产物。
 
-它不实现 A2UI 协议渲染核心，而是把后端已提交的 A2UI messages 交给 `packages/renderer`，并把 Renderer 派发的 action/error 转发给后端记录。
+它不实现 A2UI 协议渲染核心，而是把后端已提交的 A2UI messages 交给 `@a2ui-platform/renderer-core` 的 `SurfaceRuntime`，并通过 `@a2ui-platform/renderer-vue` 预览；Runtime action/error 回调由 PreviewPanel 转发给后端记录。
 
 ## 2. 技术栈
 
@@ -16,7 +16,7 @@
 - 状态管理：Pinia
 - UI 组件库：Naive UI
 - 测试：Vitest、vue-tsc
-- 依赖模块：`@a2ui-platform/shared`、`@a2ui-platform/renderer`
+- 依赖模块：`@a2ui-platform/shared`、`@a2ui-platform/renderer-core`、`@a2ui-platform/renderer-vue`
 
 ## 3. 职责边界
 
@@ -111,7 +111,7 @@ packages/frontend/src/
 - `changeKind`：`append`、`replace` 或 `reset`。
 - `rendererReady`：Renderer 是否就绪。
 
-`SurfaceGroupModel`、`MessageProcessor` 和 DOM surface handles 只在 `PreviewPanel.vue` 内部持有，避免把 Renderer 运行时模型混入全局业务 store。Frontend 的 Vue 组件只提供挂载容器，Renderer 子树由 `mountA2uiSurface()` 接管。
+`SurfaceGroupModel`、`MessageProcessor` 和每个 surface 的 `SurfaceRuntime` 只在 `PreviewPanel.vue` 内部持有，避免把 Renderer 运行时模型混入全局业务 store。`A2uiRuntimeSurface` 是 Vue Adapter 的订阅桥接，不重新解释 A2UI 协议。
 
 Preview 按 surfaceId 保存挂载句柄。追加数据或组件消息时保留已有 host，仅对新增/删除 surface 执行挂载/卸载；完整替换消息集或切换会话时清理旧 host。本地 Tabs 状态和输入焦点由 host 保持，卸载后的排队回调不会再次挂载。
 
