@@ -5,6 +5,7 @@
 ## 文件索引
 
 - [API 契约](./api.md)
+- [Agent Engine SPI v1 契约](./agent-engine-spi.md)
 - [A2UI v0.9 契约](./a2ui-v0.9.md)
 - [数据库契约](./db-schema.md)
 - [Shared 类型契约](./shared-types.md)
@@ -21,11 +22,12 @@ plan -> generate_a2ui -> validate -> preview -> commit
 
 原则：
 
-- Agent Output 只用于 debug / audit。
-- Agent Runtime 产出 Parsed Agent Result（workflow 任务由 ReAct 循环驱动，见 `40-implementation/modules/agent/`）。
-- WorkflowService 只消费 Parsed Agent Result 并负责 gate / persistence。
+- Agent Engine Adapter 输出受 task `outputSchema` 约束的通用 SPI outcome；原始引擎 payload 只用于诊断。
+- 平台消费 SPI outcome，执行权威校验后映射为稳定 workflow artifact，并负责 gate / persistence。
 - API 只返回稳定 DTO / SSE payload。
 - 前端只消费 parsed/validated artifacts。
+
+现有 ReAct Runtime 类型和事件仍在迁移兼容期内；新引擎与新平台路径以 [Agent Engine SPI v1 契约](./agent-engine-spi.md) 为准。
 
 ## 维护规则
 

@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import {
+  createActionMessage,
   MessageProcessor,
   SurfaceGroupModel,
-  mountA2uiSurface,
-  type DomSurfaceHandle,
-} from "@a2ui-platform/renderer";
-import type { A2UIClientMessage, A2UIComponent, JsonValue } from "@a2ui-platform/shared";
+  SurfaceRuntime,
+} from "@a2ui-platform/renderer-core";
+import { A2uiRuntimeSurface } from "@a2ui-platform/renderer-vue";
+import type { A2UIClientMessage, A2UIComponent, JsonObject, JsonValue } from "@a2ui-platform/shared";
 import { NAlert, NEmpty, NInput, NSpin, NTag } from "naive-ui";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import * as api from "../../services/api";
@@ -20,7 +21,7 @@ const renderer = useRendererStore();
 const surfaceGroup = new SurfaceGroupModel();
 const messageProcessor = new MessageProcessor(surfaceGroup);
 const surfaceIds = ref<string[]>([]);
-const rendererHost = ref<HTMLElement | null>(null);
+const surfaceRuntimes = ref<Array<{ surfaceId: string; runtime: SurfaceRuntime }>>([]);
 const componentJson = ref("");
 const dataModelJson = ref("");
 let consumedMessageCount = 0;
@@ -30,7 +31,7 @@ const isSyncingEditors = ref(false);
 const inspectorExpanded = ref(false);
 const applyTimers: Partial<Record<"components" | "dataModel", ReturnType<typeof setTimeout>>> = {};
 let unsubscribeDataModel: (() => void) | undefined;
-const surfaceHandles = new Map<string, { container: HTMLElement; handle: DomSurfaceHandle }>();
+const runtimeBySurface = new Map<string, SurfaceRuntime>();
 let disposed = false;
 
 const hasContent = computed(() => surfaceIds.value.length > 0);
@@ -54,7 +55,7 @@ const processRendererMessages = () => {
       messageProcessor.processMessages(pendingMessages);
     }
   } else {
-    unmountSurfaces();
+    disposeRuntimes();
     unsubscribeDataModel?.();
     unsubscribeDataModel = undefined;
     surfaceGroup.destroy();
@@ -69,9 +70,7 @@ const processRendererMessages = () => {
   unsubscribeDataModel?.();
   unsubscribeDataModel = activeSurface.value?.dataModel.subscribe("/", syncEditorsFromSurface);
   syncEditorsFromSurface();
-  void nextTick(() => {
-    syncSurfaceHosts();
-  });
+  syncSurfaceRuntimes();
 };
 
 watch(() => renderer.revision, processRendererMessages, { immediate: true });
@@ -80,62 +79,47 @@ watch(activeSurfaceId, () => {
   unsubscribeDataModel = activeSurface.value?.dataModel.subscribe("/", syncEditorsFromSurface);
   syncEditorsFromSurface();
 });
-watch(rendererHost, syncSurfaceHosts, { flush: "post" });
 watch(componentJson, () => scheduleApplyEditors("components"));
 watch(dataModelJson, () => scheduleApplyEditors("dataModel"));
 
 onMounted(() => {
   processRendererMessages();
-  window.addEventListener("a2ui:action", handleRendererAction);
-  window.addEventListener("a2ui:error", handleRendererError);
 });
 
 onBeforeUnmount(() => {
   disposed = true;
-  window.removeEventListener("a2ui:action", handleRendererAction);
-  window.removeEventListener("a2ui:error", handleRendererError);
   unsubscribeDataModel?.();
-  unmountSurfaces();
+  disposeRuntimes();
   Object.values(applyTimers).forEach((timer) => {
     if (timer) clearTimeout(timer);
   });
   surfaceGroup.destroy();
 });
 
-function syncSurfaceHosts(): void {
+function syncSurfaceRuntimes(): void {
   if (disposed) return;
-  const host = rendererHost.value;
-  if (!host) {
-    unmountSurfaces();
-    return;
-  }
-  for (const [sid, entry] of surfaceHandles) {
-    if (!surfaceIds.value.includes(sid) || entry.container.parentElement !== host) {
-      entry.handle.unmount();
-      entry.container.remove();
-      surfaceHandles.delete(sid);
+  for (const [surfaceId, runtime] of runtimeBySurface) {
+    if (!surfaceIds.value.includes(surfaceId)) {
+      runtime.dispose();
+      runtimeBySurface.delete(surfaceId);
     }
   }
-  for (const sid of surfaceIds.value) {
-    if (surfaceHandles.has(sid)) continue;
-    const surfaceContainer = document.createElement("div");
-    host.appendChild(surfaceContainer);
-    surfaceHandles.set(sid, {
-      container: surfaceContainer,
-      handle: mountA2uiSurface(surfaceContainer, {
-        surfaceGroup,
-        surfaceId: sid,
-      }),
-    });
+  for (const surfaceId of surfaceIds.value) {
+    if (runtimeBySurface.has(surfaceId)) continue;
+    runtimeBySurface.set(surfaceId, new SurfaceRuntime({
+      surfaceGroup,
+      surfaceId,
+      onAction: (action) => handleRuntimeAction(surfaceId, action),
+      onError: (error) => handleRuntimeError(surfaceId, error),
+    }));
   }
+  surfaceRuntimes.value = surfaceIds.value.map((surfaceId) => ({ surfaceId, runtime: runtimeBySurface.get(surfaceId)! }));
 }
 
-function unmountSurfaces(): void {
-  for (const entry of surfaceHandles.values()) {
-    entry.handle.unmount();
-    entry.container.remove();
-  }
-  surfaceHandles.clear();
+function disposeRuntimes(): void {
+  for (const runtime of runtimeBySurface.values()) runtime.dispose();
+  runtimeBySurface.clear();
+  surfaceRuntimes.value = [];
 }
 
 function syncEditorsFromSurface(): void {
@@ -238,30 +222,16 @@ function stringifyJson(value: unknown): string {
   return JSON.stringify(value, null, 2);
 }
 
-function handleRendererAction(event: Event): void {
+function handleRuntimeAction(surfaceId: string, input: { name: string; sourceComponentId: string; context: JsonObject }): void {
   const sessionId = workspace.activeSessionId;
-  const payload = (event as CustomEvent<unknown>).detail;
-  if (!sessionId || !isA2UIActionMessage(payload)) {
-    return;
-  }
-  void api.recordAction(sessionId, payload);
+  if (!sessionId) return;
+  void api.recordAction(sessionId, createActionMessage({ ...input, surfaceId }));
 }
 
-function handleRendererError(event: Event): void {
+function handleRuntimeError(surfaceId: string, input: { code: string; message: string; path?: string; sourceComponentId?: string }): void {
   const sessionId = workspace.activeSessionId;
-  const payload = (event as CustomEvent<unknown>).detail;
-  if (!sessionId || !isA2UIErrorMessage(payload)) {
-    return;
-  }
-  void api.recordError(sessionId, payload);
-}
-
-function isA2UIActionMessage(value: unknown): value is A2UIClientMessage {
-  return isPlainObject(value) && value.version === "v0.9" && isPlainObject(value.action);
-}
-
-function isA2UIErrorMessage(value: unknown): value is A2UIClientMessage {
-  return isPlainObject(value) && value.version === "v0.9" && isPlainObject(value.error);
+  if (!sessionId) return;
+  void api.recordError(sessionId, { version: "v0.9", error: { ...input, surfaceId } } as A2UIClientMessage);
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -308,7 +278,11 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
                   <span class="phone-nav-icon">...</span>
                 </div>
                 <div class="phone-content">
-                  <div ref="rendererHost"></div>
+                  <A2uiRuntimeSurface
+                    v-for="entry in surfaceRuntimes"
+                    :key="entry.surfaceId"
+                    :runtime="entry.runtime"
+                  />
                 </div>
                 <div class="phone-tabs">
                   <span class="phone-tab phone-tab--active">Home</span>

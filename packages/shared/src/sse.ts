@@ -42,6 +42,7 @@ export type ServerSentEventName =
   | "surface_snapshot"
   | "agent_run_failed"
   | "agent_trace_event"
+  | "agent_engine_event"
   | "workflow_started"
   | "workflow_step_updated"
   | "workflow_artifact_created"
@@ -130,6 +131,19 @@ export type PlatformSseEvent =
       /** Agent 运行 trace 事件（ReAct 循环实时进展） */
       event: "agent_trace_event";
       data: AgentTraceEventDto;
+    }
+  | {
+      /** 引擎无关的 Agent 语义事件；native 仅为脱敏摘要。 */
+      event: "agent_engine_event";
+      data: {
+        sessionId: string;
+        agentRunId: string;
+        sequence: number;
+        type: string;
+        occurredAt: string;
+        summary: Record<string, unknown>;
+        nativeSummary?: Record<string, unknown> | null;
+      };
     }
   | {
       /** Agent Workflow 开始事件 */

@@ -54,6 +54,16 @@ vi.mock("../../repositories/agent-run.repository.js", () => ({
   },
 }));
 
+// 历史 workflow fixture 没有 engine binding，应验证兼容回退仍保持既有行为。
+vi.mock("../../repositories/agent-engine.repository.js", () => ({
+  agentEngineRepository: {
+    createBinding: vi.fn(),
+    findBinding: vi.fn().mockResolvedValue(null),
+    updateContinuation: vi.fn(),
+    createEvent: vi.fn(),
+  },
+}));
+
 vi.mock("../../repositories/session.repository.js", () => ({
   sessionRepository: {
     findById: vi.fn(),
@@ -409,7 +419,7 @@ describe("workflowService new workflow contract", () => {
     );
   });
 
-  it("resumes a retryable failed plan step from a follow-up message", async () => {
+  it("uses the follow-up as a new AgentRun after a context_insufficient plan failure", async () => {
     mockRuntimeResult({
       kind: "plan_markdown",
       markdown: "# 新方案",
@@ -425,14 +435,15 @@ describe("workflowService new workflow contract", () => {
       type: "plan",
       status: "failed",
       attemptCount: 1,
-      failureReason: "API 失败",
+      failureReason: "缺少业务口径",
+      failureMetadata: { code: "context_insufficient" },
       completedAt: now,
     });
     vi.mocked(workflowRepository.findWorkflowById)
       .mockResolvedValueOnce({
         ...workflowRecord({
           status: "failed_retryable",
-          failureReason: "API 失败",
+          failureReason: "缺少业务口径",
         }),
         steps: [failedPlanStep],
         artifacts: [],
@@ -454,7 +465,7 @@ describe("workflowService new workflow contract", () => {
       sessionId: "session-a",
       workflowId: "workflow-a",
       messageId: "message-resume",
-      userMessage: "继续",
+      userMessage: "GMV 只统计已支付订单，按自然周汇总",
     });
 
     expect(workflowRepository.updateWorkflow).toHaveBeenCalledWith(
@@ -474,6 +485,7 @@ describe("workflowService new workflow contract", () => {
         completedAt: null,
         metadata: expect.objectContaining({
           resumeMessageId: "message-resume",
+          resumeUserMessage: "GMV 只统计已支付订单，按自然周汇总",
         }),
       }),
     );

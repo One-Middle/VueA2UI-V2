@@ -33,6 +33,8 @@ model Session {
   a2uiEvents        A2UIEvent[]
   surfaceSnapshots  SurfaceSnapshot[]
   rendererEvents    RendererEvent[]
+  engineBindings    AgentEngineBinding[]
+  engineEvents      AgentEngineEvent[]
 
   @@index([status, updatedAt])
   @@index([catalogId])
@@ -161,6 +163,7 @@ model AgentRun {
   toolCalls          ToolCall[]
   a2uiEvents         A2UIEvent[]
   snapshots          SurfaceSnapshot[]
+  engineEvents       AgentEngineEvent[]
 
   @@index([sessionId, createdAt])
   @@index([workflowId])
@@ -190,11 +193,60 @@ model AgentWorkflow {
   artifacts          WorkflowArtifact[]
   agentRuns          AgentRun[]
   messages           Message[]
+  engineBinding      AgentEngineBinding?
+  engineEvents       AgentEngineEvent[]
 
   @@index([sessionId, createdAt])
   @@index([sessionId, status])
   @@index([status])
   @@map("agent_workflows")
+}
+
+model AgentEngineBinding {
+  id                String        @id @default(uuid()) @db.Uuid
+  workflowId        String        @unique @map("workflow_id") @db.Uuid
+  sessionId         String        @map("session_id") @db.Uuid
+  engineId          String        @map("engine_id")
+  pluginVersion     String        @map("plugin_version")
+  config            Json          @default("{}")
+  configFingerprint String        @map("config_fingerprint")
+  continuation      Json?
+  createdAt         DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt         DateTime?     @map("deleted_at") @db.Timestamptz
+
+  workflow          AgentWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  session           Session       @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, engineId])
+  @@index([engineId, pluginVersion])
+  @@map("agent_engine_bindings")
+}
+
+model AgentEngineEvent {
+  id                            String    @id @default(uuid()) @db.Uuid
+  agentRunId                    String    @map("agent_run_id") @db.Uuid
+  sessionId                     String    @map("session_id") @db.Uuid
+  workflowId                    String?   @map("workflow_id") @db.Uuid
+  sequence                      Int
+  eventType                     String    @map("event_type")
+  occurredAt                    DateTime  @map("occurred_at") @db.Timestamptz
+  summary                       Json      @default("{}")
+  nativeSummary                 Json?     @map("native_summary")
+  failureNativePayloadEncrypted String?   @map("failure_native_payload_encrypted")
+  payloadExpiresAt              DateTime? @map("payload_expires_at") @db.Timestamptz
+  createdAt                     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  deletedAt                     DateTime? @map("deleted_at") @db.Timestamptz
+
+  agentRun                      AgentRun  @relation(fields: [agentRunId], references: [id], onDelete: Cascade)
+  workflow                      AgentWorkflow? @relation(fields: [workflowId], references: [id], onDelete: SetNull)
+  session                       Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([agentRunId, sequence])
+  @@index([agentRunId, createdAt])
+  @@index([workflowId, createdAt])
+  @@index([payloadExpiresAt])
+  @@map("agent_engine_events")
 }
 
 model WorkflowStep {

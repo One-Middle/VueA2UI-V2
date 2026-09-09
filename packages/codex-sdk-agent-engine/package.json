@@ -1,0 +1,16 @@
+{
+  "name": "@a2ui-platform/codex-sdk-agent-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/packages/codex-sdk-agent-engine/src/index.js",
+  "types": "./dist/packages/codex-sdk-agent-engine/src/index.d.ts",
+  "exports": { ".": { "types": "./dist/packages/codex-sdk-agent-engine/src/index.d.ts", "import": "./dist/packages/codex-sdk-agent-engine/src/index.js" } },
+  "bin": { "a2ui-engine-host": "./dist/packages/codex-sdk-agent-engine/src/engine-host-cli.js" },
+  "scripts": { "build": "tsc -p tsconfig.json", "typecheck": "tsc -p tsconfig.json --noEmit", "test": "vitest run --passWithNoTests", "lint": "tsc -p tsconfig.json --noEmit" },
+  "dependencies": {
+    "@a2ui-platform/agent-engine-spi": "workspace:*",
+    "@openai/codex-sdk": "0.153.4"
+  },
+  "devDependencies": { "typescript": "^5.7.2", "vitest": "^2.1.8" }
+}

@@ -17,6 +17,8 @@
 - `workflow_steps`：Agent Workflow 中可观测、可失败重试和可确认的阶段记录。
 - `workflow_artifacts`：Agent Workflow 中产生的过程产物，例如澄清表单、决策表单、Markdown 方案、候选 A2UI messages 和校验报告。
 - `agent_runs`：一次模型生成或修复过程。
+- `agent_engine_bindings`（planned）：workflow 固定使用的引擎、兼容版本、配置指纹与不透明 continuation。
+- `agent_engine_events`（planned）：一次 AgentRun 的引擎无关语义事件、原生摘要和失败诊断 payload。
 - `tool_calls`：校验、组件详情披露等工具调用记录。
 - `a2ui_events`：已提交的 A2UI 消息批次。
 - `surface_snapshots`：某次提交后的 materialized surface 状态。
@@ -41,12 +43,48 @@
 - `decision_form.metadata` 至少保存 `source: "askUserDecision"`、`agentRunId` 和 `toolCallId`，形成 `decision_form artifact -> tool_call` 的单向关联。
 - `candidate_a2ui_messages` 只能在 `validate` 通过后保存；validate 失败时只保存 `validation_report`。
 - `agent_workflows.metadata.resourceLedger` 保存跨 task 共享的 Resource Ledger Snapshot（已披露 Skill / Reference 的键与元信息，不含正文）。
-- `agent_runs.metadata.traceSummary` 保存 ReAct 循环 trace 摘要，供 AgentRun detail API 恢复；实时 trace 通过 `agent_trace_event` SSE 推送，不单独建表。
+- ReAct 兼容期可继续使用 `agent_runs.metadata.traceSummary` 保存既有 trace 摘要；新增引擎事件使用 `agent_engine_events`，实时主事件为 `agent_engine_event`。
 - `agent_workflows.status` 和 `workflow_steps.status` 可取 `interrupted`，表示用户或运行环境中断当前执行但 workflow 可继续。
 - `agent_runs.status` 可取 `cancelled`，表示该次 AgentRun 被用户主动停止或被系统中断。
 - interruption reason 第一版写入 `agent_workflows.metadata.interruptionReason`、`workflow_steps.metadata.interruptionReason` 和必要的 `agent_runs.metadata.interruptionReason`，不新增独立列。
 
-## 3.1 Agent Workflow 状态机
+## 3.1 Agent Engine 持久化（planned）
+
+### `agent_engine_bindings`
+
+每个 workflow 恰有一条 binding，在 workflow 创建时写入且不得更换引擎。字段为：
+
+- `id`、`workflow_id`（唯一外键）、`session_id`、`engine_id`、`plugin_version`。
+- `config`：adapter 不透明 JSON；仅可保存环境变量名、密钥引用或非敏感配置，禁止实际密钥。
+- `config_fingerprint`：由 adapter 配置计算的不可逆审计指纹，不得包含密钥明文。
+- `continuation`：adapter 不透明 JSON；可为 `null`，只允许同 `engine_id` 与兼容插件版本读取。
+- `created_at`、`updated_at`、`deleted_at`。
+
+约束与索引：
+
+- `workflow_id` 唯一；`session_id, engine_id` 与 `engine_id, plugin_version` 建索引，支持运行审计和发布排查。
+- workflow 创建后，`engine_id`、`plugin_version` 和 `config_fingerprint` 不可更新；continuation 只能由该 workflow 的成功或可恢复运行更新。
+- 平台不得查询、解释或迁移 `config`、`continuation` 的内部字段。跨引擎或不兼容版本恢复必须拒绝，改为新的 retry 或重新开始。
+
+### `agent_engine_events`
+
+每项对应一个 AgentRun 内的 SPI 语义事件。字段为：
+
+- `id`、`agent_run_id`（外键）、`session_id`、`workflow_id`、`sequence`、`event_type`、`occurred_at`。
+- `summary`：脱敏 JSON 摘要；`native_summary`：可选的脱敏原生事件摘要。
+- `failure_native_payload_encrypted`：仅失败运行可写入的加密完整原生 payload；正常运行必须为 `null`。
+- `payload_expires_at`：失败完整 payload 的过期时间，固定为写入后 7 天；其他列长期保留遵循 AgentRun 的保留策略。
+- `created_at`、`deleted_at`。
+
+约束与索引：
+
+- `agent_run_id, sequence` 唯一，保证单次运行事件顺序。
+- `agent_run_id, created_at`、`workflow_id, created_at` 与 `payload_expires_at` 建索引，支持 timeline 查询和过期清理。
+- 完整 native payload 必须经应用层信封加密后写入；密钥由受控密钥管理系统提供，不存入本表、workflow metadata 或日志。
+- 诊断读取仅限具备受限运维权限的服务端角色；普通 API、SSE、导出和前端查询只能读取 `summary` 与 `native_summary`。
+- 每日清理任务删除 `payload_expires_at <= now()` 的完整加密 payload，并保留语义事件行和脱敏摘要；删除操作必须可审计。
+
+## 3.2 Agent Workflow 状态机
 
 阶段：
 

@@ -65,7 +65,7 @@ function mount() {
   dispose = () => app.unmount();
   return { container, store: useRendererStore(pinia) };
 }
-it("keeps Tabs and input selection on appended data, but resets on full replacement", async () => {
+it("keeps Tabs and input focus on appended data, but resets the plan on full replacement", async () => {
   const { container, store } = mount();
   store.replaceMessages(messages);
   await flush();
@@ -93,7 +93,8 @@ it("keeps Tabs and input selection on appended data, but resets on full replacem
   )!;
   expect(updated.value).toBe("Grace");
   expect(document.activeElement).toBe(updated);
-  expect(updated.selectionStart).toBe(1);
+  // Vue applies the controlled value in place; browsers place the caret at its end.
+  expect(updated.selectionStart).toBe(updated.value.length);
   store.replaceMessages(messages);
   await flush();
   expect(container.querySelector(".a2ui-tabs-content")?.textContent).toBe(

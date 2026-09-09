@@ -1,45 +1,47 @@
-# Agent 模块边界
+# ReAct Agent Adapter 模块边界
 
 `packages/agent`
 
-定位：受控 Agent Runtime，负责把上下文、工具和模型调用组织为可解析、可校验的结果。
+定位：当前默认的 ReAct Engine Adapter。它实现 Agent Engine SPI，并将 ReAct loop、OpenAI-compatible 模型调用和 ReAct 私有状态封装在 adapter 内部。
+
+## 模块功能
+
+把平台提供的通用 Agent 任务转化为可执行的 ReAct 循环：编排 prompt 与模型调用，按需读取上下文或调用 capability，依据校验结果修复草稿，并将 ReAct 私有过程映射回 SPI 的结构化结果和语义事件。
 
 ## 负责
 
-- 构建 Agent 上下文和 prompt。
+- 根据 SPI request 的任务、材料和能力目录构建 ReAct prompt。
 - 调用 OpenAI-compatible API。
-- 暴露受控 AgentTool：`askClarification`、`askUserDecision`、`getSkillContent`、`getSkillReferenceContent`、`getCatalogComponentDetails` 和 `validateA2UI`。
-- 以 ReAct 循环（think → act → observe）执行 workflow task，并产出 trace 事件供后端转发 SSE。
-- 维护 Resource Ledger，在 workflow 的多个 task 之间共享已披露 Skill / Skill Reference 并做去重。
-- 维护已披露 Catalog 组件规范上下文，使模型在生成或修复 A2UI 时直接读取组件允许字段、禁止字段和修复提示。
-- 记录工具调用过程，供后端持久化和 timeline 展示。
-- 将 Agent Output 解析、归一化、校验为 Parsed Agent Result。
-- 返回 clarification request、Markdown plan、candidate A2UI、decision form 或 failure。
+- 以 ReAct 循环（think → act → observe）执行 task，并通过 SPI host 按需读取上下文、调用 capability 和发送事件。
+- 维护 ReAct 私有的资源披露、观察、草稿修复与 continuation。
+- 按 task outputSchema 返回通用结构化 outcome、contextUsed、统一失败和诊断。
 
 ## 不负责
 
 - 直接写数据库。
 - 直接提交正式 A2UI event 或 surface snapshot。
-- 决定 workflow 能否推进到下一阶段。
+- 决定 workflow 状态、用户确认或正式提交。
 - 开放 HTTP API。
 - 前端渲染或会话 UI。
 
 ## 边界
 
-- 由 `packages/backend` 编排调用。
-- 使用 `packages/shared` 的 Agent、A2UI、DTO 和校验类型。
-- raw Agent Output 只用于 debug / audit 摘要，不作为业务结果返回给前端主流程。
-- Runtime 输出的是 Parsed Agent Result；WorkflowService 决定该结果在当前 gate 下是否合法。
+- 仅依赖 Agent Engine SPI 和 ReAct 自身运行时组件；不依赖 Workflow、A2UI、Prisma、SSE 或 backend 服务。
+- 由平台通过 SPI 静态注册并调用。
+- 平台负责将通用 outcome 校验、映射为业务 artifact 并决定 gate 合法性。
+- ReAct 原始 trace 作为 adapter 诊断透传，平台不依赖其私有字段驱动业务。
 
-## ReAct 输出协议
+## ReAct 私有输出协议
 
-Workflow 路径下，模型每轮只能输出单个 ReAct action envelope：
+ReAct adapter 内部，模型每轮只能输出单个 ReAct action envelope：
 
-- `tool_call`：调用一个当前 gate 授权的 AgentTool。
+- `tool_call`：调用当前 request 暴露的 capability 或上下文读取能力。
 - `final_draft`：提交当前 task 的最终草稿。
 - `give_up`：声明无法继续，并标记是否可恢复。
 
-Workflow 路径不接受普通 A2UI 生成旧格式 `{ assistantMessage, a2uiMessages }` 作为模型顶层输出。生成候选 A2UI 时，模型必须输出：
+该格式不属于 SPI。adapter 将其转换为 task outputSchema 所要求的通用 JSON outcome；平台不消费 ReAct action envelope。
+
+生成候选 A2UI 时，现有 ReAct 私有草稿形状为：
 
 ```json
 {
@@ -53,7 +55,7 @@ Workflow 路径不接受普通 A2UI 生成旧格式 `{ assistantMessage, a2uiMes
 }
 ```
 
-普通非 workflow `run()` 路径仍可使用 `{ assistantMessage, a2uiMessages }`。Skill 文档在 workflow prompt 中注入时，必须避免把普通路径的最终输出格式表达为 workflow 顶层输出格式。
+普通非 workflow 路径属于旧兼容入口；新引擎路径统一使用 SPI request 与 outputSchema。
 
 ## Catalog Context
 
@@ -84,3 +86,32 @@ Model IO Logging（模型输入输出日志）是 Agent 模块的本地开发诊
 - 不作为生产审计日志。
 - 不进入 API、SSE 或数据库主流程。
 - 不替代 `ToolCallRecord`、`AgentRunDto` 或 workflow artifact。
+
+## 技术栈与依赖
+
+- TypeScript：运行时、工具注册与 SPI 适配层。
+- OpenAI-compatible HTTP API：当前模型调用通道，由 `ModelClient` 封装。
+- Ajv 与 Zod：分别用于 JSON Schema / DTO 的校验与解析。
+- `packages/shared`：使用稳定 DTO 和 SPI；迁移完成后不再通过 backend 类型耦合 workflow。
+
+## 核心实现
+
+| 对象 | 主要职责 |
+| --- | --- |
+| `AgentRuntime` | 维护 ReAct 回合、观察记录、草稿和循环终止条件。 |
+| `WorkflowAgentExecutor` | 将 workflow task 投影为 adapter request，处理候选生成与修复执行。 |
+| `ReactPromptComposer` | 组织任务说明、Catalog Context、已读材料和工具观察。 |
+| `ToolRegistry` | 将 ReAct 私有 action 路由到 SPI host 的 context / capability 调用。 |
+| `WorkflowAgentContextBuilder` | 汇总 task 所需的上下文目录与可见能力。 |
+| `ModelClient` | 封装模型请求、超时、日志与原始响应诊断。 |
+
+## 主要协作链路
+
+```text
+SPI request
+  -> WorkflowAgentExecutor / ContextBuilder
+  -> ReactPromptComposer -> ModelClient
+  -> AgentRuntime（think -> act -> observe）
+  -> SPI host（context、capability、event）
+  -> 通用结构化 AgentRunOutcome
+```
