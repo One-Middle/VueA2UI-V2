@@ -5,6 +5,9 @@ logs/
 .claude/
 .codex/
 .tmp-renderer-test/
+# Codex SDK 每个 workflow 的临时工作目录与本地 session 状态。
+packages/backend/.a2ui-agent-runs/
+packages/backend/.a2ui-codex-sessions/
 .env
 .env.local
 .env.*.local
