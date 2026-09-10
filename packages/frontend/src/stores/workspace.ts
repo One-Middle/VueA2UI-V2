@@ -48,6 +48,17 @@ type WorkspaceSurfaceSnapshot = Omit<SurfaceSnapshotDto, "snapshot"> & {
   snapshot: unknown;
 };
 
+/** 前端仅保存引擎语义事件及后端脱敏后的 native 摘要。 */
+type AgentEngineEventSummary = {
+  sessionId: string;
+  agentRunId: string;
+  sequence: number;
+  type: string;
+  occurredAt: string;
+  summary: Record<string, unknown>;
+  nativeSummary?: Record<string, unknown> | null;
+};
+
 export type WorkspaceTab =
   "conversation" | "history" | "skills" | "import-export" | "runtime";
 
@@ -70,6 +81,7 @@ export const useWorkspaceStore = defineStore("workspace", {
     agentRuns: [] as AgentRunDto[],
     runtimeToolCalls: [] as ToolCallDto[],
     runtimeTraceEvents: [] as AgentTraceEventDto[],
+    agentEngineEvents: [] as AgentEngineEventSummary[],
     workflows: [] as AgentWorkflowDetailDto[],
     a2uiEvents: [] as WorkspaceA2UIEvent[],
     surfaceSnapshots: [] as WorkspaceSurfaceSnapshot[],
@@ -132,6 +144,7 @@ export const useWorkspaceStore = defineStore("workspace", {
       this.agentRuns = [];
       this.runtimeToolCalls = [];
       this.runtimeTraceEvents = [];
+      this.agentEngineEvents = [];
       this.workflows = [];
       this.a2uiEvents = [];
       this.surfaceSnapshots = [];
@@ -184,6 +197,7 @@ export const useWorkspaceStore = defineStore("workspace", {
       this.agentRuns = [];
       this.runtimeToolCalls = [];
       this.runtimeTraceEvents = [];
+      this.agentEngineEvents = [];
       this.workflows = [];
       this.a2uiEvents = [];
       this.surfaceSnapshots = [];
@@ -225,6 +239,7 @@ export const useWorkspaceStore = defineStore("workspace", {
           this.agentRuns = [];
           this.runtimeToolCalls = [];
           this.runtimeTraceEvents = [];
+          this.agentEngineEvents = [];
           this.workflows = [];
           this.a2uiEvents = [];
           this.surfaceSnapshots = [];
@@ -1101,6 +1116,12 @@ export const useWorkspaceStore = defineStore("workspace", {
         agent_trace_event: (data: AgentTraceEventDto) => {
           if (!isCurrent() || data.sessionId !== sessionId) return;
           this.runtimeTraceEvents.push(data);
+        },
+
+        agent_engine_event: (data: AgentEngineEventSummary) => {
+          if (!isCurrent() || data.sessionId !== sessionId) return;
+          // 不接收或保存完整 native payload；该值只存在后端失败诊断密文中。
+          this.agentEngineEvents.push(data);
         },
 
         onError: (_error: Error) => {

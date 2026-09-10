@@ -1,10 +1,65 @@
 import { describe, expect, it } from "vitest";
 import type { A2UIServerMessage } from "@a2ui-platform/shared";
+import {
+  getCatalogComponentNames,
+  getCatalogComponents,
+} from "../catalog-schema.js";
 import { validateA2UI } from "../validate-a2ui.js";
 
-const catalogId = "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json";
+const catalogId =
+  "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json";
 
 describe("validateA2UI catalog properties", () => {
+  it("does not expose Modal in the prompt-visible Basic Catalog", () => {
+    expect(getCatalogComponentNames()).not.toContain("Modal");
+    expect(
+      getCatalogComponents().map((component) => component.component),
+    ).not.toContain("Modal");
+  });
+
+  it("rejects Modal because it is not in the new official Basic Catalog", () => {
+    const result = validateA2UI({
+      messages: [
+        {
+          version: "v0.9",
+          createSurface: {
+            surfaceId: "main",
+            catalogId,
+          },
+        },
+        {
+          version: "v0.9",
+          updateComponents: {
+            surfaceId: "main",
+            components: [
+              {
+                id: "root",
+                component: "Modal",
+                child: "content",
+              },
+              {
+                id: "content",
+                component: "Text",
+                text: "内容",
+              },
+            ],
+          },
+        },
+      ] as unknown as A2UIServerMessage[],
+      catalogId,
+      currentSnapshot: null,
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "UNKNOWN_COMPONENT",
+        }),
+      ]),
+    );
+  });
+
   it("rejects removed createSurface theme and sendDataModel fields", () => {
     const messages = [
       {
@@ -151,7 +206,7 @@ describe("validateA2UI catalog properties", () => {
       currentSnapshot: null,
     });
 
-    expect(result.valid).toBe(true);
+    expect(result.valid, JSON.stringify(result.errors, null, 2)).toBe(true);
   });
 
   it("does not treat harmless script variable fragments like one = as unsafe content", () => {
@@ -192,7 +247,9 @@ describe("validateA2UI catalog properties", () => {
     });
 
     expect(result.errors).not.toEqual(
-      expect.arrayContaining([expect.objectContaining({ code: "UNSAFE_CONTENT" })]),
+      expect.arrayContaining([
+        expect.objectContaining({ code: "UNSAFE_CONTENT" }),
+      ]),
     );
   });
 
@@ -225,7 +282,9 @@ describe("validateA2UI catalog properties", () => {
     });
 
     expect(propertyResult.errors).toEqual(
-      expect.arrayContaining([expect.objectContaining({ code: "UNSAFE_CONTENT" })]),
+      expect.arrayContaining([
+        expect.objectContaining({ code: "UNSAFE_CONTENT" }),
+      ]),
     );
 
     const htmlResult = validateA2UI({
@@ -239,7 +298,11 @@ describe("validateA2UI catalog properties", () => {
           updateComponents: {
             surfaceId: "main",
             components: [
-              { id: "root", component: "Text", text: '<button onclick="x()">x</button>' },
+              {
+                id: "root",
+                component: "Text",
+                text: '<button onclick="x()">x</button>',
+              },
             ],
           },
         },
@@ -249,7 +312,9 @@ describe("validateA2UI catalog properties", () => {
     });
 
     expect(htmlResult.errors).toEqual(
-      expect.arrayContaining([expect.objectContaining({ code: "UNSAFE_CONTENT" })]),
+      expect.arrayContaining([
+        expect.objectContaining({ code: "UNSAFE_CONTENT" }),
+      ]),
     );
   });
 });

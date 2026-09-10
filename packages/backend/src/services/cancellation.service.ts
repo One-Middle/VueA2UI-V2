@@ -12,6 +12,8 @@ type CancellationToken = {
   agentRunId: string;
   cancelled: boolean;
   reason: string | null;
+  /** 传递给 SPI adapter 的标准取消信号。 */
+  abortController: AbortController;
 };
 
 const tokens = new Map<string, CancellationToken>();
@@ -23,6 +25,7 @@ export const cancellationService = {
       agentRunId,
       cancelled: false,
       reason: null,
+      abortController: new AbortController(),
     };
     tokens.set(agentRunId, token);
     return token;
@@ -34,6 +37,8 @@ export const cancellationService = {
     if (token) {
       token.cancelled = true;
       token.reason = reason;
+      // Abort 是幂等的；adapter 可以监听 signal，也可以轮询 Host.isCancelled()。
+      token.abortController.abort(reason);
     }
   },
 

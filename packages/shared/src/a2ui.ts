@@ -139,34 +139,25 @@ export interface SurfaceSnapshotData {
 }
 
 // ─── Catalog ─────────────────────────────────────────────
-
-/** Basic Catalog 中包含的所有组件名称。 */
-export const BASIC_CATALOG_COMPONENTS = [
-  "Text",
-  "Image",
-  "Icon",
-  "Video",
-  "AudioPlayer",
-  "Divider",
-  "Row",
-  "Column",
-  "Grid",
-  "Container",
-  "Spacer",
-  "List",
-  "Card",
-  "Tabs",
-  "Modal",
-  "Button",
-  "TextField",
-  "CheckBox",
-  "ChoicePicker",
-  "Slider",
-  "DateTimeInput",
-] as const;
+export {
+  BASIC_CATALOG_COMPONENTS,
+  BASIC_CATALOG_DEFINITION,
+  BASIC_CATALOG_ID,
+  getBasicCatalogComponentDefinition,
+  getBasicCatalogJsonSchema,
+} from "./basic-catalog";
+export type {
+  BasicCatalogComponentDefinition,
+  BasicCatalogDefinition,
+  CatalogFieldDefinition,
+  CatalogFieldRole,
+  CatalogFieldType,
+  CatalogSlotRule,
+} from "./basic-catalog";
 
 /** Basic Catalog 组件名称枚举。 */
-export type BasicCatalogComponent = (typeof BASIC_CATALOG_COMPONENTS)[number];
+export type BasicCatalogComponent =
+  import("./basic-catalog").BasicCatalogComponentDefinition["component"];
 
 /** 单个组件的属性定义。 */
 export interface CatalogComponentProperty {

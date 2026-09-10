@@ -41,6 +41,16 @@ import type {
   WorkflowStepType,
 } from "@a2ui-platform/shared";
 import { createAgentRuntime, validateA2UI } from "@a2ui-platform/agent";
+import type {
+  AgentRunOutcome,
+  CapabilityDescriptor,
+  JsonObject as SpiJsonObject,
+  JsonSchema,
+} from "@a2ui-platform/agent-engine-spi";
+import Ajv from "ajv";
+import { createHash } from "node:crypto";
+import { mkdir } from "node:fs/promises";
+import { resolve } from "node:path";
 import type { Prisma } from "@prisma/client";
 import { config } from "../config.js";
 import { prisma } from "../db.js";
@@ -52,12 +62,18 @@ import { sessionRepository } from "../repositories/session.repository.js";
 import { surfaceSnapshotRepository } from "../repositories/surface-snapshot.repository.js";
 import { toolCallRepository } from "../repositories/tool-call.repository.js";
 import { workflowRepository } from "../repositories/workflow.repository.js";
+import { agentEngineRepository } from "../repositories/agent-engine.repository.js";
 import { logger } from "../logger.js";
 import { AppError, conflict } from "../utils/errors.js";
 import { skillResolverService } from "./skill-resolver.service.js";
 import { snapshotService } from "./snapshot.service.js";
 import { streamService } from "./stream.service.js";
 import { cancellationService } from "./cancellation.service.js";
+import { agentEngineRegistry, defaultAgentEngineId } from "./agent-engine-composition.js";
+import {
+  type WorkflowContextMaterial,
+  WorkflowAgentEngineHost,
+} from "./workflow-agent-engine-host.js";
 
 /** 创建 Agent Workflow 的输入参数。 */
 export type CreateWorkflowInput = {
@@ -241,17 +257,6 @@ function isCandidateFresh(
   return metadata["planArtifactId"] === latestPlan.id;
 }
 
-function buildAgentRuntime(): IAgentRuntime {
-  return createAgentRuntime({
-    baseUrl: config.openai.baseUrl,
-    apiKey: config.openai.apiKey,
-    model: config.openai.model,
-    temperature: config.openai.temperature,
-    maxTokens: config.openai.maxTokens,
-    timeoutMs: config.openai.timeoutMs,
-  });
-}
-
 async function recordRuntimeToolCall(
   agentRunId: string,
   sessionId: string,
@@ -307,6 +312,212 @@ async function buildAgentInput(
       name: config.openai.model,
       config: {},
     },
+  };
+}
+
+/**
+ * 仅用于历史 workflow（尚未创建 AgentEngineBinding）的兼容回退。
+ * 新建 workflow 必须走下方的 SPI 路径；该分支让旧数据可以安全完成或重试。
+ */
+function buildLegacyAgentRuntime(): IAgentRuntime {
+  return createAgentRuntime({
+    baseUrl: config.openai.baseUrl,
+    apiKey: config.openai.apiKey,
+    model: config.openai.model,
+    temperature: config.openai.temperature,
+    maxTokens: config.openai.maxTokens,
+    timeoutMs: config.openai.timeoutMs,
+  });
+}
+
+/**
+ * workflow-v1 只允许输出最终 artifact。运行过程的 toolCalls、trace、ledger 等
+ * 不属于 artifact，必须通过 outcome diagnostics 或语义事件传递。
+ */
+const workflowArtifactOutputSchema: JsonSchema = {
+  type: "object",
+  required: ["kind"],
+  properties: {
+    kind: { type: "string" },
+    form: { type: "object" },
+    markdown: { type: "string" },
+    decisionForm: { type: "object" },
+    messages: { type: "array" },
+    assistantMessage: { type: "string" },
+    reason: { type: "string" },
+    recoverable: { type: "boolean" },
+    details: { type: "object" },
+  },
+  additionalProperties: false,
+  oneOf: [
+    {
+      properties: { kind: { const: "clarification_request" }, form: { type: "object", required: ["fields"], properties: { fields: { type: "array" } } } },
+      required: ["kind", "form"],
+    },
+    {
+      properties: { kind: { const: "plan_markdown" }, markdown: { type: "string", minLength: 1 }, decisionForm: { type: "object" } },
+      required: ["kind", "markdown", "decisionForm"],
+    },
+    {
+      properties: { kind: { const: "candidate_a2ui_messages" }, messages: { type: "array" }, assistantMessage: { type: "string" } },
+      required: ["kind", "messages"],
+    },
+    {
+      properties: { kind: { const: "decision_form" }, form: { type: "object" } },
+      required: ["kind", "form"],
+    },
+    {
+      properties: { kind: { const: "failure" }, reason: { type: "string", minLength: 1 }, recoverable: { type: "boolean" }, details: { type: "object" } },
+      required: ["kind", "reason", "recoverable"],
+    },
+  ],
+} as SpiJsonObject;
+
+/** AJV 编译发生在启动期；adapter output 绝不因 TypeScript 断言而绕过运行时校验。 */
+const validateWorkflowArtifactOutput = new Ajv({ allErrors: true, strict: false }).compile(workflowArtifactOutputSchema);
+
+/**
+ * 将 workflow 状态投影为 profile 约定的独立 context material。
+ *
+ * 材料 ID 和 kind 描述任务语义，而不泄漏 Prisma、SSE 或具体 adapter 的实现细节。
+ * adapter 可以按自己的策略读取；Host 则统一执行版本、权限与字节预算校验。
+ */
+function createWorkflowContextMaterials(
+  taskInput: AgentWorkflowTaskInput,
+): WorkflowContextMaterial[] {
+  const material = (
+    materialId: string,
+    kind: string,
+    title: string,
+    summary: string,
+    content: SpiJsonObject | SpiJsonObject[] | string | null,
+  ): WorkflowContextMaterial => {
+    const serialized = JSON.stringify(content);
+    return {
+      materialId,
+      // 内容哈希让 adapter 可以可靠地报告实际读取的材料版本，而不是依赖运行 ID。
+      version: createHash("sha256").update(serialized).digest("hex").slice(0, 16),
+      kind,
+      title,
+      summary,
+      byteLength: Buffer.byteLength(serialized, "utf8"),
+      readable: true,
+      content,
+    };
+  };
+
+  const materials: WorkflowContextMaterial[] = [
+    material("workflow.task", "task", "Workflow task", `task=${taskInput.task}; gate=${taskInput.gate}`, {
+      sessionId: taskInput.sessionId,
+      workflowId: taskInput.workflowId,
+      workflowStepId: taskInput.workflowStepId,
+      agentRunId: taskInput.agentRunId ?? null,
+      task: taskInput.task,
+      gate: taskInput.gate,
+      stepType: taskInput.stepType ?? null,
+      stageState: taskInput.stageState ?? null,
+      userMessage: taskInput.userMessage,
+      revisionText: taskInput.revisionText ?? null,
+      clarificationAnswers: taskInput.clarificationAnswers ?? null,
+      model: taskInput.model,
+    }),
+    material("conversation.recent", "conversation", "Recent conversation", `${taskInput.recentMessages.length} recent messages`, taskInput.recentMessages as unknown as SpiJsonObject[]),
+    material("documents.uploaded", "documents", "Uploaded documents", `${taskInput.uploadedFiles.length} uploaded files`, taskInput.uploadedFiles as unknown as SpiJsonObject[]),
+    material("skills.enabled", "skills", "Enabled skills", `${taskInput.enabledSkills.length} enabled skills`, taskInput.enabledSkills as unknown as SpiJsonObject[]),
+    material("ui.snapshot.current", "ui_snapshot", "Current UI snapshot", taskInput.currentSnapshot ? "Current rendered surface state" : "No current surface snapshot", taskInput.currentSnapshot as unknown as SpiJsonObject | null),
+    material("catalog.descriptor", "catalog", "A2UI catalog descriptor", `${taskInput.catalogId}@${taskInput.catalogVersion}`, {
+      catalogId: taskInput.catalogId,
+      catalogVersion: taskInput.catalogVersion,
+      rendererVersion: taskInput.rendererVersion,
+    }),
+    material("workflow.available_tools", "capability_selection", "Available capabilities", "Capabilities enabled for this task", taskInput.availableTools as unknown as SpiJsonObject[]),
+  ];
+
+  if (taskInput.previousPlanMarkdown) {
+    materials.push(material("workflow.plan.previous", "artifact", "Previous plan", "Most recent plan artifact", taskInput.previousPlanMarkdown));
+  }
+  if (taskInput.previousCandidate) {
+    materials.push(material("workflow.candidate.previous", "artifact", "Previous candidate", "Most recent candidate artifact", taskInput.previousCandidate as unknown as SpiJsonObject));
+  }
+  if (taskInput.workflowContext) {
+    materials.push(material("workflow.context", "workflow_context", "Workflow context", "Task-specific workflow context", taskInput.workflowContext as unknown as SpiJsonObject));
+  }
+  if (taskInput.resourceLedger) {
+    materials.push(material("workflow.resource_ledger", "resource_ledger", "Resource ledger", "Previously disclosed resources", taskInput.resourceLedger as unknown as SpiJsonObject));
+  }
+  return materials;
+}
+
+/** 目前可由任意 workflow-v1 adapter 调用的无副作用平台能力。 */
+const workflowCapabilityCatalog: CapabilityDescriptor[] = [
+  {
+    name: "a2ui.validate",
+    description: "Validate candidate A2UI server messages against the active catalog and snapshot.",
+    inputSchema: { type: "object", required: ["messages"], properties: { messages: { type: "array" } } },
+    outputSchema: { type: "object", required: ["valid", "errors", "warnings", "normalizedMessages"] },
+    mode: "read",
+  },
+];
+
+/**
+ * 把 adapter 返回的 artifact 收敛为兼容的 workflow 结果。
+ * 此处不依据 engineId 分支；任何 adapter 都必须满足 task 的 outputSchema。
+ */
+function mapEngineOutcome(outcome: AgentRunOutcome, task: AgentWorkflowTaskInput["task"], gate: WorkflowStepType): AgentWorkflowTaskResult {
+  if (outcome.status !== "completed") {
+    const failure = outcome.failure;
+    return {
+      parsedResult: {
+        kind: "failure",
+        reason: failure.message,
+        recoverable: failure.retryable,
+        details: { code: failure.code, ...(failure.details ?? {}) },
+      },
+      debugMetadata: {
+        task,
+        gate,
+        engineFailure: {
+          code: failure.code,
+          contextUsed: outcome.contextUsed.map(({ materialId, version }) => ({ materialId, version })),
+        },
+      },
+      toolCalls: [],
+      rawOutputPreview: "",
+      attemptCount: 1,
+      tokenUsage: {},
+    };
+  }
+  const artifact = toJsonObject(outcome.output);
+  if (!validateWorkflowArtifactOutput(artifact)) {
+    return {
+      parsedResult: { kind: "failure", reason: "Agent engine 输出不符合 workflow task schema", recoverable: true, details: { code: "invalid_output" } },
+      debugMetadata: {
+        task,
+        gate,
+        invalidEngineOutput: true,
+        schemaErrors: validateWorkflowArtifactOutput.errors?.map((error) => ({ instancePath: error.instancePath, message: error.message ?? "schema validation failed" })) ?? [],
+      },
+      toolCalls: [], rawOutputPreview: "", attemptCount: 1, tokenUsage: {},
+    };
+  }
+  const diagnostics = toJsonObject(outcome.diagnostics);
+  return {
+    parsedResult: artifact as unknown as ParsedAgentResult,
+    // contextUsed 是本次 adapter 自主选择的材料版本，写入 run metadata 供审计和
+    // 后续 context 失效诊断；平台不会据此推断或重组引擎 prompt。
+    debugMetadata: {
+      ...toJsonObject(diagnostics["legacyDebugMetadata"]),
+      engine: {
+        contextUsed: outcome.contextUsed.map(({ materialId, version }) => ({ materialId, version })),
+        diagnostics,
+      },
+    },
+    toolCalls: Array.isArray(diagnostics["legacyToolCalls"]) ? diagnostics["legacyToolCalls"] as unknown as ToolCallRecord[] : [],
+    rawOutputPreview: typeof diagnostics["legacyRawOutputPreview"] === "string" ? diagnostics["legacyRawOutputPreview"] : "",
+    attemptCount: typeof diagnostics["legacyAttemptCount"] === "number" ? diagnostics["legacyAttemptCount"] : 1,
+    tokenUsage: toJsonObject(diagnostics["legacyTokenUsage"]),
+    traceSummary: diagnostics["legacyTraceSummary"] as unknown as AgentRunTraceSummaryDto | undefined,
+    resourceLedger: diagnostics["legacyResourceLedger"] as unknown as ResourceLedgerSnapshot | undefined,
   };
 }
 
@@ -384,48 +595,110 @@ async function runWorkflowTask(input: {
   const resourceLedger = workflowMetadata["resourceLedger"] as
     ResourceLedgerSnapshot | undefined;
 
-  const runtime = buildAgentRuntime();
-  cancellationService.register(run.id);
+  const cancellationToken = cancellationService.register(run.id);
   try {
-    const toolCallTasks: Array<Promise<void>> = [];
     let result: AgentWorkflowTaskResult;
     try {
-      result = await runtime.runWorkflowTask(
-        {
-          ...agentInput,
+      const taskInput: AgentWorkflowTaskInput = {
+        ...agentInput,
+        workflowId: input.workflowId,
+        workflowStepId: input.workflowStepId,
+        agentRunId: run.id,
+        gate: input.gate,
+        stepType: input.gate,
+        stageState: input.stageState ?? null,
+        task: input.task,
+        availableTools: input.availableTools ?? ["askClarification", "askUserDecision", "getSkillContent", "getSkillReferenceContent", "getCatalogComponentDetails"],
+        clarificationAnswers: input.clarificationAnswers,
+        previousPlanMarkdown: input.previousPlanMarkdown,
+        previousCandidate: input.previousCandidate,
+        revisionText: input.revisionText,
+        workflowContext: input.workflowContext,
+        ...(resourceLedger ? { resourceLedger } : {}),
+      };
+      const binding = await agentEngineRepository.findBinding(input.workflowId);
+      if (!binding) {
+        // 数据库 migration 前创建的 workflow 没有 binding。保留旧 Runtime 路径，
+        // 但不为它补写 binding，从而避免在恢复时悄然改变已存在运行的引擎归属。
+        result = await buildLegacyAgentRuntime().runWorkflowTask(
+          taskInput,
+          // 兼容旧 Runtime 回调签名；持久化统一在 outcome/result 收敛后执行，
+          // 避免 callback 与 result.toolCalls 双写同一条工具审计记录。
+          () => undefined,
+          (event) => streamService.send(input.sessionId, { event: "agent_trace_event", data: event }),
+        );
+      } else {
+
+        // Binding config 是不透明且不含密钥的；此处由 Host 依据当前环境补全 adapter
+        // 的运行参数。引擎实现仍无法感知 workflow、Prisma 或 SSE。
+        const bindingConfig = toJsonObject(binding.config);
+        const engineConfig: SpiJsonObject = binding.engineId === "react"
+          ? { baseUrl: config.openai.baseUrl, apiKey: config.openai.apiKey, model: config.openai.model, temperature: config.openai.temperature, maxTokens: config.openai.maxTokens, timeoutMs: config.openai.timeoutMs }
+          : {
+              ...bindingConfig,
+              apiKeyEnv: typeof bindingConfig["apiKeyEnv"] === "string" ? bindingConfig["apiKeyEnv"] : config.agentEngine.codex.apiKeyEnv,
+              workingDirectory: resolve(config.agentEngine.codex.workDirectoryRoot, input.sessionId, input.workflowId),
+              sessionDirectory: resolve(config.agentEngine.codex.sessionDirectoryRoot, input.sessionId, input.workflowId),
+            };
+        if (binding.engineId === "codex-sdk") {
+          // 工作目录和 Codex thread session 目录均以 session/workflow 隔离；
+          // 后者应挂载到持久卷，才能在后端重启后 resume 同一 thread。
+          await Promise.all([
+            mkdir(engineConfig["workingDirectory"] as string, { recursive: true }),
+            mkdir(engineConfig["sessionDirectory"] as string, { recursive: true }),
+          ]);
+        }
+        const engine = await agentEngineRegistry.create(binding.engineId, engineConfig);
+        const host = new WorkflowAgentEngineHost({
+          sessionId: input.sessionId,
           workflowId: input.workflowId,
-          workflowStepId: input.workflowStepId,
           agentRunId: run.id,
-          gate: input.gate,
-          stepType: input.gate,
-          stageState: input.stageState ?? null,
+        materials: createWorkflowContextMaterials(taskInput),
+        capabilities: {
+          // SPI capability 的输入输出保持 JSON；adapter 不接触平台校验器或 catalog 私有实现。
+          "a2ui.validate": (capabilityInput) => {
+            const value = toJsonObject(capabilityInput);
+            const messages = Array.isArray(value["messages"])
+              ? (value["messages"] as unknown as A2UIServerMessage[])
+              : [];
+            return validateA2UI({
+              messages,
+              catalogId: taskInput.catalogId,
+              currentSnapshot: taskInput.currentSnapshot,
+            }) as unknown as SpiJsonObject;
+          },
+        },
+        maxContextBytes: 2 * 1024 * 1024,
+        maxEvents: 1_000,
+        });
+        const outcome = await engine.run({
+          runId: run.id,
           task: input.task,
-          availableTools: input.availableTools ?? [
-            "askClarification",
-            "askUserDecision",
-            "getSkillContent",
-            "getSkillReferenceContent",
-            "getCatalogComponentDetails",
-          ],
-          clarificationAnswers: input.clarificationAnswers,
-          previousPlanMarkdown: input.previousPlanMarkdown,
-          previousCandidate: input.previousCandidate,
-          revisionText: input.revisionText,
-          workflowContext: input.workflowContext,
-          ...(resourceLedger ? { resourceLedger } : {}),
-        },
-        (record) => {
-          toolCallTasks.push(
-            recordRuntimeToolCall(run.id, input.sessionId, record),
-          );
-        },
-        (event) => {
-          streamService.send(input.sessionId, {
-            event: "agent_trace_event",
-            data: event,
-          });
-        },
-      );
+          // SPI input 只携带控制面信息；正文一律由 adapter 按 context catalog 读取。
+          input: {
+            task: input.task,
+            gate: input.gate,
+            workflowProfile: "workflow-v1",
+          },
+          outputSchema: workflowArtifactOutputSchema,
+          contextCatalog: await host.listContext(),
+          capabilityCatalog: workflowCapabilityCatalog,
+          continuation: binding.continuation as never ?? undefined,
+        }, host, {
+          signal: cancellationToken.abortController.signal,
+          deadline: new Date(Date.now() + config.openai.timeoutMs),
+          maxEvents: 1_000,
+          maxContextBytes: 2 * 1024 * 1024,
+        });
+        if (outcome.status === "failed" && outcome.failure.nativePayload !== undefined) {
+          // 完整原生 payload 属于受限审计数据：只在失败时加密落库，绝不混入 run metadata。
+          await host.persistFailureNativePayload(outcome.failure.nativePayload);
+        }
+        if (outcome.status !== "cancelled" && outcome.continuation) {
+          await agentEngineRepository.updateContinuation(input.workflowId, outcome.continuation as unknown as Prisma.InputJsonValue);
+        }
+        result = mapEngineOutcome(outcome, input.task, input.gate);
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       logger.error(
@@ -462,7 +735,7 @@ async function runWorkflowTask(input: {
         tokenUsage: {},
       };
     }
-    await Promise.all(toolCallTasks);
+    await Promise.all(result.toolCalls.map((record) => recordRuntimeToolCall(run.id, input.sessionId, record)));
 
     if (cancellationService.isCancelled(run.id)) {
       throw conflict("AgentRun 已被用户停止", "AGENT_RUN_CANCELLED", {
@@ -839,6 +1112,30 @@ export const workflowService = {
       intent: input.intent,
       metadata: input.metadata ?? {},
       startedAt: new Date(),
+    });
+
+    // 引擎绑定在 workflow 创建时冻结。配置仅保存 adapter 可解释的非敏感引用；
+    // 运行时真正的密钥仍由 adapter 从环境读取，平台不持久化其值。
+    const engineId = defaultAgentEngineId();
+    const manifest = agentEngineRegistry.get(engineId).manifest;
+    const opaqueConfig =
+      manifest.engineId === "codex-sdk"
+        ? {
+            apiKeyEnv: config.agentEngine.codex.apiKeyEnv,
+            model: config.agentEngine.codex.model ?? null,
+            reasoningEffort: config.agentEngine.codex.reasoningEffort ?? null,
+          }
+        : { apiKeyEnv: "OPENAI_COMPAT_API_KEY" };
+    const configFingerprint = createHash("sha256")
+      .update(`${manifest.engineId}:${manifest.version}:${JSON.stringify(opaqueConfig)}`)
+      .digest("hex");
+    await agentEngineRepository.createBinding({
+      workflow: { connect: { id: workflow.id } },
+      session: { connect: { id: input.sessionId } },
+      engineId: manifest.engineId,
+      pluginVersion: manifest.version,
+      config: opaqueConfig,
+      configFingerprint,
     });
 
     streamService.send(input.sessionId, {
@@ -1278,9 +1575,12 @@ export const workflowService = {
   },
 
   /**
-   * 用户在 retryable 失败后追加普通消息时，复用当前失败 step 继续执行。
+   * 用户在 retryable 失败后追加普通消息时，以该消息作为补充上下文，
+   * 为当前失败 step 创建新的 AgentRun。
    *
    * 注意：本方法只恢复同一个 workflow 内最新失败 step，不创建新 workflow，也不创建新的同类型 step。
+   * `context_insufficient` 没有独立的特殊分支：它同样走这里，从而确保旧 run
+   * 不会被改写，用户的补充文本只会进入新的 run。
    * `validate` 失败会回到其来源 `generate_a2ui` step 重新生成 candidate。
    *
    * @param input - 恢复触发消息与目标 workflow

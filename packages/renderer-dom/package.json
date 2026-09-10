@@ -1,0 +1,23 @@
+{
+  "name": "@a2ui-platform/renderer-dom",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "source": "./src/index.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js", "default": "./src/index.ts" },
+    "./styles.css": "./dist/styles.css"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json --noEmit && vite build",
+    "demo": "vite --config renderer-capability-demo/vite.config.ts --host 127.0.0.1",
+    "demo:build": "vite build --config renderer-capability-demo/vite.config.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "lint": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": { "@a2ui-platform/renderer-core": "workspace:*" },
+  "devDependencies": { "typescript": "^5.7.2", "vite": "^6.0.3", "vitest": "^2.1.8" }
+}

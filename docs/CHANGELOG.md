@@ -1,5 +1,46 @@
 ﻿# 更新日志
 
+## 2026-09-08
+
+### Renderer 迁移回归修复
+
+- 修复 surface 切换/同 ID 重建后依赖路径相同时订阅旧模型的问题。
+- Preview 按 surfaceId 增量管理 host，追加消息保持 Tabs 和输入状态，完整替换正确重置；阻止卸载后重新挂载。
+- 恢复 Grid/Container/Flex/Spacer 布局、Card 内容区域、表单模式/属性和值类型、图片/媒体视觉属性以及原有 CSS 类名。
+- 修复根按钮与 Tabs/选项焦点恢复，保留文本选区，并延迟 IME composition 中的数据写回。
+- DataModel 复制输入 JSON，避免交互污染原始消息导致重放失真；补充 Renderer 和 Preview 生命周期回归测试。
+
+## 2026-09-04
+
+### Renderer
+
+- 确认 Renderer 长期架构锚点为框架无关 DOM API runtime，产品、设计和 A2UI 契约文档不再把 Renderer 绑定到 Vue。
+- 新增 DOM A2UI Renderer scratch，规划去除 renderer package 的 Vue 依赖、实现函数式 mount API、Web Component wrapper 和显式 dataModel 响应式。
+- Renderer core model 去除 Vue reactivity 依赖，`DataModel`、`ComponentModel`、`SurfaceModel` 和 `SurfaceGroupModel` 改为普通 TypeScript 数据结构加显式订阅。
+- Renderer 完成纯 DOM runtime 迁移，新增 `DomSurfaceHost`、`mountA2uiSurface()`、`renderDomNode()`、host-level UI state store、焦点恢复和 DOM Basic UI registry。
+- 新增 `<a2ui-surface>` Web Component wrapper 与 surface group registry，支持 property 注入、registry 注入、`surface-id` 切换和 light DOM 渲染。
+- renderer capability demo 和 Frontend preview 改为通过 DOM mount API 挂载 Renderer 子树；renderer package 移除 Vue dependency、`vue-tsc`、Vite Vue plugin、Vue SFC renderer/UI 文件和旧注册表。
+- 同步 Renderer、Basic Catalog、Frontend、Integration 实现文档和 scratch issues；补充 DOM 行为测试覆盖 dataModel 刷新、List item 相对路径、action.script、表单写回、Tabs 本地状态、20 个正式 Basic Catalog 组件和 Web Component 生命周期。
+
+## 2026-08-28
+
+### Renderer
+
+- 新增不感知 A2UI 的普通 Basic UI 组件库，并将 `A2uiSurface` 切换为 `RenderNode -> VNode` 新链路。
+- 新增 RenderNode builder、通用 props/model/action/slot resolver 和依赖收集订阅机制，表单绑定统一映射为 `modelValue + update:modelValue`。
+- `List` 和 `Tabs` 通过统一 slot 解析路径处理结构展开，`Tabs` 只渲染当前 active panel。
+- `Modal` 不进入新的正式 Basic Catalog，旧组件文件仅作为 legacy 参考保留。
+
+### Shared / Agent
+
+- 新增 shared TypeScript Basic Catalog Definition 作为组件集合、字段 schema、字段语义和 Renderer 映射单一事实源。
+- Agent 组件披露和 `validateA2UI` 改为读取 shared Catalog 派生数据，删除手写 `basic-catalog-schema.json`。
+- 补充校验测试，确认 `Modal` 不再出现在 prompt-visible Catalog 且不能通过新 Catalog 校验。
+
+### 文档
+
+- 新增 Renderer 普通组件库重构 spec、ADR 和本地 issues，并同步 A2UI 契约、Renderer/Agent/Shared 模块文档与能力矩阵。
+
 ## 2026-08-24
 
 ### Workflow

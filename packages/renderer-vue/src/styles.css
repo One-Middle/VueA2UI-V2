@@ -1,0 +1,875 @@
+/* ================================================================
+   A2UI Renderer 基础样式
+   ================================================================ */
+
+:root {
+  --a2ui-color-text: #1f2937;
+  --a2ui-color-muted: #6b7280;
+  --a2ui-color-border: #e5e7eb;
+  --a2ui-color-surface: #ffffff;
+  --a2ui-color-soft: #f8fafc;
+  --a2ui-color-brand: #22c55e;
+  --a2ui-color-brand-strong: #16a34a;
+  --a2ui-color-success: #16a34a;
+  --a2ui-color-warning: #d97706;
+  --a2ui-color-danger: #ef4444;
+  --a2ui-color-danger-strong: #dc2626;
+  --a2ui-radius-sm: 6px;
+  --a2ui-radius-md: 8px;
+  --a2ui-radius-lg: 12px;
+  --a2ui-shadow-sm: 0 4px 10px rgba(15, 23, 42, 0.08);
+  --a2ui-shadow-md: 0 12px 28px rgba(15, 23, 42, 0.12);
+}
+
+/* ── Surface ─────────────────────────────────────────────────── */
+.a2ui-surface {
+  min-height: 160px;
+  padding: 16px;
+  color: var(--a2ui-color-text);
+  background: var(--a2ui-color-surface);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.a2ui-empty {
+  color: #6b7280;
+  font-size: 14px;
+  padding: 24px;
+  text-align: center;
+  border: 1px dashed #d1d5db;
+  border-radius: 6px;
+}
+
+/* ── Fallback（未知/未注册组件占位） ──────────────────────────── */
+.a2ui-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 8px 12px;
+  color: #9ca3af;
+  font-size: 13px;
+  border: 2px dashed #d1d5db;
+  border-radius: 4px;
+  background: #f9fafb;
+}
+
+/* ── Flex 布局容器 ───────────────────────────────────────────── */
+.a2ui-row {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.a2ui-column {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.a2ui-grid {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.a2ui-grid--density-compact { gap: 8px; }
+.a2ui-grid--density-comfortable { gap: 16px; }
+.a2ui-grid--density-spacious { gap: 24px; }
+
+.a2ui-container {
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.a2ui-container--width-narrow { max-width: 640px; }
+.a2ui-container--width-content { max-width: 960px; }
+.a2ui-container--width-wide { max-width: 1200px; }
+.a2ui-container--width-full { max-width: none; }
+.a2ui-container--padding-none { padding: 0; }
+.a2ui-container--padding-sm { padding: 8px; }
+.a2ui-container--padding-md { padding: 16px; }
+.a2ui-container--padding-lg { padding: 24px; }
+.a2ui-container--align-start { margin-inline: 0 auto; }
+.a2ui-container--align-center { margin-inline: auto; }
+
+.a2ui-spacer {
+  flex: 0 0 auto;
+}
+
+.a2ui-row--role-toolbar,
+.a2ui-row--role-actions {
+  align-items: center;
+}
+
+.a2ui-row--role-actions {
+  justify-content: flex-end;
+}
+
+.a2ui-row--role-metadata {
+  color: var(--a2ui-color-muted);
+  font-size: 12px;
+}
+
+.a2ui-row--density-compact,
+.a2ui-column--density-compact {
+  gap: 4px;
+}
+
+.a2ui-row--density-spacious,
+.a2ui-column--density-spacious {
+  gap: 16px;
+}
+
+.a2ui-column--role-centered {
+  align-items: center;
+  justify-content: center;
+}
+
+.a2ui-row--divider-between > * + * {
+  border-left: 1px solid var(--a2ui-color-border);
+  padding-left: 8px;
+}
+
+.a2ui-column--divider-between > * + * {
+  border-top: 1px solid var(--a2ui-color-border);
+  padding-top: 8px;
+}
+
+.a2ui-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--a2ui-color-border);
+  border-radius: var(--a2ui-radius-md);
+  background: var(--a2ui-color-surface);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.a2ui-card--variant-plain {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.a2ui-card--variant-elevated {
+  box-shadow: var(--a2ui-shadow-md);
+}
+
+.a2ui-card--variant-filled {
+  background: var(--a2ui-color-soft);
+}
+
+.a2ui-card--variant-interactive {
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.a2ui-card--variant-interactive:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--a2ui-shadow-md);
+}
+
+.a2ui-card--preset-media {
+  gap: 10px;
+  padding: 12px;
+}
+
+.a2ui-card-title {
+  color: #111827;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.a2ui-card-header {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.a2ui-card-subtitle,
+.a2ui-card-footer {
+  color: var(--a2ui-color-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.a2ui-card--density-compact {
+  gap: 8px;
+  padding: 12px;
+}
+
+.a2ui-card--density-spacious {
+  gap: 16px;
+  padding: 20px;
+}
+
+.a2ui-card--role-metric .a2ui-card-title {
+  color: var(--a2ui-color-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.a2ui-card--role-emptyState {
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+  text-align: center;
+  color: var(--a2ui-color-muted);
+  border-style: dashed;
+}
+
+.a2ui-card--selected {
+  border-color: var(--a2ui-color-brand);
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.16);
+}
+
+.a2ui-card--clickable {
+  cursor: pointer;
+}
+
+/* ── 文本层级 ────────────────────────────────────────────────── */
+.a2ui-text-h1 { font-size: 32px; font-weight: 700; line-height: 1.2; margin: 0; }
+.a2ui-text-h2 { font-size: 24px; font-weight: 600; line-height: 1.3; margin: 0; }
+.a2ui-text-h3 { font-size: 20px; font-weight: 600; line-height: 1.4; margin: 0; }
+.a2ui-text-h4 { font-size: 18px; font-weight: 500; line-height: 1.4; margin: 0; }
+.a2ui-text-h5 { font-size: 16px; font-weight: 500; line-height: 1.5; margin: 0; }
+.a2ui-text-body { font-size: 14px; font-weight: 400; line-height: 1.5; margin: 0; }
+.a2ui-text-caption { font-size: 12px; font-weight: 400; line-height: 1.4; color: #6b7280; }
+
+.a2ui-text--variant-title,
+.a2ui-text--preset-title {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.a2ui-text--variant-subtitle,
+.a2ui-text--preset-subtitle {
+  font-size: 14px;
+  color: var(--a2ui-color-muted);
+}
+
+.a2ui-text--variant-metric,
+.a2ui-text--preset-metric {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.a2ui-text--tone-neutral { color: var(--a2ui-color-muted); }
+.a2ui-text--tone-brand { color: var(--a2ui-color-brand); }
+.a2ui-text--tone-success { color: #16a34a; }
+.a2ui-text--tone-warning { color: #d97706; }
+.a2ui-text--tone-danger { color: var(--a2ui-color-danger); }
+
+.a2ui-text--decoration-underline { text-decoration: underline; }
+.a2ui-text--decoration-lineThrough,
+.a2ui-text--role-previousPrice {
+  text-decoration: line-through;
+}
+.a2ui-text--decoration-overline { text-decoration: overline; }
+.a2ui-text--emphasis-muted,
+.a2ui-text--role-timestamp,
+.a2ui-text--role-emptyState {
+  color: var(--a2ui-color-muted);
+}
+.a2ui-text--emphasis-strong,
+.a2ui-text--role-price {
+  font-weight: 700;
+}
+.a2ui-text--emphasis-danger { color: var(--a2ui-color-danger); }
+.a2ui-text--emphasis-success { color: var(--a2ui-color-success); }
+.a2ui-text--emphasis-warning { color: var(--a2ui-color-warning); }
+.a2ui-text--role-discount { color: var(--a2ui-color-danger); font-weight: 700; }
+.a2ui-text--role-status { font-weight: 600; }
+
+/* ── Button ──────────────────────────────────────────────────── */
+.a2ui-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #ffffff;
+  background: var(--a2ui-color-brand);
+  border: none;
+  border-radius: var(--a2ui-radius-sm);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s, opacity 0.15s;
+}
+
+.a2ui-button:hover {
+  background: var(--a2ui-color-brand-strong);
+}
+
+.a2ui-button:active {
+  background: var(--a2ui-color-brand-strong);
+}
+
+.a2ui-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.a2ui-button--variant-secondary {
+  color: #0f172a;
+  background: #e2e8f0;
+}
+
+.a2ui-button--variant-secondary:hover {
+  background: #cbd5e1;
+}
+
+.a2ui-button--variant-outline {
+  color: var(--a2ui-color-text);
+  background: transparent;
+  border: 1px solid var(--a2ui-color-border);
+}
+
+.a2ui-button--variant-outline:hover {
+  background: var(--a2ui-color-soft);
+}
+
+.a2ui-button--variant-ghost {
+  color: var(--a2ui-color-text);
+  background: transparent;
+}
+
+.a2ui-button--variant-ghost:hover {
+  background: rgba(15, 23, 42, 0.06);
+}
+
+.a2ui-button--variant-danger,
+.a2ui-button--tone-danger {
+  color: #ffffff;
+  background: var(--a2ui-color-danger);
+}
+
+.a2ui-button--variant-danger:hover,
+.a2ui-button--tone-danger:hover {
+  background: var(--a2ui-color-danger-strong);
+}
+
+.a2ui-button--intent-primary {
+  color: #ffffff;
+  background: var(--a2ui-color-brand);
+}
+
+.a2ui-button--intent-secondary {
+  color: #0f172a;
+  background: #e2e8f0;
+}
+
+.a2ui-button--intent-danger {
+  color: #ffffff;
+  background: var(--a2ui-color-danger);
+}
+
+.a2ui-button--intent-success {
+  color: #ffffff;
+  background: var(--a2ui-color-success);
+}
+
+.a2ui-button--intent-warning {
+  color: #111827;
+  background: #facc15;
+}
+
+.a2ui-button--importance-quiet {
+  color: var(--a2ui-color-text);
+  background: transparent;
+}
+
+.a2ui-button--importance-prominent {
+  box-shadow: var(--a2ui-shadow-sm);
+}
+
+.a2ui-button--shape-pill,
+.a2ui-button--shape-circle {
+  border-radius: 999px;
+}
+
+.a2ui-button--shape-square {
+  border-radius: 0;
+}
+
+.a2ui-button--shape-circle,
+.a2ui-button--icon-only {
+  width: 40px;
+  min-width: 40px;
+  height: 40px;
+  padding: 0;
+}
+
+.a2ui-button-icon {
+  display: inline-flex;
+  line-height: 1;
+}
+
+.a2ui-button--size-sm {
+  min-height: 30px;
+  padding: 5px 10px;
+  font-size: 12px;
+}
+
+.a2ui-button--size-md {
+  min-height: 36px;
+}
+
+.a2ui-button--size-lg {
+  min-height: 44px;
+  padding: 10px 18px;
+  font-size: 15px;
+}
+
+.a2ui-button--preset-buttonIcon {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0;
+  border-radius: 999px;
+}
+
+.a2ui-button--preset-buttonIcon.a2ui-button--size-sm {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+}
+
+.a2ui-button--preset-buttonIcon.a2ui-button--size-lg {
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  min-height: 48px;
+}
+
+.a2ui-button--full-width {
+  width: 100%;
+}
+
+/* ── TextField ───────────────────────────────────────────────── */
+.a2ui-textfield {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.a2ui-textfield-control {
+  display: flex;
+  align-items: stretch;
+}
+
+.a2ui-textfield-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.a2ui-textfield-input {
+  min-width: 0;
+  flex: 1;
+  padding: 8px 12px;
+  font-size: 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.a2ui-field-affix {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  color: var(--a2ui-color-muted);
+  font-size: 13px;
+  border: 1px solid #d1d5db;
+  background: var(--a2ui-color-soft);
+}
+
+.a2ui-field-affix:first-child {
+  border-right: 0;
+  border-radius: 6px 0 0 6px;
+}
+
+.a2ui-field-affix:last-child {
+  border-left: 0;
+  border-radius: 0 6px 6px 0;
+}
+
+.a2ui-textfield-control .a2ui-field-affix:first-child + .a2ui-textfield-input {
+  border-radius: 0 6px 6px 0;
+}
+
+.a2ui-textfield-control .a2ui-textfield-input:has(+ .a2ui-field-affix) {
+  border-radius: 6px 0 0 6px;
+}
+
+.a2ui-field-description,
+.a2ui-field-help,
+.a2ui-field-error {
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.a2ui-field-description,
+.a2ui-field-help {
+  color: var(--a2ui-color-muted);
+}
+
+.a2ui-field-error,
+.a2ui-field-required {
+  color: var(--a2ui-color-danger);
+}
+
+.a2ui-field--validation-error .a2ui-textfield-input,
+.a2ui-field--validation-error .a2ui-choicepicker,
+.a2ui-field--validation-error .a2ui-datetimeinput-input {
+  border-color: var(--a2ui-color-danger);
+}
+
+.a2ui-field--validation-success .a2ui-textfield-input,
+.a2ui-field--validation-success .a2ui-choicepicker,
+.a2ui-field--validation-success .a2ui-datetimeinput-input {
+  border-color: var(--a2ui-color-success);
+}
+
+.a2ui-field--density-compact {
+  gap: 2px;
+}
+
+.a2ui-field--density-compact .a2ui-textfield-input,
+.a2ui-field--density-compact .a2ui-choicepicker,
+.a2ui-field--density-compact .a2ui-datetimeinput-input {
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.a2ui-textfield-input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
+
+/* ── CheckBox ────────────────────────────────────────────────── */
+.a2ui-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.a2ui-checkbox-field,
+.a2ui-choicepicker-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.a2ui-choicepicker-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+}
+
+/* ── Modal ───────────────────────────────────────────────────── */
+.a2ui-modal-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+}
+
+.a2ui-modal {
+  position: relative;
+  min-width: 320px;
+  max-width: 90vw;
+  padding: 24px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+}
+
+.a2ui-modal-close {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  font-size: 18px;
+  color: #6b7280;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+/* ── 其他组件 ────────────────────────────────────────────────── */
+.a2ui-image {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+}
+
+.a2ui-image-frame {
+  margin: 0;
+}
+
+.a2ui-image-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 80px;
+  color: var(--a2ui-color-muted);
+  background: var(--a2ui-color-soft);
+  border: 1px dashed var(--a2ui-color-border);
+}
+
+.a2ui-image-caption {
+  margin-top: 6px;
+  color: var(--a2ui-color-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.a2ui-image--shape-square { border-radius: 0; }
+.a2ui-image--shape-rounded { border-radius: var(--a2ui-radius-md); }
+.a2ui-image--shape-circle {
+  border-radius: 999px;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+}
+.a2ui-image--role-avatar,
+.a2ui-image--role-thumbnail,
+.a2ui-image--role-cover,
+.a2ui-image--role-hero {
+  object-fit: cover;
+}
+
+.a2ui-image--preset-avatar {
+  aspect-ratio: 1 / 1;
+  border-radius: 999px;
+  object-fit: cover;
+}
+
+.a2ui-image--preset-thumbnail {
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+.a2ui-image--preset-hero {
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+}
+
+.a2ui-image--preset-logo {
+  width: auto;
+  max-height: 48px;
+  object-fit: contain;
+}
+
+.a2ui-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  width: 1em;
+  height: 1em;
+  line-height: 1;
+}
+
+.a2ui-icon--size-sm { font-size: 16px; }
+.a2ui-icon--size-md { font-size: 20px; }
+.a2ui-icon--size-lg { font-size: 26px; }
+.a2ui-icon--tone-neutral { color: var(--a2ui-color-muted); }
+.a2ui-icon--tone-brand { color: var(--a2ui-color-brand); }
+.a2ui-icon--tone-success { color: #16a34a; }
+.a2ui-icon--tone-warning { color: #d97706; }
+.a2ui-icon--tone-danger { color: var(--a2ui-color-danger); }
+.a2ui-icon--status-info { color: #2563eb; }
+.a2ui-icon--status-success { color: var(--a2ui-color-success); }
+.a2ui-icon--status-warning { color: var(--a2ui-color-warning); }
+.a2ui-icon--status-danger { color: var(--a2ui-color-danger); }
+
+.a2ui-icon--preset-badge,
+.a2ui-icon--preset-status {
+  width: 1.8em;
+  height: 1.8em;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.06);
+}
+
+.a2ui-video {
+  max-width: 100%;
+  border-radius: 4px;
+}
+
+.a2ui-audio {
+  width: 100%;
+  min-width: 240px;
+}
+
+.a2ui-divider {
+  border: none;
+  border-top: 1px solid #e5e7eb;
+  margin: 12px 0;
+}
+
+.a2ui-list {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.a2ui-list--dividers > li + li {
+  border-top: 1px solid var(--a2ui-color-border);
+  padding-top: 8px;
+}
+
+.a2ui-list-status {
+  color: var(--a2ui-color-muted);
+  font-size: 14px;
+  list-style: none;
+}
+
+/* ── Tabs ────────────────────────────────────────────────────── */
+.a2ui-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.a2ui-tabs-header {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.a2ui-tabs-tab {
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #6b7280;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.a2ui-tabs-tab--active {
+  color: #3b82f6;
+  border-bottom-color: #3b82f6;
+}
+
+.a2ui-tabs-content {
+  padding: 8px 0;
+}
+
+/* ── Slider ──────────────────────────────────────────────────── */
+.a2ui-slider {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.a2ui-slider-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.a2ui-slider-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.a2ui-slider-input {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--a2ui-color-brand);
+}
+
+.a2ui-slider-value {
+  font-size: 13px;
+  color: #6b7280;
+  min-width: 36px;
+}
+
+/* ── ChoicePicker / DateTimeInput ────────────────────────────── */
+.a2ui-choicepicker {
+  padding: 8px 12px;
+  font-size: 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  outline: none;
+}
+
+.a2ui-choicepicker-options {
+  display: inline-flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.a2ui-choicepicker-field--mode-segmented .a2ui-choicepicker-options {
+  gap: 0;
+}
+
+.a2ui-choicepicker-option {
+  padding: 7px 12px;
+  color: var(--a2ui-color-text);
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.a2ui-choicepicker-field--mode-segmented .a2ui-choicepicker-option {
+  border-radius: 0;
+}
+
+.a2ui-choicepicker-field--mode-segmented .a2ui-choicepicker-option:first-child {
+  border-radius: 6px 0 0 6px;
+}
+
+.a2ui-choicepicker-field--mode-segmented .a2ui-choicepicker-option:last-child {
+  border-radius: 0 6px 6px 0;
+}
+
+.a2ui-choicepicker-option--selected {
+  color: #ffffff;
+  background: var(--a2ui-color-brand);
+  border-color: var(--a2ui-color-brand);
+}
+
+.a2ui-datetimeinput {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.a2ui-datetimeinput-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.a2ui-datetimeinput-input {
+  padding: 8px 12px;
+  font-size: 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  outline: none;
+}
