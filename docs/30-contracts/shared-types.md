@@ -8,6 +8,7 @@
 
 - `packages/shared/src/a2ui.ts`：A2UI v0.9 message、component、surface、Catalog 相关类型。
 - `packages/shared/src/api.ts`：HTTP API request/response DTO。
+- `packages/shared/src/agent-engine-spi.ts`：Agent Engine Plugin、Engine、Host、运行输入输出、事件、预算和失败类型。
 - `packages/shared/src/agent.ts`：Agent 输入、结果、校验、tool call 类型。
 - `packages/shared/src/resource-ledger.ts`：Resource Ledger Snapshot 契约，跨 workflow task 共享已披露 Skill / Reference 的元信息。
 - `packages/shared/src/sse.ts`：SSE event 类型。
@@ -31,11 +32,8 @@
 - `WorkflowArtifactDto` 描述 workflow 产物，`kind` 包含 `clarification_form`、`decision_form`、`plan_markdown`、`candidate_a2ui_messages` 和 `validation_report`。
 - `MessageDto` 和 `AgentRunDto` 包含可选 `workflowId` 与 `workflowStepId`，用于恢复完整 workflow timeline。
 - `WorkflowActionRequest` 和 `WorkflowActionResponse` 是前端推进 workflow 的通用 action 契约。当前 action 集合为 `submit_clarification`、`submit_decision`、`retry_step` 和 `cancel`。`cancel` 的结果是可继续的 `interrupted` 状态，不是 workflow 删除或不可继续终态。
-- `PlatformSseEvent` 包含连接事件 `connected`、`heartbeat`，workflow 级事件：`workflow_started`、`workflow_step_updated`、`workflow_artifact_created`、`workflow_completed`、`workflow_failed`、`workflow_interrupted`，以及 ReAct 循环实时事件 `agent_trace_event`。
-- `AgentWorkflowTaskInput` 是 workflow task 执行入口的上下文快照，`task` 联合为 `plan`、`revise_plan`、`generate_a2ui`、`validate`、`preview_decision`、`initial_planning`、`generate_candidate`；后端实际只使用 `plan`、`revise_plan`、`generate_a2ui`、`preview_decision` 四种。它还携带 `availableTools`、`resourceLedger`、`agentRunId`、`clarificationAnswers`、`previousPlanMarkdown`、`previousCandidate`、`revisionText` 等跨 task 上下文。
-- `AgentToolName` 是 workflow 内 Agent 可调用的受控工具集合：`askClarification`、`askUserDecision`、`getSkillContent`、`getSkillReferenceContent`、`getCatalogComponentDetails`、`validateA2UI`。
-- `AgentWorkflowTaskResult` 是 workflow task 的执行结果，包含 `parsedResult`、`debugMetadata`、`toolCalls`、`rawOutputPreview`、`attemptCount`、`tokenUsage`、`traceSummary` 和 `resourceLedger`。
-- `AgentTraceEventDto` 与 `AgentRunTraceSummaryDto` 描述 ReAct 循环的实时 trace 事件与持久化摘要；trace 事件由 backend 零转换转发为 `agent_trace_event` SSE，摘要写入 `agent_runs.metadata.traceSummary`。
+- `PlatformSseEvent` 包含连接、workflow 和引擎无关的 `agent_engine_event`。`agent_trace_event` 保留为 ReAct 兼容事件，迁移完成后不再作为新增前端功能的依赖。
+- `AgentWorkflowTaskInput`、`AgentToolName`、`AgentWorkflowTaskResult`、`ParsedAgentResult`、`AgentTraceEventDto` 与 `AgentRunTraceSummaryDto` 为当前 ReAct workflow 的兼容类型；新平台路径必须使用 SPI request、capability、outcome 与 `AgentEngineEvent`。
 
 ### WorkflowStepType
 
@@ -205,17 +203,29 @@ export interface DecisionForm {
 }
 ```
 
-## 3.2 Agent Runtime 共享字段
+## 3.2 Agent Engine SPI 共享字段
+
+SPI 的权威行为定义见 [Agent Engine SPI v1 契约](./agent-engine-spi.md)。`packages/shared/src/agent-engine-spi.ts` 将承载以下跨模块类型：
+
+- `AgentEnginePlugin`、`AgentEngine`、`AgentEngineHost` 与 `AgentEngineManifest`：plugin 生命周期、实例创建和宿主边界。
+- `AgentRunRequest`、`AgentRunOptions`、`AgentRunOutcome`、`AgentEngineFailure`：引擎无关的任务、预算、终止结果与失败分类。
+- `ContextMaterialDescriptor`、`ContextMaterial`、`ContextUsed`：目录、按需正文和材料版本追踪。
+- `CapabilityDescriptor`、`CapabilityInvocation`、`CapabilityResult`：平台能力及调用关联。
+- `AgentEngineEvent`：统一语义事件、脱敏 native 摘要和 sequence。
+- `EngineBindingDto`、`AgentEngineEventDto`：平台 API / SSE 需要暴露的稳定引擎摘要；不包含 adapter 配置、continuation 或完整 native payload。
+
+SPI 类型不得引用 `WorkflowStepType`、A2UI、Prisma、Express、Vue、ReAct 或 Codex SDK 类型。workflow 业务通过 `AgentRunRequest.task`、`outputSchema` 和 capability catalog 投影到 SPI。
+
+## 3.3 ReAct Runtime 兼容类型
 
 - `AgentRunInput.enabledSkills` 包含 `id`、`name`、`description`、`content` 和可选 `references`；普通 `run()` 路径的初始 Prompt 只暴露 Skill 摘要和 Reference 摘要，完整内容按需披露。
 - `SkillReference` 包含 `id`、`title`、`content` 和可选 `description`，表示隶属于单个 Skill 的参考资料正文。
 - `ToolCallRecord.phase` 用于标记工具调用所属阶段，后端 SSE 会将该阶段透传给前端。
-- `IAgentRuntime` 接口定义两个入口：普通生成 `run(input, onToolCall?) → AgentRunResult`，以及 workflow 入口 `runWorkflowTask(input, onToolCall?, onTraceEvent?) → AgentWorkflowTaskResult`。后端只依赖此接口，不感知具体实现。
-- `AgentRuntimeFactoryConfig` 定义工厂函数所需的最小配置（模型 API 连接参数），与具体模型客户端实现无关。
-- `AgentRuntimeFactory` 是工厂函数签名，后端持有此类型引用；替换 Agent 实现只需换一行 import。
+- `IAgentRuntime` 接口定义两个入口：普通生成 `run(input, onToolCall?) → AgentRunResult`，以及 workflow 入口 `runWorkflowTask(input, onToolCall?, onTraceEvent?) → AgentWorkflowTaskResult`。它仅作为 ReAct 迁移兼容外观，新 backend 路径不应新增依赖。
+- `AgentRuntimeFactoryConfig` 与 `AgentRuntimeFactory` 仅服务现有 OpenAI-compatible ReAct runtime；新 adapter 自己定义并校验不透明配置。
 - `ResourceLedgerSnapshot`（`resource-ledger.ts`）只保存已披露资源的键与元信息（`skill:<skillId>`、`reference:<skillId>:<referenceId>`），不保存正文；正文在每次 workflow task 运行前由 Agent Runtime 依据 `enabledSkills` 重新 hydrate。该 snapshot 存于 `AgentWorkflow.metadata.resourceLedger`，跨 task 共享已披露资源并做披露去重。
 
-## 3.3 Model IO Logging 契约
+## 3.4 Model IO Logging 契约
 
 Model IO Logging（模型输入输出日志）是本地开发诊断契约，不属于 HTTP API、SSE、数据库 schema 或用户可见 artifact 契约。
 

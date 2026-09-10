@@ -1,0 +1,24 @@
+# 03 - 事件、结构化输出与续跑映射
+
+**构建内容：** 将 Codex SDK 事件映射为语义事件+native payload，使用 outputSchema 输出 JSON，保存 thread continuation 和 contextUsed。
+
+**状态：** planned
+
+## 范围
+
+- 将 Codex SDK 事件映射为语义事件+native payload，使用 outputSchema 输出 JSON，保存 thread continuation 和 contextUsed。
+- 遵守平台 Core 与 Engine Adapter 的双向隔离。
+- 为公开行为补充与风险相称的测试。
+
+## 验收标准
+
+- [ ] 实时完整事件可输出。
+- [ ] 正常持久化摘要。
+- [ ] 失败保存完整 payload。
+- [ ] 状态不泄漏 SDK 类型。。
+
+## 非目标
+
+- 不把其他 scratch 的职责提前耦合进本 issue。
+- 不引入具体引擎或平台业务类型到 SPI。
+

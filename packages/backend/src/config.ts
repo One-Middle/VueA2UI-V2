@@ -23,6 +23,17 @@ export const config = {
   skills: {
     platformSource: platformSkillSource,
   },
+  agentEngine: {
+    defaultId: process.env.AGENT_ENGINE_DEFAULT ?? "react",
+    payloadEncryptionKey: process.env.AGENT_ENGINE_PAYLOAD_ENCRYPTION_KEY ?? "",
+    codex: {
+      apiKeyEnv: process.env.CODEX_API_KEY_ENV ?? "CODEX_API_KEY",
+      model: process.env.CODEX_MODEL,
+      reasoningEffort: process.env.CODEX_REASONING_EFFORT,
+      workDirectoryRoot: process.env.CODEX_WORK_DIRECTORY_ROOT ?? ".a2ui-agent-runs",
+      sessionDirectoryRoot: process.env.CODEX_SESSION_DIRECTORY_ROOT ?? ".a2ui-codex-sessions",
+    },
+  },
   openai: {
     baseUrl: process.env.OPENAI_COMPAT_BASE_URL ?? "https://api.openai.com/v1",
     apiKey: process.env.OPENAI_COMPAT_API_KEY ?? "",

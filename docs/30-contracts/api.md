@@ -81,7 +81,7 @@ workflow 的启动由 `POST /api/sessions/:sessionId/messages` 触发：`Message
 - `retry_step`
 - `cancel`
 
-`retry_step` 当前只支持重试最新的失败 `generate_a2ui` step。Codex 式续跑的主路径是用户向 `POST /api/sessions/:sessionId/messages` 追加普通消息，由后端在 `failed_retryable` workflow 上复用失败 step 并创建新的 AgentRun 记录本次尝试。
+`retry_step` 当前只支持重试最新的失败 `generate_a2ui` step。引擎续跑的主路径是用户向 `POST /api/sessions/:sessionId/messages` 追加普通消息，由后端在 `failed_retryable` workflow 上复用失败 step 并创建新的 AgentRun 记录本次尝试；是否使用某 adapter 的私有 continuation 由引擎绑定决定。
 
 `cancel` 表示用户主动停止当前运行，不表示删除 workflow 或把 workflow 置为不可继续终态。后端应中断当前 running AgentRun，并把 workflow 与当前 step 标记为 `interrupted`。对已 `interrupted` 的 workflow 重复 `cancel` 应幂等返回当前状态；对 awaiting User Gate 的 workflow 不需要 cancel；对 completed 或 terminal failed workflow 应返回不可取消错误。
 
@@ -132,9 +132,9 @@ workflow 的启动由 `POST /api/sessions/:sessionId/messages` 触发：`Message
 
 artifact 输出规则：
 
-- `clarification_form` 由 Agent 调用 `askClarification` 后生成。
-- `plan_markdown` 由 Agent 生成，并由 Agent Runtime 按页面目标、视觉效果、页面结构、界面元素、数据语义、交互行为执行 Markdown 最低标题校验。
-- `decision_form` 由 Agent 调用 `askUserDecision` 后生成，只在工具实际调用时展示为特殊 UI block。
+- `clarification_form`、`plan_markdown`、`decision_form` 和 `candidate_a2ui_messages` 均来自当前 task `outputSchema` 所约束的 SPI outcome；平台校验并映射为 artifact。
+- `plan_markdown` 仍由平台执行页面目标、视觉效果、页面结构、界面元素、数据语义、交互行为的最低标题校验。
+- `decision_form` 是平台渲染的特殊 UI block，不是 adapter 可绕过的 WorkflowAction。
 - `candidate_a2ui_messages` 只在 `validate` 通过后保存。
 - `validation_report` 在 validate 成功或失败时都可以保存；失败时不得保存 candidate artifact。
 - raw Agent Output 不进入 API 主流程，也不得作为 artifact content 返回。
@@ -196,7 +196,8 @@ SSE 事件类型由 `packages/shared/src/sse.ts` 维护。当前核心事件包�
 - `surface_snapshot`
 - `agent_run_completed`
 - `agent_run_failed`
-- `agent_trace_event`
+- `agent_engine_event`（planned）
+- `agent_trace_event`（ReAct 兼容期）
 - `workflow_started`
 - `workflow_step_updated`
 - `workflow_artifact_created`
@@ -210,6 +211,14 @@ SSE 事件类型由 `packages/shared/src/sse.ts` 维护。当前核心事件包�
 
 `workflow_interrupted` 在用户 `cancel` action 成功中断当前运行时发送。payload 应包含 `sessionId`、最新 workflow、被中断 step 和被取消 agentRun 摘要。前端收到后停止 generating 状态并展示可继续输入。
 
+### Agent Engine 事件（planned）
+
+`agent_engine_event` 是新的引擎无关实时事件。payload 至少包含 `sessionId`、`agentRunId`、严格递增的 `sequence`、语义 `type`、时间戳和脱敏 `summary`，可选包含脱敏的 `native` 摘要。语义类型覆盖运行进展、上下文读取、capability、原生工具、预算和错误。
+
+- 前端只依据语义事件和摘要展示运行过程，不得解析 `native` 驱动 UI 状态或 workflow action。
+- 完整 native payload 不通过 HTTP 或 SSE 返回；仅失败运行在受限诊断存储中加密保留 7 天。
+- `agent_trace_event` 是既有 ReAct 事件，在 SPI 落地后的兼容期保留。新 adapter 和新前端功能必须发送/消费 `agent_engine_event`；删除旧事件前需要单独的破坏性变更公告。
+
 SSE 重连不是业务状态事实源。客户端可带 `Last-Event-ID`，但第一版不要求后端按该 ID 回放事件。前端在重连成功后必须执行 Session Resync，全量拉取 messages、workflows、agent runs、A2UI events、snapshots 和 session detail，以修复断线期间漏掉的实时事件。
 
 ## 5. 错误码分类
@@ -217,7 +226,7 @@ SSE 重连不是业务状态事实源。客户端可带 `Last-Event-ID`，但第
 - 通用错误：参数错误、未找到、内部错误。
 - 会话错误：会话不存在、会话已归档。
 - 文件错误：文件类型不支持、文件过大、文件读取失败。
-- Agent 错误：模型调用失败、输出解析失败、A2UI 校验失败。
+- Agent 引擎错误：`invalid_output`、`budget_exhausted`、`context_insufficient`、`cancelled`、`transient_error`、`configuration_error`、`internal_error`；是否重试由 `retryable` 与 workflow task 规则共同决定。
 - Renderer 错误：action/error 回传数据非法。
 
 ## 6. 维护规则

@@ -16,6 +16,7 @@ import { config } from "./config.js";
 import { prisma } from "./db.js";
 import { logger } from "./logger.js";
 import { workflowService } from "./services/workflow.service.js";
+import { agentEnginePayloadCleanupService } from "./services/agent-engine-payload-cleanup.service.js";
 
 const app = createApp();
 let server: Server | null = null;
@@ -25,6 +26,7 @@ try {
   await prisma.$connect();
   logger.info("Prisma connected");
   await workflowService.repairOrphanRunningWork();
+  agentEnginePayloadCleanupService.start();
 
   server = app.listen(config.port, () => {
     logger.info({ port: config.port }, "Backend server started");
@@ -69,6 +71,7 @@ async function gracefulShutdown(signal: string, exitCode = 0) {
     }
 
     await prisma.$disconnect();
+    agentEnginePayloadCleanupService.stop();
     logger.info("Prisma disconnected");
     process.exit(exitCode);
   } catch (err: unknown) {

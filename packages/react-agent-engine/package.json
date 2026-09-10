@@ -1,0 +1,16 @@
+{
+  "name": "@a2ui-platform/react-agent-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/packages/react-agent-engine/src/index.js",
+  "types": "./dist/packages/react-agent-engine/src/index.d.ts",
+  "exports": { ".": { "types": "./dist/packages/react-agent-engine/src/index.d.ts", "import": "./dist/packages/react-agent-engine/src/index.js" } },
+  "scripts": { "build": "tsc -p tsconfig.json", "typecheck": "tsc -p tsconfig.json --noEmit", "test": "vitest run --passWithNoTests", "lint": "tsc -p tsconfig.json --noEmit" },
+  "dependencies": {
+    "@a2ui-platform/agent": "workspace:*",
+    "@a2ui-platform/agent-engine-spi": "workspace:*",
+    "@a2ui-platform/shared": "workspace:*"
+  },
+  "devDependencies": { "typescript": "^5.7.2", "vitest": "^2.1.8" }
+}

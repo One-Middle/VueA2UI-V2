@@ -15,8 +15,14 @@
     "baseUrl": ".",
     "paths": {
       "@a2ui-platform/shared": ["packages/shared/src/index.ts"],
-      "@a2ui-platform/renderer": ["packages/renderer/src/index.ts"],
-      "@a2ui-platform/agent": ["packages/agent/src/index.ts"]
+      "@a2ui-platform/renderer-core": ["packages/renderer-core/src/index.ts"],
+      "@a2ui-platform/renderer-dom": ["packages/renderer-dom/src/index.ts"],
+      "@a2ui-platform/renderer-vue": ["packages/renderer-vue/src/index.ts"],
+      "@a2ui-platform/renderer-react": ["packages/renderer-react/src/index.ts"],
+      "@a2ui-platform/agent": ["packages/agent/src/index.ts"],
+      "@a2ui-platform/agent-engine-spi": ["packages/agent-engine-spi/src/index.ts"],
+      "@a2ui-platform/react-agent-engine": ["packages/react-agent-engine/src/index.ts"],
+      "@a2ui-platform/codex-sdk-agent-engine": ["packages/codex-sdk-agent-engine/src/index.ts"]
     }
   }
 }

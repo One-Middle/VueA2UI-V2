@@ -449,6 +449,22 @@ describe("workspace store session restore", () => {
     });
   });
 
+  it("stores only the safe summary from agent_engine_event SSE", () => {
+    const workspace = useWorkspaceStore();
+    workspace.setActiveSessionId("session-a");
+    const handlers = vi.mocked(connectStream).mock.calls.at(-1)?.[1] as StreamHandlers;
+    handlers.agent_engine_event?.({
+      sessionId: "session-a",
+      agentRunId: "run-a",
+      sequence: 1,
+      type: "native_tool_completed",
+      occurredAt: "2026-09-08T00:00:00.000Z",
+      summary: { tool: "command_execution" },
+      nativeSummary: { status: "completed" },
+    });
+    expect(workspace.agentEngineEvents).toEqual([expect.objectContaining({ agentRunId: "run-a", nativeSummary: { status: "completed" } })]);
+  });
+
   it("submits clarification form with submit_clarification payload", async () => {
     vi.mocked(api.sendWorkflowAction).mockResolvedValue({
       workflow: makeWorkflow(),
