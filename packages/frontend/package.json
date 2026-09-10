@@ -12,7 +12,8 @@
     "lint": "vue-tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@a2ui-platform/renderer": "workspace:*",
+    "@a2ui-platform/renderer-core": "workspace:*",
+    "@a2ui-platform/renderer-dom": "workspace:*",
     "@a2ui-platform/shared": "workspace:*",
     "naive-ui": "^2.40.3",
     "pinia": "^2.2.6",

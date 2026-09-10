@@ -2,9 +2,11 @@
 import {
   MessageProcessor,
   SurfaceGroupModel,
+} from "@a2ui-platform/renderer-core";
+import {
   mountA2uiSurface,
   type DomSurfaceHandle,
-} from "@a2ui-platform/renderer";
+} from "@a2ui-platform/renderer-dom";
 import type { A2UIClientMessage, A2UIComponent, JsonValue } from "@a2ui-platform/shared";
 import { NAlert, NEmpty, NInput, NSpin, NTag } from "naive-ui";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
