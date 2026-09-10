@@ -14,7 +14,7 @@
 - 当用户在 `failed_retryable` workflow 后追加普通消息时，接收后端返回的 workflow 摘要并更新本地运行态；是否允许恢复由 Backend 决定。
 - 将普通续跑消息作为独立用户气泡展示，并把后续 workflow 生成片段锚定在该消息之后，避免生成状态出现在触发消息上方。
 - 消费 `agent_trace_event` 实时展示 ReAct 循环进度。
-- 通过 Renderer 预览已校验 candidate A2UI。
+- 通过 Renderer 预览已校验 candidate A2UI；Frontend 可以使用自身框架承载预览容器，但不接管 Renderer 内部 DOM 子树。
 - 维护 SSE 生命周期状态，消费 `connected`、`heartbeat`、workflow 和 agent run 事件。
 - SSE 重连成功后执行 Session Resync，重新拉取 messages、workflows、agent runs、A2UI events、snapshots 和 session detail，以后端事实源修复断线期间漏掉的事件。
 - 用户切换会话时只断开当前 SSE 监听并重置当前前端状态，不向后端表达取消运行。
@@ -34,7 +34,7 @@
 ## 边界
 
 - 通过 HTTP/SSE 与 `packages/backend` 交互。
-- 通过 `packages/renderer` 承载 A2UI 预览。
+- 通过 `packages/renderer` 承载 A2UI 预览；Renderer 以框架无关 DOM runtime 的边界接入 Frontend。
 - 通过 `packages/shared` 使用跨模块 DTO 和事件类型。
 - 只渲染 API 输出中的稳定 DTO 和 parsed/validated artifacts。
 - `decision_form` 是工具调用产生的特殊 UI block，不是普通 assistant message 旁边的按钮。

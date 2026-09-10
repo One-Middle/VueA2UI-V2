@@ -11,7 +11,8 @@ export default defineConfig(({ mode }) => {
     envDir,
     resolve: {
       alias: {
-        "@a2ui-platform/renderer": resolve(__dirname, "../renderer/src/index.ts"),
+        "@a2ui-platform/renderer-core": resolve(__dirname, "../renderer-core/src/index.ts"),
+        "@a2ui-platform/renderer-dom": resolve(__dirname, "../renderer-dom/src/index.ts"),
         "@a2ui-platform/shared": resolve(__dirname, "../shared/src/index.ts"),
         "@a2ui-platform/agent": resolve(__dirname, "../agent/src/index.ts"),
       },

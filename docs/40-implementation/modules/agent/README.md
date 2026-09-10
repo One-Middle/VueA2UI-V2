@@ -80,7 +80,6 @@ packages/agent/src/
     __tests__/
   schemas/
     a2ui-v0.9-schema.json
-    basic-catalog-schema.json
   skills/
     registry.ts
     platform-skills.ts
@@ -96,33 +95,35 @@ packages/agent/src/
 
 ## 5. 关键文件职责
 
-| 文件 / 目录 | 作用 |
-| --- | --- |
-| `src/index.ts` | 包公共 API 入口，导出 runtime 工厂、解析工具、校验/Catalog 工具和内置 Skill 注册表。 |
-| `src/runtime/create-agent-runtime.ts` | 对外工厂函数，组装 `ModelClient`、`PromptComposer` 和 `AgentContextBuilder`。 |
-| `src/runtime/agent-runtime.ts` | Agent 主循环：普通 `run()` 编排生成、渐进披露、校验、修复；`runWorkflowTask()` 组装 ReAct executor、hydrate Resource Ledger 并把 trace summary 映射为结果。 |
-| `src/runtime/react-agent-types.ts` | ReAct 运行时内部类型：goal / facts / capabilities / limits / draft / observation / 动作与最终产物。 |
-| `src/runtime/react-action-parser.ts` | 解析模型原始输出为单一 `AgentModelAction`（只接受严格 JSON object）。 |
-| `src/runtime/catalog-context.ts` | 维护 workflow 单次运行内已披露组件字段规范，并渲染面向生成与修复的 Catalog Context。 |
-| `src/runtime/react-prompt-composer.ts` | 合成 ReAct 的稳定 system prompt 与逐轮 user prompt（含 Working Resources 与 Catalog Context 分区）。 |
-| `src/runtime/workflow-agent-context-builder.ts` | 把 `AgentWorkflowTaskInput` 投影为 executor 输入（goal / facts / capabilities / limits）。 |
-| `src/runtime/workflow-agent-executor.ts` | ReAct while 循环执行器：模型调用 → 动作解析 → 工具执行 → 观察累积 → 草稿修复，并发出 trace 事件。 |
-| `src/runtime/tool-registry.ts` | 受控工具注册表（6 个工具），执行参数校验与失败策略，并提供最终产物结构校验辅助。 |
-| `src/runtime/resource-ledger.ts` | 运行时 Resource Ledger：hydrate / dehydrate / record / has，承载已披露 Skill / Reference 正文并做去重。 |
-| `src/runtime/workflow-task-parser.ts` | 旧 workflow 输出的解析器，当前 ReAct 路径已不调用，保留为历史兼容（见 §10 已知差异）。 |
-| `src/runtime/output-parser.ts` | 解析模型最终 JSON envelope。 |
-| `src/runtime/component-info-request-parser.ts` | 解析模型请求 Basic Catalog 组件详情的结构化输出。 |
-| `src/runtime/skill-info-request-parser.ts` | 解析模型请求完整 Skill 内容的结构化输出。 |
-| `src/runtime/skill-reference-request-parser.ts` | 解析模型请求 Skill Reference 正文的结构化输出。 |
-| `src/context/context-builder.ts` | 汇总用户输入、历史消息、上传文件、已启用 Skill、当前 snapshot 和 Catalog 摘要。 |
-| `src/prompts/prompt-composer.ts` | 生成初始、修复和披露后的 prompt。 |
-| `src/model/model-client.ts` | 封装 OpenAI-compatible API 调用、超时和错误处理。 |
-| `src/model/model-io-logger.ts` | 根据 `MODEL_IO_LOG` 输出模型输入输出摘要、debug 预览和本地 JSONL trace。 |
-| `src/tools/validate-a2ui.ts` | A2UI schema、Catalog、引用和安全约束校验入口。 |
-| `src/tools/catalog-schema.ts` | Basic Catalog 定义、摘要和详情格式化工具。 |
-| `src/skills/registry.ts` | 内置 Skill 元数据源。 |
-| `src/skills/platform-skills.ts` | 平台默认启用 Skill 解析入口。 |
-| `src/skills/a2ui-v0.9-generation.ts` | 运行时强依赖的 A2UI 生成 Skill 定义。 |
+| 文件 / 目录                                     | 作用                                                                                                                                                        |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/index.ts`                                  | 包公共 API 入口，导出 runtime 工厂、解析工具、校验/Catalog 工具和内置 Skill 注册表。                                                                        |
+| `src/runtime/create-agent-runtime.ts`           | 对外工厂函数，组装 `ModelClient`、`PromptComposer` 和 `AgentContextBuilder`。                                                                               |
+| `src/runtime/agent-runtime.ts`                  | Agent 主循环：普通 `run()` 编排生成、渐进披露、校验、修复；`runWorkflowTask()` 组装 ReAct executor、hydrate Resource Ledger 并把 trace summary 映射为结果。 |
+| `src/runtime/react-agent-types.ts`              | ReAct 运行时内部类型：goal / facts / capabilities / limits / draft / observation / 动作与最终产物。                                                         |
+| `src/runtime/react-action-parser.ts`            | 解析模型原始输出为单一 `AgentModelAction`（只接受严格 JSON object）。                                                                                       |
+| `src/runtime/catalog-context.ts`                | 维护 workflow 单次运行内已披露组件字段规范，并渲染面向生成与修复的 Catalog Context。                                                                        |
+| `src/runtime/react-prompt-composer.ts`          | 合成 ReAct 的稳定 system prompt 与逐轮 user prompt（含 Working Resources 与 Catalog Context 分区）。                                                        |
+| `src/runtime/workflow-agent-context-builder.ts` | 把 `AgentWorkflowTaskInput` 投影为 executor 输入（goal / facts / capabilities / limits）。                                                                  |
+| `src/runtime/workflow-agent-executor.ts`        | ReAct while 循环执行器：模型调用 → 动作解析 → 工具执行 → 观察累积 → 草稿修复，并发出 trace 事件。                                                           |
+| `src/runtime/tool-registry.ts`                  | 受控工具注册表（6 个工具），执行参数校验与失败策略，并提供最终产物结构校验辅助。                                                                            |
+| `src/tools/catalog-schema.ts`                   | 从 `@a2ui-platform/shared` 的 Basic Catalog Definition 读取组件摘要和字段详情，供渐进披露使用。                                                             |
+| `src/tools/validate-a2ui.ts`                    | 校验 A2UI 消息结构、组件引用、安全字段和 Catalog 字段；组件属性 JSON Schema 由 shared Basic Catalog Definition 派生。                                       |
+| `src/runtime/resource-ledger.ts`                | 运行时 Resource Ledger：hydrate / dehydrate / record / has，承载已披露 Skill / Reference 正文并做去重。                                                     |
+| `src/runtime/workflow-task-parser.ts`           | 旧 workflow 输出的解析器，当前 ReAct 路径已不调用，保留为历史兼容（见 §10 已知差异）。                                                                      |
+| `src/runtime/output-parser.ts`                  | 解析模型最终 JSON envelope。                                                                                                                                |
+| `src/runtime/component-info-request-parser.ts`  | 解析模型请求 Basic Catalog 组件详情的结构化输出。                                                                                                           |
+| `src/runtime/skill-info-request-parser.ts`      | 解析模型请求完整 Skill 内容的结构化输出。                                                                                                                   |
+| `src/runtime/skill-reference-request-parser.ts` | 解析模型请求 Skill Reference 正文的结构化输出。                                                                                                             |
+| `src/context/context-builder.ts`                | 汇总用户输入、历史消息、上传文件、已启用 Skill、当前 snapshot 和 Catalog 摘要。                                                                             |
+| `src/prompts/prompt-composer.ts`                | 生成初始、修复和披露后的 prompt。                                                                                                                           |
+| `src/model/model-client.ts`                     | 封装 OpenAI-compatible API 调用、超时和错误处理。                                                                                                           |
+| `src/model/model-io-logger.ts`                  | 根据 `MODEL_IO_LOG` 输出模型输入输出摘要、debug 预览和本地 JSONL trace。                                                                                    |
+| `src/tools/validate-a2ui.ts`                    | A2UI schema、Catalog、引用和安全约束校验入口。                                                                                                              |
+| `src/tools/catalog-schema.ts`                   | Basic Catalog 定义、摘要和详情格式化工具。                                                                                                                  |
+| `src/skills/registry.ts`                        | 内置 Skill 元数据源。                                                                                                                                       |
+| `src/skills/platform-skills.ts`                 | 平台默认启用 Skill 解析入口。                                                                                                                               |
+| `src/skills/a2ui-v0.9-generation.ts`            | 运行时强依赖的 A2UI 生成 Skill 定义。                                                                                                                       |
 
 ## 6. 公共 API
 
@@ -226,7 +227,7 @@ A2UI v0.9 生成规则中的 `path` 需要区分两层语义：
 ```
 
 ```js
-dataModel.get("done")
+dataModel.get("done");
 ```
 
 ```json
@@ -286,5 +287,3 @@ Agent 生成约束：
 - [Shared 类型契约](../../../30-contracts/shared-types.md)
 - [Backend 模块说明](../backend/README.md)
 - [Integration 模块说明](../integration/README.md)
-
-

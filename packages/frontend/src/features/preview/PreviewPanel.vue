@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import { A2uiSurface, MessageProcessor, SurfaceGroupModel, registerBasicCatalog } from "@a2ui-platform/renderer";
+import {
+  MessageProcessor,
+  SurfaceGroupModel,
+} from "@a2ui-platform/renderer-core";
+import {
+  mountA2uiSurface,
+  type DomSurfaceHandle,
+} from "@a2ui-platform/renderer-dom";
 import type { A2UIClientMessage, A2UIComponent, JsonValue } from "@a2ui-platform/shared";
 import { NAlert, NEmpty, NInput, NSpin, NTag } from "naive-ui";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
@@ -12,11 +19,10 @@ defineProps<{ compact?: boolean }>();
 const workspace = useWorkspaceStore();
 const renderer = useRendererStore();
 
-registerBasicCatalog();
-
 const surfaceGroup = new SurfaceGroupModel();
 const messageProcessor = new MessageProcessor(surfaceGroup);
 const surfaceIds = ref<string[]>([]);
+const rendererHost = ref<HTMLElement | null>(null);
 const componentJson = ref("");
 const dataModelJson = ref("");
 let consumedMessageCount = 0;
@@ -26,10 +32,13 @@ const isSyncingEditors = ref(false);
 const inspectorExpanded = ref(false);
 const applyTimers: Partial<Record<"components" | "dataModel", ReturnType<typeof setTimeout>>> = {};
 let unsubscribeDataModel: (() => void) | undefined;
+const surfaceHandles = new Map<string, { container: HTMLElement; handle: DomSurfaceHandle }>();
+let disposed = false;
 
 const hasContent = computed(() => surfaceIds.value.length > 0);
 const activeSurfaceId = computed(() => surfaceIds.value[0]);
-const activeSurface = computed(() => activeSurfaceId.value ? surfaceGroup.get(activeSurfaceId.value) : undefined);
+// Depend on the refreshed id list: a replacement can reuse the same first id.
+const activeSurface = computed(() => surfaceIds.value[0] ? surfaceGroup.get(surfaceIds.value[0]) : undefined);
 
 const statusTag = computed(() => {
   if (workspace.isGenerating) return { label: "AI 正在生成...", type: "info" as const };
@@ -47,6 +56,7 @@ const processRendererMessages = () => {
       messageProcessor.processMessages(pendingMessages);
     }
   } else {
+    unmountSurfaces();
     unsubscribeDataModel?.();
     unsubscribeDataModel = undefined;
     surfaceGroup.destroy();
@@ -61,6 +71,9 @@ const processRendererMessages = () => {
   unsubscribeDataModel?.();
   unsubscribeDataModel = activeSurface.value?.dataModel.subscribe("/", syncEditorsFromSurface);
   syncEditorsFromSurface();
+  void nextTick(() => {
+    syncSurfaceHosts();
+  });
 };
 
 watch(() => renderer.revision, processRendererMessages, { immediate: true });
@@ -69,6 +82,7 @@ watch(activeSurfaceId, () => {
   unsubscribeDataModel = activeSurface.value?.dataModel.subscribe("/", syncEditorsFromSurface);
   syncEditorsFromSurface();
 });
+watch(rendererHost, syncSurfaceHosts, { flush: "post" });
 watch(componentJson, () => scheduleApplyEditors("components"));
 watch(dataModelJson, () => scheduleApplyEditors("dataModel"));
 
@@ -79,14 +93,52 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  disposed = true;
   window.removeEventListener("a2ui:action", handleRendererAction);
   window.removeEventListener("a2ui:error", handleRendererError);
   unsubscribeDataModel?.();
+  unmountSurfaces();
   Object.values(applyTimers).forEach((timer) => {
     if (timer) clearTimeout(timer);
   });
   surfaceGroup.destroy();
 });
+
+function syncSurfaceHosts(): void {
+  if (disposed) return;
+  const host = rendererHost.value;
+  if (!host) {
+    unmountSurfaces();
+    return;
+  }
+  for (const [sid, entry] of surfaceHandles) {
+    if (!surfaceIds.value.includes(sid) || entry.container.parentElement !== host) {
+      entry.handle.unmount();
+      entry.container.remove();
+      surfaceHandles.delete(sid);
+    }
+  }
+  for (const sid of surfaceIds.value) {
+    if (surfaceHandles.has(sid)) continue;
+    const surfaceContainer = document.createElement("div");
+    host.appendChild(surfaceContainer);
+    surfaceHandles.set(sid, {
+      container: surfaceContainer,
+      handle: mountA2uiSurface(surfaceContainer, {
+        surfaceGroup,
+        surfaceId: sid,
+      }),
+    });
+  }
+}
+
+function unmountSurfaces(): void {
+  for (const entry of surfaceHandles.values()) {
+    entry.handle.unmount();
+    entry.container.remove();
+  }
+  surfaceHandles.clear();
+}
 
 function syncEditorsFromSurface(): void {
   const surface = activeSurface.value;
@@ -242,33 +294,30 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
             <div class="device-toolbar">
               <span>iPhone 14</span>
               <span>390 x 844</span>
-              <span>100%</span>
+              <span>70%</span>
             </div>
 
-            <div class="phone-frame">
-              <div class="phone-status">
-                <span>9:41</span>
-                <span class="dynamic-island"></span>
-                <span>5G</span>
-              </div>
-              <div class="phone-nav">
-                <span class="phone-nav-icon">&lt;</span>
-                <strong>实时预览</strong>
-                <span class="phone-nav-icon">...</span>
-              </div>
-              <div class="phone-content">
-                <A2uiSurface
-                  v-for="sid in surfaceIds"
-                  :key="sid"
-                  :surface-id="sid"
-                  :surface-group="surfaceGroup"
-                />
-              </div>
-              <div class="phone-tabs">
-                <span class="phone-tab phone-tab--active">Home</span>
-                <span class="phone-tab">Explore</span>
-                <span class="phone-tab">Library</span>
-                <span class="phone-tab">Profile</span>
+            <div class="phone-shell">
+              <div class="phone-frame">
+                <div class="phone-status">
+                  <span>9:41</span>
+                  <span class="dynamic-island"></span>
+                  <span>5G</span>
+                </div>
+                <div class="phone-nav">
+                  <span class="phone-nav-icon">&lt;</span>
+                  <strong>实时预览</strong>
+                  <span class="phone-nav-icon">...</span>
+                </div>
+                <div class="phone-content">
+                  <div ref="rendererHost"></div>
+                </div>
+                <div class="phone-tabs">
+                  <span class="phone-tab phone-tab--active">Home</span>
+                  <span class="phone-tab">Explore</span>
+                  <span class="phone-tab">Library</span>
+                  <span class="phone-tab">Profile</span>
+                </div>
               </div>
             </div>
           </div>
@@ -388,12 +437,16 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 }
 
 .preview-stage {
+  --preview-phone-scale: 0.7;
+  --preview-phone-width: 390px;
+  --preview-phone-height: 844px;
+
   display: flex;
   align-items: center;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
   min-height: 0;
-  padding: 20px;
+  padding: 16px;
   overflow: auto;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
@@ -425,11 +478,16 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   border-right: 0;
 }
 
+.phone-shell {
+  flex-shrink: 0;
+  width: calc(var(--preview-phone-width) * var(--preview-phone-scale));
+  height: calc(var(--preview-phone-height) * var(--preview-phone-scale));
+}
+
 .phone-frame {
   display: grid;
-  flex-shrink: 0;
-  width: 390px;
-  min-height: 844px;
+  width: var(--preview-phone-width);
+  min-height: var(--preview-phone-height);
   grid-template-rows: 42px 48px 1fr 68px;
   overflow: hidden;
   border: 8px solid #111827;
@@ -438,6 +496,8 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   box-shadow:
     0 28px 70px rgb(15 23 42 / 16%),
     0 0 0 1px rgb(15 23 42 / 8%);
+  transform: scale(var(--preview-phone-scale));
+  transform-origin: top left;
 }
 
 .phone-status,
@@ -496,18 +556,67 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 }
 
 .phone-content :deep(.a2ui-surface) {
-  padding: 16px;
+  padding: 10px;
   background: transparent;
 }
 
 .phone-content :deep(.a2ui-list) {
-  gap: 10px;
+  gap: 8px;
   padding-left: 0;
   list-style: none;
 }
 
 .phone-content :deep(.a2ui-list > li) {
   min-width: 0;
+}
+
+.phone-content :deep(.a2ui-card) {
+  gap: 8px;
+  padding: 12px;
+}
+
+.phone-content :deep(.a2ui-card--density-compact) {
+  gap: 6px;
+  padding: 10px;
+}
+
+.phone-content :deep(.a2ui-container--padding-md) {
+  padding: 10px;
+}
+
+.phone-content :deep(.a2ui-container--padding-lg) {
+  padding: 14px;
+}
+
+.phone-content :deep(.a2ui-column) {
+  gap: 6px;
+}
+
+.phone-content :deep(.a2ui-column--density-spacious),
+.phone-content :deep(.a2ui-row--density-spacious) {
+  gap: 10px;
+}
+
+.phone-content :deep(.a2ui-text--variant-title),
+.phone-content :deep(.a2ui-text--preset-title) {
+  font-size: 18px;
+}
+
+.phone-content :deep(.a2ui-text-body),
+.phone-content :deep(.a2ui-text--variant-subtitle),
+.phone-content :deep(.a2ui-text--preset-subtitle) {
+  font-size: 13px;
+  line-height: 1.42;
+}
+
+.phone-content :deep(.a2ui-button) {
+  min-height: 28px;
+  padding: 6px 13px;
+}
+
+.phone-content :deep(.a2ui-button--size-sm) {
+  min-height: 28px;
+  padding: 4px 10px;
 }
 
 .phone-tabs {
@@ -657,12 +766,16 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 
 @media (max-width: 760px) {
   .preview-stage {
-    padding: 14px;
+    --preview-phone-scale: 0.7;
+
+    padding: 12px;
   }
 
-  .phone-frame {
-    width: min(390px, calc(100vw - 52px));
-    min-height: 760px;
+  .phone-shell {
+    width: min(
+      calc(var(--preview-phone-width) * var(--preview-phone-scale)),
+      calc(100vw - 52px)
+    );
   }
 
   .device-toolbar {
