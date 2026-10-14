@@ -12,6 +12,11 @@ import { DataContext } from "../core/data-context";
 import { isDynamicRef, resolveDynamicValue } from "../core/dynamic-value";
 import type { RenderContext } from "./render-context";
 
+/**
+ * 在 RenderNode 构建过程中解析动态值。
+ *
+ * 注意：解析 `{ path }` 和属性脚本 deps 时会同时登记 DataModel 依赖。
+ */
 export function resolveRenderValue(input: {
   value: unknown;
   dataContext: DataContext;

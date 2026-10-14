@@ -5,6 +5,17 @@
  *   - resolve(expr)：如果 expr 是 { path: string }，从 dataModel 解析；否则返回原值
  *   - createChildContext(relativePath)：创建子上下文，basePath 拼接
  *   - resolvePath(path)：支持 "/" 开头绝对路径和相对路径拼接
+ *
+ * 职责：
+ * - 为动态列表、Tab 面板等嵌套作用域提供相对路径解析。
+ * - 统一 renderer-core 内部读取、写入和订阅 DataModel 的路径语义。
+ *
+ * 引用：
+ * - DataModel。
+ * 被引用：
+ * - RenderNode 构建、动态值解析和 JSRuntime 脚本执行。
+ * 注意：
+ * - 内部 basePath 不保留尾斜杠；对外读取 basePath 时根路径统一返回 "/"。
  */
 
 import type { JsonValue } from "@a2ui-platform/shared";
@@ -32,8 +43,10 @@ export class DataContext {
   private _basePath: string;
 
   /**
-   * @param dataModel 底层 DataModel 实例
-   * @param basePath  基准路径，默认为 "/"
+   * 创建数据上下文。
+   *
+   * @param dataModel - 底层 DataModel 实例。
+   * @param basePath - 当前作用域基准路径，默认为 "/"。
    */
   constructor(dataModel: DataModel, basePath?: string) {
     this.dataModel = dataModel;
@@ -74,7 +87,11 @@ export class DataContext {
     return this.dataModel.subscribe(fullPath, callback);
   }
 
-  /** 在当前上下文设置相对路径的值 */
+  /**
+   * 在当前上下文设置相对路径的值。
+   *
+   * 副作用：写入底层 DataModel，并触发对应路径订阅者。
+   */
   set(path: string, value: JsonValue): void {
     const fullPath = this.resolvePath(path);
     this.dataModel.set(fullPath, value);

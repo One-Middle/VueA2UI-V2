@@ -55,6 +55,12 @@ export function buildRenderTree(input: {
   };
 }
 
+/**
+ * 构建单个组件及其 slot 子树对应的 RenderNode。
+ *
+ * @param input - 组件 ID、数据作用域和构建上下文。
+ * @returns 构建出的 RenderNode；组件不存在时返回 null。
+ */
 export function buildRenderNode(input: {
   componentId: string;
   basePath: string;

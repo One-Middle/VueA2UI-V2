@@ -1,3 +1,16 @@
+/**
+ * DOM 整树重绘时的焦点保存与恢复工具。
+ *
+ * 职责：
+ * - 在容器重建前记录当前聚焦控件所属的组件与控件定位信息。
+ * - 在重建后尽量恢复焦点、光标选区和输入方向。
+ *
+ * 被引用：
+ * - surface-host。
+ * 注意：
+ * - 该模块依赖渲染结果上的 data-component-id 与 data-a2ui-base-path。
+ * - 恢复失败时静默放弃，避免因为不可聚焦节点影响正常渲染。
+ */
 export interface FocusSnapshot {
   componentId: string;
   basePath: string;
@@ -8,6 +21,12 @@ export interface FocusSnapshot {
   selectionDirection?: "forward" | "backward" | "none" | null;
 }
 
+/**
+ * 捕获容器内当前焦点的位置。
+ *
+ * @param container - 即将被重建的 Surface 容器。
+ * @returns 可用于恢复焦点的快照；焦点不在容器内时返回 null。
+ */
 export function captureFocus(container: HTMLElement): FocusSnapshot | null {
   const active = document.activeElement;
   if (!active || !container.contains(active)) return null;
@@ -35,6 +54,12 @@ export function captureFocus(container: HTMLElement): FocusSnapshot | null {
   return snapshot.componentId ? snapshot : null;
 }
 
+/**
+ * 根据快照恢复容器内的焦点。
+ *
+ * @param container - 已完成重建的 Surface 容器。
+ * @param snapshot - captureFocus 返回的焦点快照。
+ */
 export function restoreFocus(
   container: HTMLElement,
   snapshot: FocusSnapshot | null,
@@ -65,7 +90,7 @@ export function restoreFocus(
         snapshot.selectionDirection ?? "none",
       );
     } catch {
-      // Some input types do not support selection ranges.
+      // 部分 input 类型不支持选区 API，焦点已恢复即可。
     }
   }
 }

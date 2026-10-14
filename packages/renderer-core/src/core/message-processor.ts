@@ -9,6 +9,18 @@
  *
  * 只接受 version === "v0.9" 的消息。
  * 目标 surface 不存在时忽略该消息（记录 warning）。
+ *
+ * 职责：
+ * - 将服务端协议消息应用到 SurfaceGroupModel。
+ * - 统计本批消息成功处理数量和涉及的 Surface。
+ *
+ * 引用：
+ * - shared 中的 A2UIServerMessage。
+ * - SurfaceGroupModel。
+ * 被引用：
+ * - 外部应用接收服务端消息后的入口。
+ * 注意：
+ * - 本类不做协议 schema 校验，只按已知字段分派。
  */
 
 import type { A2UIServerMessage } from "@a2ui-platform/shared";
@@ -32,8 +44,9 @@ export class MessageProcessor {
 
   /**
    * 处理一批 A2UI 服务端消息。
-   * @param msgs 待处理的消息数组
-   * @returns 接受的记录数和涉及的 surfaceIds
+   *
+   * @param msgs - 待处理的消息数组。
+   * @returns 接受的记录数和涉及的 surfaceIds。
    */
   processMessages(msgs: A2UIServerMessage[]): ProcessMessagesResult {
     let accepted = 0;
@@ -55,11 +68,13 @@ export class MessageProcessor {
         const payload = msg.createSurface;
         const surface = this._surfaceGroup.getOrCreate(
           payload.surfaceId,
-          payload.catalogId
+          payload.catalogId,
         );
         surface.createSurface();
         surfaceIds.add(payload.surfaceId);
-        logger.info(`创建 Surface → surfaceId=${payload.surfaceId}, catalogId=${payload.catalogId}`);
+        logger.info(
+          `创建 Surface → surfaceId=${payload.surfaceId}, catalogId=${payload.catalogId}`,
+        );
         handled = true;
       }
 
@@ -70,7 +85,9 @@ export class MessageProcessor {
         if (surface) {
           surface.updateComponents(components);
           surfaceIds.add(surfaceId);
-          logger.debug(`更新组件 → surfaceId=${surfaceId}, ${components.length}个`);
+          logger.debug(
+            `更新组件 → surfaceId=${surfaceId}, ${components.length}个`,
+          );
           handled = true;
         } else {
           logger.warn(`updateComponents 目标 surface 不存在: "${surfaceId}"`);

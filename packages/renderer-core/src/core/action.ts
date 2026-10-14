@@ -10,7 +10,11 @@
  * 不负责：调用后端 API、直接执行脚本或决定业务处理策略。
  */
 
-import type { A2UIClientMessage, JsonObject, JsonValue } from "@a2ui-platform/shared";
+import type {
+  A2UIClientMessage,
+  JsonObject,
+  JsonValue,
+} from "@a2ui-platform/shared";
 import type { ActionScriptDeclaration } from "./js-runtime";
 
 /** Renderer 当前可派发的 event action。 */
@@ -43,9 +47,7 @@ export interface RendererScriptAction {
 
 /** Renderer 支持识别的 action 声明。 */
 export type RendererComponentAction =
-  | RendererEventAction
-  | RendererScriptAction
-  | RendererFunctionCallAction;
+  RendererEventAction | RendererScriptAction | RendererFunctionCallAction;
 
 /** 动态值解析函数。 */
 export type ActionValueResolver = (value: unknown) => unknown;
@@ -67,7 +69,7 @@ export interface CreateActionMessageInput {
 /** 解析组件 action 声明。 */
 export function resolveComponentAction(
   rawAction: unknown,
-  resolveValue: ActionValueResolver
+  resolveValue: ActionValueResolver,
 ): RendererComponentAction | null {
   const action = isPlainObject(rawAction) ? rawAction : resolveValue(rawAction);
   if (!isPlainObject(action)) {
@@ -77,7 +79,9 @@ export function resolveComponentAction(
   const event = isPlainObject(action.event) ? action.event : null;
   if (event) {
     const name = typeof event.name === "string" ? event.name.trim() : "";
-    return name ? { kind: "event", name, context: toRecord(event.context) } : null;
+    return name
+      ? { kind: "event", name, context: toRecord(event.context) }
+      : null;
   }
 
   const script = isPlainObject(action.script) ? action.script : null;
@@ -89,7 +93,9 @@ export function resolveComponentAction(
           script: {
             code,
             deps: Array.isArray(script.deps)
-              ? script.deps.filter((dep): dep is string => typeof dep === "string")
+              ? script.deps.filter(
+                  (dep): dep is string => typeof dep === "string",
+                )
               : undefined,
             context: toRecord(script.context),
           },
@@ -97,9 +103,12 @@ export function resolveComponentAction(
       : null;
   }
 
-  const functionCall = isPlainObject(action.functionCall) ? action.functionCall : null;
+  const functionCall = isPlainObject(action.functionCall)
+    ? action.functionCall
+    : null;
   if (functionCall) {
-    const call = typeof functionCall.call === "string" ? functionCall.call.trim() : "";
+    const call =
+      typeof functionCall.call === "string" ? functionCall.call.trim() : "";
     return call
       ? { kind: "functionCall", call, args: toRecord(functionCall.args) }
       : null;
@@ -111,7 +120,7 @@ export function resolveComponentAction(
 /** 解析 action context 中的动态绑定。 */
 export function resolveActionContext(
   context: Record<string, unknown>,
-  resolveValue: ActionValueResolver
+  resolveValue: ActionValueResolver,
 ): JsonObject {
   const resolvedContext: JsonObject = {};
   for (const [key, value] of Object.entries(context)) {
@@ -123,8 +132,15 @@ export function resolveActionContext(
   return resolvedContext;
 }
 
-/** 创建标准 A2UI action 回传消息。 */
-export function createActionMessage(input: CreateActionMessageInput): A2UIClientMessage {
+/**
+ * 创建标准 A2UI action 回传消息。
+ *
+ * @param input - 动作名称、来源组件和已解析上下文。
+ * @returns 符合 v0.9 client-to-server 协议的 action 消息。
+ */
+export function createActionMessage(
+  input: CreateActionMessageInput,
+): A2UIClientMessage {
   return {
     version: "v0.9",
     action: {

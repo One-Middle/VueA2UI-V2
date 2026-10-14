@@ -16,6 +16,11 @@ import type { RenderEventIntent } from "./render-node";
 import type { RenderContext } from "./render-context";
 import { resolveRenderValue } from "./resolve-dynamic";
 
+/**
+ * 解析 model 字段，并在动态路径绑定时生成写回事件意图。
+ *
+ * 副作用：写入 input.props 与 input.events。
+ */
 export function resolveModelBindings(input: {
   componentModel: ComponentModel;
   componentDef: BasicCatalogComponentDefinition;

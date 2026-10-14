@@ -2,6 +2,17 @@
  * ComponentModel 类：单个 A2UI 组件模型。
  *
  * 提供对组件原始属性的访问，以及 children 中静态/动态子引用的解析。
+ *
+ * 职责：
+ * - 保存组件类型和除 id/component 外的原始协议属性。
+ * - 提供子组件引用解析能力，供旧链路和测试使用。
+ *
+ * 引用：
+ * - shared 中的 A2UIComponent。
+ * 被引用：
+ * - SurfaceModel 与 RenderNode 构建链路。
+ * 注意：
+ * - 本类不解析动态值，也不关心 Catalog 字段角色。
  */
 
 import type { A2UIComponent, JsonValue } from "@a2ui-platform/shared";
@@ -32,7 +43,12 @@ export class ComponentModel {
 
   // ─── 公开方法 ─────────────────────────────────────────────
 
-  /** 获取指定属性的值。 */
+  /**
+   * 获取指定属性的原始协议值。
+   *
+   * @param key - 属性名。
+   * @returns 属性值；不存在时返回 undefined。
+   */
   getProperty(key: string): JsonValue | undefined {
     return this._raw[key] as JsonValue | undefined;
   }
@@ -59,7 +75,9 @@ export class ComponentModel {
     return ids;
   }
 
-  /** 返回所有静态子组件 id（字符串类型的 child）。 */
+  /**
+   * 返回所有静态子组件 id（字符串类型的 child）。
+   */
   getStaticChildren(): string[] {
     const children = this._raw.children;
     if (!Array.isArray(children)) return [];
@@ -67,13 +85,22 @@ export class ComponentModel {
     return children.filter((c): c is string => typeof c === "string");
   }
 
-  /** 返回动态子组件配置（{ path, componentId }），没有则返回 undefined。 */
+  /**
+   * 返回动态子组件配置（{ path, componentId }）。
+   *
+   * @returns 首个动态子组件配置；没有则返回 undefined。
+   */
   getDynamicChild(): { path: string; componentId: string } | undefined {
     const children = this._raw.children;
     if (!Array.isArray(children)) return undefined;
 
     for (const child of children) {
-      if (child && typeof child === "object" && "path" in child && "componentId" in child) {
+      if (
+        child &&
+        typeof child === "object" &&
+        "path" in child &&
+        "componentId" in child
+      ) {
         const obj = child as Record<string, string>;
         const p = obj.path;
         const cid = obj.componentId;
@@ -87,7 +114,11 @@ export class ComponentModel {
 
   /**
    * 用新的原始数据更新组件属性。
+   *
    * 如果组件类型（component）发生了变化，返回 false；否则返回 true。
+   *
+   * @param raw - 新的组件协议数据。
+   * @returns 是否成功就地更新。
    */
   update(raw: A2UIComponent): boolean {
     // 类型检查：只允许同类型更新

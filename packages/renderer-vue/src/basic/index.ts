@@ -6,6 +6,13 @@
  * - 提供 RenderNode type 到 Vue component 的映射
  *
  * 不负责：注册 legacy A2UI Basic 组件或解析 ComponentModel。
+ *
+ * 引用：
+ * - 各 basic/*.vue 组件。
+ * 被引用：
+ * - render-vue。
+ * 注意：
+ * - Map key 必须与 renderer-core 输出的 RenderNode.type 保持一致。
  */
 
 import type { Component } from "vue";
@@ -30,6 +37,9 @@ import ChoicePicker from "./ChoicePicker.vue";
 import Slider from "./Slider.vue";
 import DateTimeInput from "./DateTimeInput.vue";
 
+/**
+ * RenderNode.type 到 Vue Basic 组件的注册表。
+ */
 export const basicUiComponents = new Map<string, Component>([
   ["Text", Text],
   ["Image", Image],

@@ -24,6 +24,12 @@ export type BuildChildRenderNode = (
   basePath: string,
 ) => RenderNode | null;
 
+/**
+ * 根据 Catalog slot rule 解析组件内容区域。
+ *
+ * @param input - 组件模型、Catalog 定义、数据上下文与子节点构建函数。
+ * @returns slot 名到 RenderNode 数组或面板数组的映射。
+ */
 export function resolveSlots(input: {
   componentModel: ComponentModel;
   componentDef: BasicCatalogComponentDefinition;
@@ -86,6 +92,9 @@ export function resolveSlots(input: {
   return slots;
 }
 
+/**
+ * 兼容旧 Tabs 协议的 slot 数据解析入口。
+ */
 export function resolveTabSlotData(input: {
   componentModel: ComponentModel;
   dataContext: DataContext;

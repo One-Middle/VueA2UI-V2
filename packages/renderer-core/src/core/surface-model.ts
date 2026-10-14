@@ -3,18 +3,27 @@
  *
  * 管理 surface 上的所有组件（ComponentModel）和数据模型（DataModel）。
  * SurfaceGroupModel 管理所有 surface 实例。
+ *
+ * 职责：
+ * - 维护一个 Surface 内的组件集合和 DataModel。
+ * - 为 MessageProcessor 提供增量更新入口。
+ * - 向 SurfaceRuntime 暴露组件集合变更订阅。
+ *
+ * 引用：
+ * - ComponentModel、DataModel。
+ * 被引用：
+ * - MessageProcessor、SurfaceRuntime、测试。
+ * 注意：
+ * - 组件集合变更和 DataModel 路径变更分属两套订阅机制。
  */
 
-import type {
-  A2UIComponent,
-  JsonValue,
-} from "@a2ui-platform/shared";
+import type { A2UIComponent, JsonValue } from "@a2ui-platform/shared";
 import { ComponentModel } from "./component-model";
 import { DataModel } from "./data-model";
 
 type SubscriberCallback = () => void;
 
-/** SurfaceModel：单个 surface 的完整状态 */
+/** SurfaceModel：单个 surface 的完整状态。 */
 export class SurfaceModel {
   /** Surface 唯一标识 */
   readonly surfaceId: string;
@@ -43,6 +52,7 @@ export class SurfaceModel {
 
   /**
    * 初始化或更新 surface。
+   *
    * 注意：createSurface 当前只声明 surface 与 Catalog 的绑定关系。
    */
   createSurface(): void {
@@ -56,6 +66,8 @@ export class SurfaceModel {
    *   - 列表中存在的组件：新增或更新
    *   - 类型变化时重建 ComponentModel
    *   - 不在列表中的现有组件：删除
+   *
+   * @param components - 最新组件列表。
    */
   updateComponents(components: A2UIComponent[]): void {
     this._ensureNotDestroyed();
@@ -96,7 +108,12 @@ export class SurfaceModel {
 
   // ─── 数据模型 ─────────────────────────────────────────────
 
-  /** 更新 dataModel 中指定路径的值。 path 为 undefined 时用 value 替换整个 model。 */
+  /**
+   * 更新 dataModel 中指定路径的值。
+   *
+   * @param path - JSON Pointer 路径；undefined 或 "/" 表示替换整个 model。
+   * @param value - 要写入的数据。
+   */
   updateDataModel(path: string | undefined, value: JsonValue): void {
     this._ensureNotDestroyed();
     if (path === undefined || path === "/") {
@@ -106,7 +123,12 @@ export class SurfaceModel {
     }
   }
 
-  /** 订阅组件集合变更。 */
+  /**
+   * 订阅组件集合变更。
+   *
+   * @param callback - 组件增删或更新后调用。
+   * @returns 取消订阅函数。
+   */
   subscribe(callback: SubscriberCallback): () => void {
     this._ensureNotDestroyed();
     this._subscribers.add(callback);
@@ -117,7 +139,9 @@ export class SurfaceModel {
 
   // ─── 清理 ─────────────────────────────────────────────────
 
-  /** 清理所有组件订阅和 dataModel */
+  /**
+   * 清理所有组件订阅和 dataModel。
+   */
   destroy(): void {
     if (this._destroyed) return;
     for (const [id, unsubscribe] of this._componentSubscriptions) {
@@ -161,7 +185,9 @@ export class SurfaceModel {
 
 // ─────────────────────────────────────────────────────────────
 
-/** SurfaceGroupModel：管理所有 surface 的集合 */
+/**
+ * 管理多个 SurfaceModel 的集合。
+ */
 export class SurfaceGroupModel {
   /** surfaceId → SurfaceModel 映射 */
   private _surfaces = new Map<string, SurfaceModel>();
@@ -172,7 +198,11 @@ export class SurfaceGroupModel {
 
   /**
    * 获取或创建指定 surfaceId 的 SurfaceModel。
+   *
    * 已存在时直接返回；不存在时新建。
+   *
+   * @param surfaceId - Surface 标识。
+   * @param catalogId - 该 Surface 使用的 Catalog 标识。
    */
   getOrCreate(surfaceId: string, catalogId: string): SurfaceModel {
     const existing = this._surfaces.get(surfaceId);
@@ -185,17 +215,25 @@ export class SurfaceGroupModel {
     return surface;
   }
 
-  /** 获取指定 surface，不存在返回 undefined。 */
+  /**
+   * 获取指定 surface。
+   *
+   * @returns 不存在时返回 undefined。
+   */
   get(surfaceId: string): SurfaceModel | undefined {
     return this._surfaces.get(surfaceId);
   }
 
-  /** 获取所有 surface 的 surfaceId 列表。 */
+  /**
+   * 获取所有 surface 的 surfaceId 列表。
+   */
   getSurfaceIds(): string[] {
     return Array.from(this._surfaces.keys());
   }
 
-  /** 删除指定 surface，调用其 destroy()。 */
+  /**
+   * 删除指定 surface，并调用其 destroy。
+   */
   delete(surfaceId: string): void {
     const surface = this._surfaces.get(surfaceId);
     if (surface) {
@@ -205,7 +243,9 @@ export class SurfaceGroupModel {
     }
   }
 
-  /** 订阅 surface 集合变更。 */
+  /**
+   * 订阅 surface 集合变更。
+   */
   subscribe(callback: SubscriberCallback): () => void {
     this._subscribers.add(callback);
     return () => {
@@ -213,7 +253,9 @@ export class SurfaceGroupModel {
     };
   }
 
-  /** 清理所有 surface。 */
+  /**
+   * 清理所有 surface。
+   */
   destroy(): void {
     for (const surface of this._surfaces.values()) {
       surface.destroy();

@@ -44,7 +44,12 @@ export function isDynamicRef(value: unknown): value is { path: string } {
   );
 }
 
-/** 解析单个动态值。 */
+/**
+ * 解析单个动态值。
+ *
+ * @param input - 原始值、数据上下文和错误/依赖回调。
+ * @returns 解析后的普通值；属性脚本失败时返回声明中的 fallback。
+ */
 export function resolveDynamicValue(input: ResolveDynamicValueInput): unknown {
   if (isDynamicRef(input.value)) {
     return input.dataContext.resolve(input.value);
@@ -67,7 +72,11 @@ export function resolveDynamicValue(input: ResolveDynamicValueInput): unknown {
   return input.value;
 }
 
-/** 解析受控对象的直接子字段，供 style 白名单等场景使用。 */
+/**
+ * 解析受控对象的直接子字段，供 style 白名单等场景使用。
+ *
+ * 注意：只解析对象第一层字段，不递归进入任意深层对象。
+ */
 export function resolveObjectFields(
   value: Record<string, unknown>,
   input: Omit<ResolveDynamicValueInput, "value">,
@@ -82,16 +91,26 @@ export function resolveObjectFields(
   return resolved;
 }
 
-/** 解析脚本声明中的 deps，并转换为当前 DataContext 下的绝对路径。 */
-export function resolveScriptDeps(deps: string[], dataContext: DataContext): string[] {
-  return deps.map((dep) => dataContext.resolvePath(validateScriptDataPath(dep)));
+/**
+ * 解析脚本声明中的 deps，并转换为当前 DataContext 下的绝对路径。
+ */
+export function resolveScriptDeps(
+  deps: string[],
+  dataContext: DataContext,
+): string[] {
+  return deps.map((dep) =>
+    dataContext.resolvePath(validateScriptDataPath(dep)),
+  );
 }
 
 function toErrorPayload(
   error: unknown,
   script: PropertyScriptDeclaration,
 ): { code: string; message: string; path?: string } {
-  const code = error instanceof Error && "code" in error ? String((error as { code: unknown }).code) : "SCRIPT_EXECUTION_ERROR";
+  const code =
+    error instanceof Error && "code" in error
+      ? String((error as { code: unknown }).code)
+      : "SCRIPT_EXECUTION_ERROR";
   const message = error instanceof Error ? error.message : "属性脚本执行失败。";
   return {
     code,
