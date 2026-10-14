@@ -1,9 +1,32 @@
+/**
+ * dom-basic 组件共享的 DOM 构建工具。
+ *
+ * 职责：
+ * - 统一 props 类型收窄、className 拼接与 style 写入。
+ * - 提供字段外壳、选项归一化和子节点 cleanup 聚合能力。
+ *
+ * 引用：
+ * - dom-basic 类型契约。
+ * 被引用：
+ * - dom-basic 组件实现。
+ * 注意：
+ * - helper 只处理通用 DOM 拼装，不承载具体组件语义。
+ */
 import type { DomCleanup, DomRenderResult, DomStyleProperties } from "./types";
 
+/**
+ * 把未知值转换为适合写入 textContent 的字符串。
+ *
+ * @param value - 任意协议值。
+ * @returns undefined 与 null 会被转换为空字符串。
+ */
 export function textValue(value: unknown): string {
   return value === undefined || value === null ? "" : String(value);
 }
 
+/**
+ * 安全读取字符串属性。
+ */
 export function stringProp(
   props: Record<string, unknown>,
   key: string,
@@ -12,6 +35,9 @@ export function stringProp(
   return typeof value === "string" ? value : undefined;
 }
 
+/**
+ * 安全读取布尔属性，只把显式 true 视为真。
+ */
 export function booleanProp(
   props: Record<string, unknown>,
   key: string,
@@ -19,6 +45,9 @@ export function booleanProp(
   return props[key] === true;
 }
 
+/**
+ * 安全读取有限数字属性。
+ */
 export function numberProp(
   props: Record<string, unknown>,
   key: string,
@@ -29,6 +58,13 @@ export function numberProp(
     : undefined;
 }
 
+/**
+ * 创建 HTMLElement，并应用 className、style、文本与属性。
+ *
+ * @param tagName - 要创建的 HTML 标签名。
+ * @param options - 可选的 DOM 初始化配置。
+ * @returns 已初始化的 HTMLElement。
+ */
 export function createElement<K extends keyof HTMLElementTagNameMap>(
   tagName: K,
   options?: {
@@ -57,10 +93,16 @@ export function createElement<K extends keyof HTMLElementTagNameMap>(
   return element;
 }
 
+/**
+ * 拼接可选 className 片段。
+ */
 export function classes(items: Array<string | false | undefined>): string {
   return items.filter(Boolean).join(" ");
 }
 
+/**
+ * 根据通用视觉属性生成 BEM 风格 className。
+ */
 export function visualClasses(
   block: string,
   props: Record<string, unknown>,
@@ -71,6 +113,9 @@ export function visualClasses(
     .join(" ");
 }
 
+/**
+ * 根据字段类组件的通用属性生成 className。
+ */
 export function fieldClasses(
   block: string,
   props: Record<string, unknown>,
@@ -88,6 +133,13 @@ export function fieldClasses(
   ]);
 }
 
+/**
+ * 把多个子渲染结果挂到父节点上，并合并它们的 cleanup。
+ *
+ * @param parent - 要追加子节点的父节点。
+ * @param results - 子组件渲染结果。
+ * @returns 聚合后的清理函数；没有副作用时返回 undefined。
+ */
 export function appendResults(
   parent: Node,
   results: DomRenderResult[],
@@ -104,6 +156,11 @@ export function appendResults(
     : undefined;
 }
 
+/**
+ * 把协议 style 对象写入 HTMLElement.style。
+ *
+ * 注意：驼峰属性名会转换为 kebab-case，再通过 setProperty 写入。
+ */
 export function applyStyle(element: HTMLElement, style: unknown): void {
   if (!style || typeof style !== "object" || Array.isArray(style)) return;
   for (const [key, value] of Object.entries(style as DomStyleProperties)) {
@@ -112,6 +169,11 @@ export function applyStyle(element: HTMLElement, style: unknown): void {
   }
 }
 
+/**
+ * 批量设置 HTML 属性。
+ *
+ * 注意：布尔 true 写成空属性，false 与 undefined 不写入。
+ */
 export function setAttrs(
   element: HTMLElement,
   attrs: Record<string, string | number | boolean | undefined>,
@@ -126,6 +188,14 @@ export function setAttrs(
   }
 }
 
+/**
+ * 创建字段类组件共享的标签、描述与根节点外壳。
+ *
+ * @param tagName - 根节点标签，label 表示点击标签可聚焦控件。
+ * @param props - 组件属性。
+ * @param className - 根节点 className。
+ * @returns 已包含 label/description 的根节点。
+ */
 export function fieldChrome(
   tagName: "label" | "div",
   props: Record<string, unknown>,
@@ -163,6 +233,9 @@ export function fieldChrome(
   return root;
 }
 
+/**
+ * 根据字段校验状态追加错误或帮助文案。
+ */
 export function appendFieldMessage(
   root: HTMLElement,
   props: Record<string, unknown>,
@@ -180,6 +253,12 @@ export function appendFieldMessage(
   }
 }
 
+/**
+ * 将协议中的 options 归一化为原生控件可使用的选项数组。
+ *
+ * @param value - 字符串数组或对象数组。
+ * @returns 标准化后的 label/value/disabled 结构。
+ */
 export function toOptions(value: unknown): Array<{
   label: string;
   value: string | number | boolean;

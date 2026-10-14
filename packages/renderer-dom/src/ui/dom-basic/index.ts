@@ -1,3 +1,19 @@
+/**
+ * A2UI 基础组件到原生 DOM 的适配器集合。
+ *
+ * 职责：
+ * - 为 Text、Button、TextField、Tabs 等基础组件创建原生 DOM 结构。
+ * - 将用户输入、点击等 DOM 事件转换为 renderer-core 能理解的组件事件。
+ * - 汇总子组件 cleanup，保证整树重绘后旧事件监听能被释放。
+ *
+ * 引用：
+ * - renderer-core 的 RenderNode。
+ * - dom-basic helpers 与类型契约。
+ * 被引用：
+ * - dom-renderer。
+ * 注意：
+ * - 这里不做组件协议解析，只消费 renderer-core 已经解析好的 props 与 slots。
+ */
 import type { RenderNode } from "@a2ui-platform/renderer-core";
 import {
   appendFieldMessage,
@@ -263,7 +279,7 @@ const TextField: DomBasicComponent = ({ props, emit }) => {
   if (isTextarea && rows) (input as HTMLTextAreaElement).rows = rows;
   const name = stringProp(props, "name");
   if (name) input.setAttribute("name", name);
-  // Do not rebuild the focused input during an IME composition session.
+  // 输入法组合期间先暂存输入，避免拼音等 IME（Input Method Editor，输入法编辑器）过程被重绘打断。
   let composing = false;
   const onInput = () => {
     if (!composing) emit("update:modelValue", input.value);
@@ -945,6 +961,11 @@ const Grid: DomBasicComponent = (input) => {
   return { node: root, cleanup: appendResults(root, renderSlot(input)) };
 };
 
+/**
+ * 内置基础组件注册表。
+ *
+ * 注意：key 必须与 renderer-core 输出的 RenderNode.type 保持一致。
+ */
 export const basicDomComponents = new Map<string, DomBasicComponent>([
   ["Text", Text],
   ["Image", Image],

@@ -17,6 +17,12 @@ import { resolveControlledStyle } from "./resolve-style";
 
 const PROP_ROLES = new Set(["prop", "display", "visual", "state"]);
 
+/**
+ * 解析组件的普通 props。
+ *
+ * @param input - 组件模型、Catalog 定义和当前渲染上下文。
+ * @returns 适合平台基础组件直接消费的 props 对象。
+ */
 export function resolveProps(input: {
   componentModel: ComponentModel;
   componentDef: BasicCatalogComponentDefinition;

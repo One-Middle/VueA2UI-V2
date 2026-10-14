@@ -16,6 +16,11 @@ import type { RenderContext } from "./render-context";
 import type { RenderEventIntent } from "./render-node";
 import { resolveRenderValue } from "./resolve-dynamic";
 
+/**
+ * 解析组件 action 字段，并映射为普通组件事件意图。
+ *
+ * 副作用：写入 input.events。
+ */
 export function resolveActionBindings(input: {
   componentModel: ComponentModel;
   componentDef: BasicCatalogComponentDefinition;

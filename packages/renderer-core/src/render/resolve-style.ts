@@ -48,6 +48,12 @@ const SHADOW_MAP: Record<string, string> = {
   lg: "0 20px 44px rgba(15, 23, 42, 0.16)",
 };
 
+/**
+ * 解析受控 style 字段。
+ *
+ * @param input - 原始 style 值、数据上下文和渲染上下文。
+ * @returns 经过白名单过滤和动态值解析后的 DOM style 对象。
+ */
 export function resolveControlledStyle(input: {
   value: unknown;
   dataContext: DataContext;
